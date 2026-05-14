@@ -49,6 +49,20 @@ const restored = loadSavedGame(storage);
 assert.deepEqual(restored, state, 'saved state should restore after refresh');
 storage.setItem(STORAGE_KEY, '{bad json');
 assert.deepEqual(loadSavedGame(storage), createInitialState(), 'bad save data should fall back to a new game');
+assert.equal(storage.getItem(STORAGE_KEY), null, 'bad save data should be cleared after fallback');
+storage.setItem(STORAGE_KEY, JSON.stringify({ version: 1, state: { cash: 10 } }));
+assert.deepEqual(loadSavedGame(storage), createInitialState(), 'incomplete save data should fall back to a new game');
+assert.equal(storage.getItem(STORAGE_KEY), null, 'incomplete save data should be cleared after fallback');
+const throwingStorage = {
+  getItem: () => {
+    throw new Error('storage blocked');
+  },
+  setItem: () => {
+    throw new Error('storage blocked');
+  },
+  removeItem: () => undefined
+};
+assert.deepEqual(loadSavedGame(throwingStorage), createInitialState(), 'blocked storage should fall back to a new game');
 saveGameState(state, storage);
 resetSavedGame(storage);
 assert.equal(storage.getItem(STORAGE_KEY), null, 'reset should clear browser-local save data');
