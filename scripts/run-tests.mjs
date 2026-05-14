@@ -33,6 +33,9 @@ assert.equal(upgraded.batches[0].casesExpected, 12, 'larger kettle should increa
 
 const index = await readFile(new URL('../index.html', import.meta.url), 'utf8');
 assert.match(index, /viewport-fit=cover/, 'index should include an iPhone safe-area viewport');
-assert.match(index, /dist\/main\.js/, 'index should load compiled TypeScript output');
+assert.match(index, /src="\.\/dist\/main\.js"/, 'index should load compiled TypeScript output with a relative path');
+assert.match(index, /href="\.\/src\/styles\/globals\.css"/, 'index should load global CSS with a relative path');
+assert.match(index, /href="\.\/src\/styles\/garage\.css"/, 'index should load garage CSS with a relative path');
+assert.doesNotMatch(index, /(?:href|src)="\//, 'index asset references should not use root-relative paths');
 
 console.log('All Brewery Sim prototype checks passed.');
