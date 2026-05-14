@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Brewery Simulation Game - Design Direction</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #11100d;
+      --panel: #1b1914;
+      --panel-soft: #242018;
+      --ink: #f5ead3;
+      --muted: #b9aa8e;
+      --accent: #d8a94f;
+      --accent-green: #7fb069;
+      --accent-blue: #6da7b8;
+      --line: rgba(245, 234, 211, 0.14);
+      --shadow: rgba(0, 0, 0, 0.45);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background:
+        radial-gradient(circle at top left, rgba(216, 169, 79, 0.18), transparent 32rem),
+        linear-gradient(135deg, #17140f 0%, var(--bg) 58%, #0c0c0a 100%);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.6;
+    }
+
+    main {
+      width: min(1180px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 48px 0 72px;
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 0.92fr) minmax(340px, 1.08fr);
+      gap: 28px;
+      align-items: stretch;
+      margin-bottom: 30px;
+    }
+
+    .card {
+      background: linear-gradient(180deg, rgba(36, 32, 24, 0.92), rgba(19, 17, 13, 0.94));
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      box-shadow: 0 22px 60px var(--shadow);
+      overflow: hidden;
+    }
+
+    .hero-copy {
+      padding: 34px;
+    }
+
+    .eyebrow {
+      color: var(--accent);
+      font-size: 0.78rem;
+      font-weight: 800;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+    }
+
+    h1, h2, h3 {
+      line-height: 1.12;
+      margin: 0;
+    }
+
+    h1 {
+      max-width: 12ch;
+      margin-top: 12px;
+      font-size: clamp(3rem, 8vw, 6.8rem);
+      letter-spacing: -0.07em;
+    }
+
+    h2 {
+      font-size: clamp(1.8rem, 3vw, 3rem);
+      letter-spacing: -0.04em;
+    }
+
+    h3 {
+      color: var(--accent);
+      font-size: 1rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .subtitle {
+      max-width: 42rem;
+      margin: 22px 0 0;
+      color: var(--muted);
+      font-size: 1.12rem;
+    }
+
+    .tag-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 28px;
+      padding: 0;
+      list-style: none;
+    }
+
+    .tag-list li {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 7px 12px;
+      background: rgba(255, 255, 255, 0.035);
+      color: #f8e8bd;
+      font-size: 0.88rem;
+      font-weight: 700;
+    }
+
+    .reference {
+      position: relative;
+      min-height: 470px;
+    }
+
+    .reference svg {
+      display: block;
+      width: 100%;
+      height: 100%;
+      min-height: 470px;
+      background: #1a1711;
+    }
+
+    .caption {
+      position: absolute;
+      right: 18px;
+      bottom: 18px;
+      max-width: 330px;
+      margin: 0;
+      padding: 14px 16px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: rgba(9, 9, 8, 0.78);
+      color: var(--muted);
+      font-size: 0.88rem;
+      backdrop-filter: blur(12px);
+    }
+
+    .caption strong {
+      color: var(--ink);
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap: 18px;
+    }
+
+    .section {
+      grid-column: span 12;
+      padding: 28px;
+    }
+
+    .half {
+      grid-column: span 6;
+    }
+
+    .third {
+      grid-column: span 4;
+    }
+
+    .section p, .section li {
+      color: var(--muted);
+    }
+
+    .section ul, .section ol {
+      margin: 16px 0 0;
+      padding-left: 1.2rem;
+    }
+
+    .section li + li {
+      margin-top: 8px;
+    }
+
+    .arc {
+      display: grid;
+      gap: 12px;
+      margin-top: 18px;
+    }
+
+    .arc-step {
+      display: grid;
+      grid-template-columns: 46px 1fr;
+      gap: 14px;
+      align-items: start;
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.025);
+    }
+
+    .num {
+      display: grid;
+      place-items: center;
+      width: 38px;
+      height: 38px;
+      border-radius: 12px;
+      background: rgba(216, 169, 79, 0.16);
+      color: var(--accent);
+      font-weight: 900;
+    }
+
+    .arc-step strong, .loop strong {
+      color: var(--ink);
+    }
+
+    .loop {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 18px;
+    }
+
+    .loop span {
+      min-height: 112px;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.015));
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .scale {
+      display: grid;
+      gap: 14px;
+      margin-top: 18px;
+    }
+
+    .scale article {
+      padding: 18px;
+      border-left: 4px solid var(--accent-green);
+      border-radius: 14px;
+      background: rgba(127, 176, 105, 0.08);
+    }
+
+    .scale article:nth-child(2) {
+      border-left-color: var(--accent);
+      background: rgba(216, 169, 79, 0.08);
+    }
+
+    .scale article:nth-child(3) {
+      border-left-color: #bf5f55;
+      background: rgba(191, 95, 85, 0.08);
+    }
+
+    .do-dont {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+      margin-top: 18px;
+    }
+
+    .do-dont > div {
+      padding: 18px;
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.026);
+      border: 1px solid var(--line);
+    }
+
+    .prototype {
+      border: 1px solid rgba(216, 169, 79, 0.42);
+      background:
+        linear-gradient(135deg, rgba(216, 169, 79, 0.12), transparent),
+        linear-gradient(180deg, rgba(36, 32, 24, 0.94), rgba(18, 16, 12, 0.96));
+    }
+
+    .operon {
+      border: 1px solid rgba(109, 167, 184, 0.38);
+      background:
+        linear-gradient(135deg, rgba(109, 167, 184, 0.11), transparent),
+        linear-gradient(180deg, rgba(36, 32, 24, 0.94), rgba(18, 16, 12, 0.96));
+    }
+
+    @media (max-width: 900px) {
+      main {
+        width: min(100% - 22px, 720px);
+        padding-top: 22px;
+      }
+
+      .hero, .grid, .loop, .do-dont {
+        grid-template-columns: 1fr;
+      }
+
+      .section, .half, .third {
+        grid-column: 1;
+      }
+
+      .loop span {
+        min-height: 0;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <section class="hero">
+      <div class="card hero-copy">
+        <span class="eyebrow">Design Direction / Brewing Simulation Game</span>
+        <h1>From garage brewer to living brewery floor.</h1>
+        <p class="subtitle">A grounded, Sims-like brewery management simulation powered by real operational logic: recipes, tanks, pumps, fermentation, packaging, cashflow, quality, and consequences.</p>
+        <ul class="tag-list" aria-label="Core pillars">
+          <li>Isometric 3D</li>
+          <li>Sims-like workers</li>
+          <li>Real brewing logic</li>
+          <li>Progression from garage</li>
+          <li>Operational consequences</li>
+          <li>Minimal UI</li>
+        </ul>
+      </div>
+
+      <figure class="card reference" aria-labelledby="reference-title">
+        <svg role="img" viewBox="0 0 960 620" xmlns="http://www.w3.org/2000/svg">
+          <title id="reference-title">Reference image for brewery simulation game UI and production floor</title>
+          <defs>
+            <linearGradient id="floor" x1="0" x2="1" y1="0" y2="1">
+              <stop offset="0" stop-color="#5b5142" />
+              <stop offset="0.55" stop-color="#312b22" />
+              <stop offset="1" stop-color="#191711" />
+            </linearGradient>
+            <linearGradient id="tank" x1="0" x2="1">
+              <stop offset="0" stop-color="#7e7566" />
+              <stop offset="0.18" stop-color="#fff1c6" />
+              <stop offset="0.44" stop-color="#9d927e" />
+              <stop offset="0.72" stop-color="#efe0b8" />
+              <stop offset="1" stop-color="#5f574d" />
+            </linearGradient>
+            <radialGradient id="lamp" cx="50%" cy="25%" r="60%">
+              <stop offset="0" stop-color="#ffd98b" stop-opacity="0.88" />
+              <stop offset="1" stop-color="#ffd98b" stop-opacity="0" />
+            </radialGradient>
+            <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+              <feGaussianBlur stdDeviation="8" result="blur" />
+              <feMerge>
+                <feMergeNode in="blur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+          </defs>
+
+          <rect width="960" height="620" fill="#17140f" />
+          <polygon points="60,185 640,56 920,206 336,532" fill="url(#floor)" />
+          <g opacity="0.28" stroke="#f3d99a" stroke-width="2">
+            <path d="M98 206 392 490" />
+            <path d="M214 181 510 425" />
+            <path d="M332 152 640 358" />
+            <path d="M456 125 776 290" />
+            <path d="M136 278 704 88" />
+            <path d="M206 350 794 136" />
+            <path d="M290 426 878 190" />
+          </g>
+          <g opacity="0.5" stroke="#10100d" stroke-width="7" fill="none">
+            <path d="M106 442 812 250" />
+            <path d="M184 507 897 286" />
+            <path d="M76 328 398 517" />
+          </g>
+
+          <circle cx="198" cy="80" r="170" fill="url(#lamp)" filter="url(#glow)" />
+          <circle cx="770" cy="98" r="190" fill="url(#lamp)" opacity="0.7" filter="url(#glow)" />
+
+          <g fill="none" stroke="#b2a183" stroke-width="5" stroke-linecap="round" opacity="0.85">
+            <path d="M186 198 C284 138, 354 155, 436 124" />
+            <path d="M418 130 C524 90, 648 99, 742 144" />
+            <path d="M278 397 C372 332, 493 335, 598 285" stroke="#7fb1c2" />
+            <path d="M355 443 C475 372, 550 407, 696 325" stroke="#c04f43" />
+          </g>
+
+          <g>
+            <g transform="translate(115 238)">
+              <ellipse cx="86" cy="24" rx="86" ry="33" fill="url(#tank)" />
+              <rect x="0" y="24" width="172" height="118" fill="url(#tank)" />
+              <ellipse cx="86" cy="142" rx="86" ry="33" fill="#6e6557" />
+              <rect x="42" y="57" width="88" height="52" rx="5" fill="#13120f" />
+              <text x="86" y="81" fill="#f8e8bd" text-anchor="middle" font-size="17" font-weight="700">MASH TUN</text>
+              <text x="86" y="101" fill="#d8a94f" text-anchor="middle" font-size="15">152°F</text>
+            </g>
+            <g transform="translate(340 182)">
+              <ellipse cx="86" cy="24" rx="86" ry="33" fill="url(#tank)" />
+              <rect x="0" y="24" width="172" height="128" fill="url(#tank)" />
+              <ellipse cx="86" cy="152" rx="86" ry="33" fill="#6e6557" />
+              <rect x="39" y="64" width="94" height="58" rx="5" fill="#13120f" />
+              <text x="86" y="88" fill="#f8e8bd" text-anchor="middle" font-size="17" font-weight="700">BOIL KETTLE</text>
+              <text x="86" y="110" fill="#d8a94f" text-anchor="middle" font-size="15">212°F</text>
+            </g>
+            <g transform="translate(560 144)">
+              <ellipse cx="62" cy="18" rx="62" ry="26" fill="url(#tank)" />
+              <rect x="0" y="18" width="124" height="154" fill="url(#tank)" />
+              <ellipse cx="62" cy="172" rx="62" ry="26" fill="#6e6557" />
+              <rect x="24" y="58" width="76" height="64" rx="5" fill="#11100d" />
+              <text x="62" y="80" fill="#f8e8bd" text-anchor="middle" font-size="16" font-weight="700">FV 01</text>
+              <text x="62" y="102" fill="#7fb069" text-anchor="middle" font-size="15">ACTIVE</text>
+            </g>
+            <g transform="translate(710 154)">
+              <ellipse cx="62" cy="18" rx="62" ry="26" fill="url(#tank)" />
+              <rect x="0" y="18" width="124" height="154" fill="url(#tank)" />
+              <ellipse cx="62" cy="172" rx="62" ry="26" fill="#6e6557" />
+              <rect x="24" y="58" width="76" height="64" rx="5" fill="#11100d" />
+              <text x="62" y="80" fill="#f8e8bd" text-anchor="middle" font-size="16" font-weight="700">FV 02</text>
+              <text x="62" y="102" fill="#d8a94f" text-anchor="middle" font-size="15">DRY HOP</text>
+            </g>
+          </g>
+
+          <g transform="translate(630 395)">
+            <polygon points="0,28 122,0 230,42 104,82" fill="#888071" />
+            <rect x="36" y="23" width="168" height="72" fill="#625a4e" />
+            <g fill="#6dbb6b">
+              <circle cx="70" cy="30" r="6" /><circle cx="94" cy="28" r="6" /><circle cx="118" cy="26" r="6" />
+              <circle cx="142" cy="30" r="6" /><circle cx="166" cy="34" r="6" /><circle cx="190" cy="39" r="6" />
+            </g>
+            <text x="118" y="71" fill="#f8e8bd" font-size="15" text-anchor="middle" font-weight="700">PACKAGING LINE</text>
+          </g>
+
+          <g fill="#15130f" stroke="#d7c393" stroke-width="4">
+            <g transform="translate(246 342)">
+              <circle cx="24" cy="15" r="14" fill="#d0b087" stroke="none" />
+              <path d="M24 30 18 84 M24 42 52 60 M23 48 -4 68 M18 84 0 118 M18 84 43 113" />
+              <rect x="-10" y="33" width="63" height="42" rx="14" fill="#15130f" />
+            </g>
+            <g transform="translate(766 330)">
+              <circle cx="24" cy="15" r="14" fill="#d0b087" stroke="none" />
+              <path d="M24 30 18 84 M24 42 52 60 M23 48 -4 68 M18 84 0 118 M18 84 43 113" />
+              <rect x="-10" y="33" width="63" height="42" rx="14" fill="#15130f" />
+            </g>
+            <g transform="translate(505 392)">
+              <circle cx="24" cy="15" r="14" fill="#d0b087" stroke="none" />
+              <path d="M24 30 18 84 M24 42 52 60 M23 48 -4 68 M18 84 0 118 M18 84 43 113" />
+              <rect x="-10" y="33" width="63" height="42" rx="14" fill="#15130f" />
+            </g>
+          </g>
+
+          <g>
+            <rect x="24" y="24" width="300" height="78" rx="12" fill="rgba(6,6,5,0.82)" />
+            <text x="46" y="54" fill="#f8e8bd" font-size="24" font-weight="900" letter-spacing="2">HOP HAVEN</text>
+            <text x="48" y="80" fill="#b9aa8e" font-size="14" font-weight="700" letter-spacing="2">BREWING CO.</text>
+            <rect x="36" y="130" width="238" height="100" rx="12" fill="rgba(6,6,5,0.82)" />
+            <text x="58" y="164" fill="#d8a94f" font-size="14" font-weight="900">CURRENT OBJECTIVE</text>
+            <text x="58" y="195" fill="#f8e8bd" font-size="18" font-weight="700">Package Hop Haven IPA</text>
+            <rect x="58" y="210" width="170" height="8" rx="4" fill="#343024" />
+            <rect x="58" y="210" width="92" height="8" rx="4" fill="#7fb069" />
+            <rect x="708" y="28" width="224" height="58" rx="14" fill="rgba(6,6,5,0.82)" />
+            <text x="730" y="64" fill="#f8e8bd" font-size="18" font-weight="800">Cash $124,850</text>
+            <rect x="744" y="492" width="180" height="98" rx="14" fill="rgba(6,6,5,0.82)" />
+            <text x="766" y="526" fill="#d8a94f" font-size="14" font-weight="900">ALERTS</text>
+            <text x="766" y="558" fill="#f8e8bd" font-size="16">Low glycol level</text>
+          </g>
+        </svg>
+        <figcaption class="caption"><strong>Reference image:</strong> professional-brewery stage target: isometric production floor, active workers, stainless tanks, hoses, wet concrete, warm industrial lighting, and minimal contextual UI. Use this as mood and layout guidance, not exact UI.</figcaption>
+      </figure>
+    </section>
+
+    <section class="grid">
+      <article class="card section">
+        <span class="eyebrow">Core Vision</span>
+        <h2>The player should feel like they are managing a real brewery, not a spreadsheet.</h2>
+      </article>
+
+      <article class="card section half">
+        <h3>Progression Arc</h3>
+        <div class="arc">
+          <div class="arc-step"><span class="num">1</span><p><strong>Garage Brewer</strong><br />Small room, plastic fermenters, kettle, burner, hand bottling, low cash, unstable process. Gameplay is intimate and manual.</p></div>
+          <div class="arc-step"><span class="num">2</span><p><strong>Serious Homebrewer</strong><br />Better gear, temperature control, pumps, recipe iteration, local demand, basic branding, first recurring customers.</p></div>
+          <div class="arc-step"><span class="num">3</span><p><strong>Nano Brewery</strong><br />Stainless fermenters, kegging, ingredient inventory, scheduling problems, tank allocation, first staff member.</p></div>
+          <div class="arc-step"><span class="num">4</span><p><strong>Professional Brewery</strong><br />Full brewery floor: brewhouse, fermenters, brite tanks, packaging line, quality control, logistics, compliance and real cash pressure.</p></div>
+          <div class="arc-step"><span class="num">5</span><p><strong>Advanced Operation</strong><br />Multiple tanks, suppliers, exports, distributors, events, maintenance planning, automation, and operational optimization.</p></div>
+        </div>
+      </article>
+
+      <article class="card section half">
+        <h3>Visual Direction</h3>
+        <ul>
+          <li><strong>Camera:</strong> Fixed or semi-fixed isometric camera. The floor layout must remain readable at all times.</li>
+          <li><strong>Lighting:</strong> Warm industrial light, morning/evening atmosphere, practical lamps, steam, wet floor reflections.</li>
+          <li><strong>World Detail:</strong> Hoses, pumps, grain bags, pallets, drains, control panels, steam, condensation, moving staff.</li>
+          <li><strong>UI:</strong> World-space labels on tanks and machines. Panels only when needed. Avoid dashboard overload.</li>
+          <li><strong>Workers:</strong> Sims-like autonomous brewers who walk, carry, clean, connect hoses, inspect tanks, package beer.</li>
+          <li><strong>Tone:</strong> Grounded, tactile, warm, industrial, professional. Not cartoon craft-beer marketing.</li>
+        </ul>
+      </article>
+
+      <article class="card section">
+        <h3>Gameplay Loop</h3>
+        <div class="loop">
+          <span><strong>Plan</strong><br />Choose recipe, inspect inventory, schedule brewday, reserve tank.</span>
+          <span><strong>Brew</strong><br />Mash, boil, chill, transfer, pitch yeast.</span>
+          <span><strong>Ferment</strong><br />Monitor temperature, gravity, yeast health, dry hop timing.</span>
+          <span><strong>Package</strong><br />Bottle, keg, label, condition, handle losses.</span>
+          <span><strong>Sell</strong><br />Local customers, bars, events, shops, online demand.</span>
+          <span><strong>Upgrade</strong><br />Buy better gear, expand room, hire staff, automate processes.</span>
+          <span><strong>Repeat</strong><br />Let constraints, mistakes, and quality outcomes create stories.</span>
+        </div>
+      </article>
+
+      <article class="card section third">
+        <h3>Realism Scale</h3>
+        <div class="scale">
+          <article><strong>Casual</strong><br />Faster brewing, simplified fermentation, fewer failures, easier money, accessible to general players.</article>
+          <article><strong>Realistic</strong><br />Tank timing, ingredient variability, temperature control, contamination risk, oxygen exposure, staff mistakes.</article>
+          <article><strong>Hardcore</strong><br />Traceability, excise, HACCP, detailed losses, supplier delays, cashflow pressure, full operational realism.</article>
+        </div>
+      </article>
+
+      <article class="card section third">
+        <h3>Do / Don’t</h3>
+        <div class="do-dont">
+          <div>
+            <strong>Do</strong>
+            <ul>
+              <li>Make the brewery floor the main interface.</li>
+              <li>Use staff animations to show work.</li>
+              <li>Keep UI contextual and minimal.</li>
+              <li>Make mistakes visible in the world.</li>
+              <li>Let systems create stories.</li>
+            </ul>
+          </div>
+          <div>
+            <strong>Don’t</strong>
+            <ul>
+              <li>Do not make it a text dashboard with a brewery background.</li>
+              <li>Do not start with massive scope.</li>
+              <li>Do not overdo cartoon styling.</li>
+              <li>Do not separate simulation logic from Operon logic long term.</li>
+              <li>Do not add compliance before the core loop is fun.</li>
+            </ul>
+          </div>
+        </div>
+      </article>
+
+      <article class="card section third prototype">
+        <h3>Recommended Prototype</h3>
+        <p>First playable prototype should be extremely small:</p>
+        <ul>
+          <li>One garage room.</li>
+          <li>One player character or brewer.</li>
+          <li>One kettle.</li>
+          <li>One fermenter.</li>
+          <li>One recipe.</li>
+          <li>One packaging method.</li>
+          <li>One local customer/order.</li>
+          <li>One upgrade: buy a better fermenter or move to a bigger space.</li>
+        </ul>
+        <p><strong>The success test:</strong> Can the player brew → ferment → package → sell → upgrade and want to do it again?</p>
+      </article>
+
+      <article class="card section operon">
+        <h3>Operon Connection</h3>
+        <p>Long term, the game should not become a separate fake simulation. It should reuse the same operational concepts as Operon:</p>
+        <ul>
+          <li>recipes</li>
+          <li>batches</li>
+          <li>ingredients</li>
+          <li>lots</li>
+          <li>tasks</li>
+          <li>tank states</li>
+          <li>packaging outputs</li>
+          <li>quality issues</li>
+          <li>inventory depletion</li>
+        </ul>
+        <p>The difference is presentation: Operon is the professional control system; the game is the living simulation layer.</p>
+      </article>
+    </section>
+  </main>
+</body>
+</html>
