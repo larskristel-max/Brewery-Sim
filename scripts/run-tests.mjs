@@ -2,21 +2,25 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { createInitialState } from '../dist/game/initialState.js';
 import { reduceGame } from '../dist/game/simulation.js';
+import { currentWorkflowStage } from '../dist/game/selectors.js';
 
 let state = createInitialState();
 state = reduceGame(state, { type: 'start-batch', recipeId: 'garage-pale' });
 assert.equal(state.batches.length, 1, 'starting a batch should create one active batch');
 assert.equal(state.inventory.grain, 30, 'starting a pale ale consumes 5 kg grain');
 assert.equal(state.batches[0].contaminationRisk, 13, 'batch should show early contamination risk');
+assert.equal(currentWorkflowStage(state).stage, 'Mash', 'started batch should show Mash stage');
 
 state = reduceGame(state, { type: 'tick', seconds: 11 });
 assert.equal(state.batches[0].step, 'fermenting', 'batch should leave mashing after prototype timing');
+assert.equal(currentWorkflowStage(state).tapTarget, 'fermenter', 'fermenting stage should point at the fermenter');
 
 state = reduceGame(state, { type: 'tick', seconds: 11 });
 assert.equal(state.batches[0].step, 'packaging', 'batch should leave fermentation after prototype timing');
 
 state = reduceGame(state, { type: 'tick', seconds: 11 });
 assert.equal(state.batches[0].step, 'ready', 'batch should be ready after prototype packaging');
+assert.equal(currentWorkflowStage(state).tapTarget, 'bottler', 'ready batches should point at the bottler for packaging');
 
 state = reduceGame(state, { type: 'package-batch', batchId: state.batches[0].id });
 assert.equal(state.inventory.cases, 8, 'packaging should add cases to inventory');
@@ -24,6 +28,7 @@ assert.equal(state.inventory.cases, 8, 'packaging should add cases to inventory'
 state = reduceGame(state, { type: 'sell-cases', cases: 6 });
 assert.equal(state.inventory.cases, 2, 'selling should remove cases from inventory');
 assert.equal(state.demand.casesSold, 6, 'selling should fulfill local demand progress');
+assert.equal(currentWorkflowStage(state).stage, 'Sell', 'remaining cases and demand should keep the flow on Sell');
 assert.ok(state.cash > 140, 'selling cases should increase cash');
 
 let upgraded = createInitialState();
@@ -47,6 +52,10 @@ let nextDay = createInitialState();
 nextDay = reduceGame(nextDay, { type: 'tick', seconds: 60 });
 assert.equal(nextDay.day, 2, 'one minute of real time should roll over to a new game day');
 assert.equal(nextDay.demand.casesSold, 0, 'new day should reset demand fulfillment');
+
+const mainSource = await readFile(new URL('../src/main.ts', import.meta.url), 'utf8');
+assert.doesNotMatch(mainSource, /data-action=\"start-batch\"/, 'UI should not render duplicate recipe buttons while kettle starts Garage Pale Ale');
+assert.match(mainSource, /Mash.*Ferment.*Package.*Sell/s, 'UI should show clear stage labels');
 
 const index = await readFile(new URL('../index.html', import.meta.url), 'utf8');
 assert.match(index, /viewport-fit=cover/, 'index should include an iPhone safe-area viewport');

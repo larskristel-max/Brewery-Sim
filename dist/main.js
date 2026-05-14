@@ -1,6 +1,5 @@
-import { recipes } from './data/recipes.js';
 import { createInitialState } from './game/initialState.js';
-import { demandProgress, formatClock, formatCurrency, nextSuggestedAction, objectiveProgress } from './game/selectors.js';
+import { currentWorkflowStage, demandProgress, formatClock, formatCurrency, nextSuggestedAction, objectiveProgress } from './game/selectors.js';
 import { reduceGame } from './game/simulation.js';
 const root = document.querySelector('#root');
 if (!root) {
@@ -17,6 +16,7 @@ const activeForEquipment = (equipmentId) => {
     const stepByEquipment = { kettle: 'mashing', fermenter: 'fermenting', bottler: 'packaging' };
     return state.batches.some((batch) => batch.step === stepByEquipment[equipmentId]);
 };
+const isNextTapTarget = (target) => currentWorkflowStage(state).tapTarget === target;
 const brewerPosition = () => {
     const focus = state.batches[0]?.step ?? 'idle';
     return {
@@ -52,7 +52,7 @@ const renderGarage = () => {
     const equipment = Object.values(state.equipment)
         .map((item) => `
         <button
-          class="equipment-node ${item.id === state.selectedEquipmentId ? 'selected' : ''} ${activeForEquipment(item.id) ? 'active' : ''}"
+          class="equipment-node ${item.id === state.selectedEquipmentId ? 'selected' : ''} ${activeForEquipment(item.id) ? 'active' : ''} ${isNextTapTarget(item.id) ? 'next-tap' : ''}"
           style="left: ${item.x}%; top: ${item.y}%"
           data-action="use-equipment"
           data-equipment-id="${item.id}"
@@ -67,9 +67,9 @@ const renderGarage = () => {
         .join('');
     return `
     <section class="garage-scene" aria-label="Playable garage brewery floor">
-      <div class="scene-title"><span>Tap equipment directly: kettle → fermenter → capper → cases</span><strong>${state.inventory.cases} cases ready</strong></div>
+      <div class="scene-title"><span>Stage: ${currentWorkflowStage(state).stage}</span><strong>${currentWorkflowStage(state).instruction}</strong></div>
       <div class="workbench"></div>
-      <button class="case-stack ${state.inventory.cases > 0 ? 'active' : ''}" data-action="sell-cases" type="button" ${state.inventory.cases > 0 ? '' : 'disabled'}>
+      <button class="case-stack ${state.inventory.cases > 0 ? 'active' : ''} ${isNextTapTarget('cases') ? 'next-tap' : ''}" data-action="sell-cases" type="button" ${state.inventory.cases > 0 ? '' : 'disabled'}>
         <span>📦</span><strong>Cases</strong><small>Tap to sell</small>
       </button>
       <div class="floor-line floor-line-one"></div>
@@ -81,24 +81,20 @@ const renderGarage = () => {
 };
 const renderActions = () => {
     const selected = state.equipment[state.selectedEquipmentId];
-    const recipeButtons = recipes
-        .map((recipe) => `
-        <button type="button" data-action="start-batch" data-recipe-id="${recipe.id}">
-          Brew ${recipe.name}
-          <small>${recipe.batchSizeCases} cases · ${recipe.grainCost} kg grain · ${recipe.waterCost} L water</small>
-        </button>
-      `)
-        .join('');
+    const workflow = currentWorkflowStage(state);
     return `
     <section class="panel action-panel">
       <div class="panel-heading"><span class="eyebrow">Selected</span><h2>${selected.name}</h2></div>
       <p>${selected.description}</p>
+      <div class="risk-card next-card">
+        <strong>Next tap: ${workflow.tapTarget === 'cases' ? 'Cases' : state.equipment[workflow.tapTarget].name}</strong>
+        <span>${workflow.instruction}</span>
+      </div>
       <div class="risk-card">
         <strong>Equipment risk</strong>
         <span>Low condition reduces quality. Dirty fermenter raises contamination risk. Cleaning costs €18.</span>
       </div>
       <div class="action-grid">
-        ${recipeButtons}
         <button type="button" data-action="clean-equipment" data-equipment-id="${selected.id}">
           Clean selected gear
           <small>€18 · improves condition and lowers risk</small>
@@ -149,6 +145,21 @@ const renderUpgrades = () => `
     .join('')}
   </section>
 `;
+const renderStageFlow = () => {
+    const workflow = currentWorkflowStage(state);
+    const stages = ['Mash', 'Ferment', 'Package', 'Sell'];
+    return `
+    <section class="stage-flow" aria-label="Brewery workflow stages">
+      ${stages
+        .map((stage) => `
+            <div class="stage-step ${workflow.stage === stage ? 'current' : ''}">
+              <span>${stage}</span>
+            </div>
+          `)
+        .join('')}
+    </section>
+  `;
+};
 const renderEventLog = () => `
   <section class="panel event-log">
     <div class="panel-heading"><span class="eyebrow">Floor chatter</span><h2>Event log</h2></div>
@@ -162,6 +173,7 @@ const render = () => {
     <main class="game-shell">
       ${renderTopBar()}
       <aside class="toast">Next: ${nextSuggestedAction(state)}</aside>
+      ${renderStageFlow()}
       ${renderGarage()}
       <div class="dashboard-grid">
         ${renderActions()}

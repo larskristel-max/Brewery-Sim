@@ -36,20 +36,68 @@ export const objectiveProgress = (state: GameState): { label: string; progress: 
 export const demandProgress = (state: GameState): string =>
   `${state.demand.accountName}: ${state.demand.casesSold}/${state.demand.casesRequested} cases`;
 
+
+export type WorkflowStage = {
+  stage: 'Mash' | 'Ferment' | 'Package' | 'Sell';
+  tapTarget: 'kettle' | 'fermenter' | 'bottler' | 'cases';
+  instruction: string;
+};
+
+export const currentWorkflowStage = (state: GameState): WorkflowStage => {
+  const readyBatch = state.batches.find((batch) => batch.step === 'ready');
+  if (readyBatch) {
+    return {
+      stage: 'Package',
+      tapTarget: 'bottler',
+      instruction: `Tap the bench capper to stack ${readyBatch.casesExpected} cases.`
+    };
+  }
+
+  if (state.inventory.cases > 0 && state.demand.casesSold < state.demand.casesRequested) {
+    return {
+      stage: 'Sell',
+      tapTarget: 'cases',
+      instruction: `Tap cases to sell into ${state.demand.accountName}'s order.`
+    };
+  }
+
+  const activeBatch = state.batches[0];
+  if (!activeBatch) {
+    return {
+      stage: 'Mash',
+      tapTarget: 'kettle',
+      instruction: 'Tap the 40 L mash kettle to start Garage Pale Ale.'
+    };
+  }
+
+  if (activeBatch.step === 'mashing') {
+    return {
+      stage: 'Mash',
+      tapTarget: 'kettle',
+      instruction: 'Mash is running. Watch the kettle finish its 10-second stage.'
+    };
+  }
+
+  if (activeBatch.step === 'fermenting') {
+    return {
+      stage: 'Ferment',
+      tapTarget: 'fermenter',
+      instruction: 'Fermentation is running. Tap the fermenter to check contamination risk.'
+    };
+  }
+
+  return {
+    stage: 'Package',
+    tapTarget: 'bottler',
+    instruction: 'Packaging is running. Watch the capper finish its 10-second stage.'
+  };
+};
+
 export const nextSuggestedAction = (state: GameState): string => {
   if (!state.upgrades['larger-kettle'].purchased && state.cash >= 500) {
     return 'Buy the larger kettle upgrade.';
   }
-  if (state.batches.length === 0 && state.inventory.cases === 0) {
-    return 'Tap the 40 L mash kettle to start a brew.';
-  }
-  if (readyToPackage(state)) {
-    return 'Tap the bench capper to package the finished batch.';
-  }
-  if (state.inventory.cases > 0 && state.demand.casesSold < state.demand.casesRequested) {
-    return 'Tap ready cases to sell into today’s local demand.';
-  }
-  return 'Let the batch progress or clean equipment to reduce risk.';
+  return currentWorkflowStage(state).instruction;
 };
 
 export const visibleRecipes = (): Recipe[] => recipes;

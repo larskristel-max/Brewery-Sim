@@ -10,6 +10,12 @@ export declare const objectiveProgress: (state: GameState) => {
     complete: boolean;
 };
 export declare const demandProgress: (state: GameState) => string;
+export type WorkflowStage = {
+    stage: 'Mash' | 'Ferment' | 'Package' | 'Sell';
+    tapTarget: 'kettle' | 'fermenter' | 'bottler' | 'cases';
+    instruction: string;
+};
+export declare const currentWorkflowStage: (state: GameState) => WorkflowStage;
 export declare const nextSuggestedAction: (state: GameState) => string;
 export declare const visibleRecipes: () => Recipe[];
 export declare const saleValue: (state: GameState, cases: number) => number;
