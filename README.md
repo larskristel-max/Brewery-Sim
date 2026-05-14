@@ -19,6 +19,88 @@ Implementation decisions should prioritize visible systems, believable spaces, a
 - Readable minimal UI: clear information only when needed, without overwhelming the player or replacing the physical simulation.
 - Alive brewery floor: workers, machines, materials, batches, maintenance, and logistics should make the space feel active and responsive.
 
+## Gameplay × Brewery Reality
+
+Brewery-Sim should combine satisfying gameplay with authentic brewery operations by treating the brewery itself as the main character. The player should become attached to the space, the equipment, the routines, and the operational rhythm rather than only chasing bigger numbers.
+
+The strongest fantasy is not “manage recipes from a dashboard.” It is:
+
+> “Keep this place running.”
+
+Good systems should create operational stories:
+
+- “We almost lost the batch.”
+- “Packaging night was chaos.”
+- “The old fermenter finally died.”
+- “We barely made the festival order.”
+- “The IPA became our local hit.”
+- “We survived contamination.”
+
+Every new mechanic should pass this test:
+
+> Does this create operational storytelling?
+
+If a mechanic creates only admin, menu work, spreadsheet optimization, or detached number management, it should be simplified, delayed, or removed.
+
+### What brewery realism should be kept
+
+Keep realities that produce tension, anticipation, mastery, atmosphere, or meaningful trade-offs:
+
+- **Cleaning and sanitation:** valuable because dirt, contamination risk, and cleanup create visible cause and effect.
+- **Fermentation waiting:** valuable because brewing has delayed gratification, uncertainty, and anticipation.
+- **Packaging pressure:** valuable because real breweries often discover that brewing is easy compared with getting beer packaged cleanly, quickly, and consistently.
+- **Equipment wear:** valuable because equipment becomes part of the player’s relationship with the brewery.
+- **Tank and space bottlenecks:** valuable because breweries are physical systems where timing and layout matter.
+- **Local demand and reputation:** valuable because it gives production emotional context and makes the town feel connected to the brewery.
+- **Ingredient shortages and supply friction:** valuable when used sparingly to create adaptation, not procurement admin.
+
+These systems should be readable and tactile. Dirty fermenters, stacked bottles, full tanks, broken pumps, and noisy packaging lines are better than hidden modifiers in a stats panel.
+
+### What brewery realism should be abstracted
+
+Reduce or delay realities that create friction without fun:
+
+- tax declarations
+- detailed accounting
+- regulatory paperwork
+- full HACCP documentation
+- deep brewing chemistry micromanagement
+- excessive recipe spreadsheets
+- detailed payroll or staffing law
+- long procurement workflows
+
+These may become atmospheric events, simple constraints, or late-game abstractions, but they should not dominate the prototype. The game is not an ERP simulator.
+
+### The ideal loop shape
+
+The short loop should feel tactile: start a brew, clean something, inspect fermentation, package, sell, and get feedback. The medium loop should feel operational: juggle batches, clean equipment, protect quality, meet local demand, and buy upgrades. The long arc should feel like stewardship: grow from a garage brewer into a real brewery without losing the human, physical connection to the place.
+
+Progression should move from cozy manual brewing toward controlled operational chaos:
+
+- **Garage brewer:** intimate, handmade, simple, personal.
+- **Nano brewery:** more capacity, more bottlenecks, more consequences.
+- **Professional brewery:** orchestration, packaging pressure, reputation expectations, maintenance, and layout decisions.
+
+Late-game systems may become more complex, but the game should never become a spreadsheet command center.
+
+### Packaging as a signature pressure point
+
+Packaging should be treated as one of the most important potential gameplay differentiators. Real breweries often experience packaging as the stressful, physical, repetitive, quality-sensitive bottleneck. In game terms, it can become the rush moment: bottles, caps, labels, crates, cleanliness, speed, and order deadlines colliding in one visible scene.
+
+Packaging should feel satisfying when prepared well and chaotic when neglected.
+
+### Atmosphere is not optional polish
+
+Atmosphere supports gameplay comprehension and emotional attachment. Steam, bubbling fermenters, pump hum, warm light, clutter, condensation, crates, bottles, wet floors, and equipment noise all help the player feel that the brewery is alive.
+
+Visual and audio atmosphere should be added only when it supports interaction clarity or emotional payoff, not as decoration that hides weak mechanics.
+
+### Tactile abstraction rule
+
+Real tasks should be tactile, but not endlessly repetitive. If a task stops being emotionally meaningful after repetition, compress it, automate it, or make it contextual.
+
+Cleaning, hose work, packaging, recipe handling, and maintenance should feel physical. They should not become mandatory identical busywork every batch forever. The player should earn smoother operations through upgrades, layout improvements, and better routines.
+
 ## Technical recommendation
 
 ### Recommendation
@@ -101,6 +183,7 @@ Brewery-Sim/
       simulation.ts
       actions.ts
       random.ts
+      persistence.ts
     data/
       equipment.ts
       recipes.ts
@@ -128,6 +211,7 @@ Brewery-Sim/
     tests/
       simulation.test.ts
       actions.test.ts
+      persistence.test.ts
 ```
 
 ### Structure principles
@@ -136,7 +220,23 @@ Brewery-Sim/
 - `src/data` contains tunable content such as starter gear, recipes, upgrades, and sales channels.
 - `src/components` contains scene and UI presentation only.
 - React components should dispatch game actions; they should not calculate brewing outcomes directly.
-- Local storage can be added after the first loop works, but initial state can simply reset on refresh for the earliest prototype.
+- Local save persistence should be handled outside simulation rules, ideally through a small `src/game/persistence.ts` module.
+
+## Immediate next implementation task
+
+### Local save persistence
+
+The next practical prototype task is local save persistence. Refreshing the page should not reset the brewery.
+
+Requirements:
+
+- Auto-save the full `GameState` after game state changes.
+- Restore the saved state on startup.
+- Keep the save local only through `localStorage`.
+- Add a clear reset/new game action.
+- Include a save `version` guard so incompatible future state can be ignored or migrated.
+- Keep persistence outside core simulation logic.
+- Do not add accounts, cloud saves, Supabase, Operon integration, or backend infrastructure.
 
 ## First milestone implementation plan
 
@@ -527,7 +627,7 @@ The first upgrade shop should be tiny and visual:
 - Test every game action as a pure state transition where possible.
 - Add only one recipe until the first loop works.
 - Add only one active batch until the first loop works.
-- Add persistence only after the loop is fun enough to replay.
+- Add local save persistence now that the first loop exists.
 - Add Supabase only after local state has stabilized.
 - Add Operon integration only after the game has a reason to exchange real brewery data.
 - Consider Canvas, Phaser, PixiJS, or Unity only if the scene interaction needs exceed what React and CSS can support.
