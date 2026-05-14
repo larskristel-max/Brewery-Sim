@@ -10,7 +10,7 @@
   top: 0;
   z-index: 10;
   display: grid;
-  grid-template-columns: 1.35fr 0.8fr 0.6fr;
+  grid-template-columns: 1.15fr 0.7fr 0.55fr;
   gap: 0.5rem;
   padding: 0.6rem;
   border: 1px solid rgba(255, 211, 144, 0.2);
@@ -29,6 +29,20 @@
 .top-bar > div {
   padding: 0.5rem 0.65rem;
   border-radius: 16px;
+}
+
+.objective-card {
+  grid-column: span 3;
+}
+
+.objective-card strong {
+  display: block;
+  margin-bottom: 0.35rem;
+}
+
+.objective-card progress,
+.batch-card progress {
+  width: 100%;
 }
 
 .eyebrow {
@@ -87,6 +101,46 @@
   border-radius: 14px;
   background: linear-gradient(180deg, #6d3518, #32170e);
   box-shadow: 0 18px 30px rgba(0, 0, 0, 0.34);
+}
+
+.case-stack {
+  position: absolute;
+  right: 9%;
+  bottom: 31%;
+  z-index: 3;
+  display: grid;
+  gap: 0.15rem;
+  min-width: 7rem;
+  padding: 0.7rem;
+  border: 2px solid rgba(255, 224, 174, 0.18);
+  border-radius: 18px;
+  color: #fff2cf;
+  background: linear-gradient(180deg, rgba(88, 47, 28, 0.96), rgba(48, 24, 16, 0.98));
+  text-align: center;
+}
+
+.case-stack.active {
+  border-color: #ffca73;
+}
+
+.case-stack span {
+  font-size: 1.35rem;
+}
+
+.risk-card {
+  display: grid;
+  gap: 0.25rem;
+  margin: 0.75rem 0;
+  padding: 0.7rem;
+  border-radius: 16px;
+  color: #ffe0a8;
+  background: rgba(15, 8, 6, 0.34);
+}
+
+.risk-card span,
+.batch-card small {
+  color: #eec894;
+  font-size: 0.78rem;
 }
 
 .floor-line {

@@ -10,6 +10,8 @@ export const formatClock = (minute: number): string => {
   return `${displayHours}:${minutes.toString().padStart(2, '0')} ${suffix}`;
 };
 
+export const formatCurrency = (amount: number): string => `€${amount}`;
+
 export const recipeCanStart = (state: GameState, recipe: Recipe): boolean =>
   state.inventory.grain >= recipe.grainCost &&
   state.inventory.hops >= recipe.hopCost &&
@@ -17,23 +19,37 @@ export const recipeCanStart = (state: GameState, recipe: Recipe): boolean =>
   state.inventory.water >= recipe.waterCost &&
   !state.batches.some((batch) => batch.step === 'mashing');
 
-export const readyToPackage = (state: GameState): boolean =>
-  state.batches.some((batch) => batch.step === 'ready');
+export const readyToPackage = (state: GameState): boolean => state.batches.some((batch) => batch.step === 'ready');
 
-export const activeBatchForStep = (state: GameState, step: BatchStep) =>
-  state.batches.find((batch) => batch.step === step);
+export const activeBatchForStep = (state: GameState, step: BatchStep) => state.batches.find((batch) => batch.step === step);
+
+export const objectiveProgress = (state: GameState): { label: string; progress: number; complete: boolean } => {
+  const hasKettle = state.upgrades['larger-kettle'].purchased;
+  const cashProgress = Math.min(state.cash, 500);
+  return {
+    label: hasKettle ? 'Objective complete: larger kettle installed.' : `Earn €500 and buy the larger kettle. €${cashProgress}/€500`,
+    progress: hasKettle ? 100 : Math.round((cashProgress / 500) * 100),
+    complete: hasKettle
+  };
+};
+
+export const demandProgress = (state: GameState): string =>
+  `${state.demand.accountName}: ${state.demand.casesSold}/${state.demand.casesRequested} cases`;
 
 export const nextSuggestedAction = (state: GameState): string => {
+  if (!state.upgrades['larger-kettle'].purchased && state.cash >= 500) {
+    return 'Buy the larger kettle upgrade.';
+  }
   if (state.batches.length === 0 && state.inventory.cases === 0) {
-    return 'Start a brew in the kettle.';
+    return 'Tap the 40 L mash kettle to start a brew.';
   }
   if (readyToPackage(state)) {
-    return 'Package the finished fermenter batch.';
+    return 'Tap the bench capper to package the finished batch.';
   }
-  if (state.inventory.cases > 0) {
-    return 'Sell cases to nearby taprooms.';
+  if (state.inventory.cases > 0 && state.demand.casesSold < state.demand.casesRequested) {
+    return 'Tap ready cases to sell into today’s local demand.';
   }
-  return 'Let the batch progress through the garage.';
+  return 'Let the batch progress or clean equipment to reduce risk.';
 };
 
 export const visibleRecipes = (): Recipe[] => recipes;
