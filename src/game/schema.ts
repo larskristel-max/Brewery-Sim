@@ -32,6 +32,7 @@ export interface Batch {
   stepProgress: number;
   quality: number;
   casesExpected: number;
+  contaminationRisk: number;
 }
 
 export interface Equipment {
@@ -52,6 +53,13 @@ export interface Upgrade {
   purchased: boolean;
 }
 
+export interface LocalDemand {
+  accountName: string;
+  casesRequested: number;
+  casesSold: number;
+  reputationReward: number;
+}
+
 export interface EventLogEntry {
   id: string;
   minute: number;
@@ -61,11 +69,14 @@ export interface EventLogEntry {
 export interface GameState {
   cash: number;
   reputation: number;
+  day: number;
+  dayElapsedSeconds: number;
   minute: number;
   inventory: Inventory;
   batches: Batch[];
   equipment: Record<EquipmentId, Equipment>;
   upgrades: Record<UpgradeId, Upgrade>;
+  demand: LocalDemand;
   events: EventLogEntry[];
   selectedEquipmentId: EquipmentId;
   salesToday: number;
@@ -74,6 +85,7 @@ export interface GameState {
 export type GameAction =
   | { type: 'tick'; seconds: number }
   | { type: 'select-equipment'; equipmentId: EquipmentId }
+  | { type: 'use-equipment'; equipmentId: EquipmentId }
   | { type: 'start-batch'; recipeId: string }
   | { type: 'package-batch'; batchId: string }
   | { type: 'sell-cases'; cases: number }

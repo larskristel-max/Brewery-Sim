@@ -5,21 +5,21 @@ export const starterUpgrades: Upgrade[] = [
     id: 'larger-kettle',
     name: 'Larger kettle',
     description: '+4 cases per batch and faster mashing.',
-    cost: 260,
+    cost: 500,
     purchased: false
   },
   {
     id: 'temp-control',
     name: 'Fermentation temp control',
-    description: 'Improves quality and reduces fermentation time.',
-    cost: 340,
+    description: 'Faster fermentation, higher quality and lower contamination risk.',
+    cost: 380,
     purchased: false
   },
   {
     id: 'labeler',
     name: 'Hand labeler',
     description: 'Packages faster and lifts reputation from sales.',
-    cost: 220,
+    cost: 240,
     purchased: false
   }
 ];

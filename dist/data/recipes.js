@@ -3,27 +3,27 @@ export const recipes = [
         id: 'garage-pale',
         name: 'Garage Pale Ale',
         style: 'Pale Ale',
-        grainCost: 8,
-        hopCost: 6,
-        yeastCost: 3,
-        waterCost: 5,
+        grainCost: 5,
+        hopCost: 1,
+        yeastCost: 1,
+        waterCost: 25,
         salePricePerCase: 18,
         batchSizeCases: 8,
         qualityBase: 68,
-        stepDurations: { mashing: 35, fermenting: 65, packaging: 25 }
+        stepDurations: { mashing: 10, fermenting: 10, packaging: 10 }
     },
     {
         id: 'amber-shift',
         name: 'Amber Shift',
         style: 'Amber Lager',
-        grainCost: 10,
-        hopCost: 4,
-        yeastCost: 4,
-        waterCost: 5,
+        grainCost: 6,
+        hopCost: 1,
+        yeastCost: 1,
+        waterCost: 25,
         salePricePerCase: 22,
         batchSizeCases: 7,
         qualityBase: 74,
-        stepDurations: { mashing: 40, fermenting: 80, packaging: 28 }
+        stepDurations: { mashing: 10, fermenting: 10, packaging: 10 }
     }
 ];
 export const getRecipe = (recipeId) => {
