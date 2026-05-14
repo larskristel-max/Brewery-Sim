@@ -60,7 +60,14 @@ npm install
 npm run dev
 ```
 
-This lightweight prototype has no runtime npm dependencies; it expects the TypeScript CLI (`tsc`) to be available in the development environment. Open the local URL on an iPhone-sized viewport. Tap equipment in the garage scene, brew a recipe, wait as the batch moves through mashing, fermentation, and packaging, then sell cases to fund upgrades.
+This lightweight prototype has no runtime npm dependencies. TypeScript is installed as a local development dependency so the `npm run build`, `npm run test`, and `npm run dev` scripts work after `npm install`. Open the local URL on an iPhone-sized viewport. Tap equipment in the garage scene, brew a recipe, wait as the batch moves through mashing, fermentation, and packaging, then sell cases to fund upgrades.
+
+### How to run in Replit
+
+1. Import or open this repository in Replit.
+2. In the Replit Shell, run `npm install`.
+3. Start the prototype with `npm run dev`. The dev server uses Replit's `PORT` environment variable when it is available and listens on `0.0.0.0`, so the Replit web preview can open the app.
+4. Optionally verify the build and simulation checks with `npm run build` and `npm run test`.
 
 ### Prototype scope
 
