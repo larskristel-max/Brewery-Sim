@@ -1,13 +1,20 @@
 import { createInitialState } from './game/initialState.js';
+import { loadSavedGame, resetSavedGame, saveGameState } from './game/persistence.js';
 import { currentWorkflowStage, demandProgress, formatClock, formatCurrency, nextSuggestedAction, objectiveProgress } from './game/selectors.js';
 import { reduceGame } from './game/simulation.js';
 const root = document.querySelector('#root');
 if (!root) {
     throw new Error('Missing #root element');
 }
-let state = createInitialState();
+let state = loadSavedGame();
 const dispatch = (action) => {
     state = reduceGame(state, action);
+    saveGameState(state);
+    render();
+};
+const resetGame = () => {
+    resetSavedGame();
+    state = createInitialState();
     render();
 };
 const stepLabel = (step) => ({ mashing: 'Mashing', fermenting: 'Fermenting', packaging: 'Packaging', ready: 'Ready' })[step] ?? step;
@@ -43,6 +50,12 @@ const renderTopBar = () => {
         <span class="eyebrow">Local demand</span>
         <strong>${demandProgress(state)}</strong>
         <progress value="${state.demand.casesSold}" max="${state.demand.casesRequested}"></progress>
+      </div>
+      <div class="save-card">
+        <button class="reset-save-button" data-action="reset-save" type="button">
+          New Game / Reset Save
+          <small>Clears browser-local progress</small>
+        </button>
       </div>
     </header>
   `;
@@ -190,6 +203,10 @@ root.addEventListener('click', (event) => {
     if (!target)
         return;
     const action = target.dataset.action;
+    if (action === 'reset-save') {
+        resetGame();
+        return;
+    }
     if (action === 'select-equipment')
         dispatch({ type: 'select-equipment', equipmentId: target.dataset.equipmentId });
     if (action === 'use-equipment')

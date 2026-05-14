@@ -2,7 +2,18 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { createInitialState } from '../dist/game/initialState.js';
 import { reduceGame } from '../dist/game/simulation.js';
+import { loadSavedGame, resetSavedGame, saveGameState, STORAGE_KEY } from '../dist/game/persistence.js';
 import { currentWorkflowStage } from '../dist/game/selectors.js';
+
+
+const createMemoryStorage = () => {
+  const values = new Map();
+  return {
+    getItem: (key) => values.get(key) ?? null,
+    setItem: (key, value) => values.set(key, value),
+    removeItem: (key) => values.delete(key)
+  };
+};
 
 let state = createInitialState();
 state = reduceGame(state, { type: 'start-batch', recipeId: 'garage-pale' });
@@ -31,6 +42,17 @@ assert.equal(state.demand.casesSold, 6, 'selling should fulfill local demand pro
 assert.equal(currentWorkflowStage(state).stage, 'Sell', 'remaining cases and demand should keep the flow on Sell');
 assert.ok(state.cash > 140, 'selling cases should increase cash');
 
+const storage = createMemoryStorage();
+saveGameState(state, storage);
+assert.match(storage.getItem(STORAGE_KEY), /\"version\":1/, 'save should use the v1 storage envelope');
+const restored = loadSavedGame(storage);
+assert.deepEqual(restored, state, 'saved state should restore after refresh');
+storage.setItem(STORAGE_KEY, '{bad json');
+assert.deepEqual(loadSavedGame(storage), createInitialState(), 'bad save data should fall back to a new game');
+saveGameState(state, storage);
+resetSavedGame(storage);
+assert.equal(storage.getItem(STORAGE_KEY), null, 'reset should clear browser-local save data');
+
 let upgraded = createInitialState();
 upgraded.cash = 500;
 upgraded = reduceGame(upgraded, { type: 'buy-upgrade', upgradeId: 'larger-kettle' });
@@ -56,6 +78,9 @@ assert.equal(nextDay.demand.casesSold, 0, 'new day should reset demand fulfillme
 const mainSource = await readFile(new URL('../src/main.ts', import.meta.url), 'utf8');
 assert.doesNotMatch(mainSource, /data-action=\"start-batch\"/, 'UI should not render duplicate recipe buttons while kettle starts Garage Pale Ale');
 assert.match(mainSource, /Mash.*Ferment.*Package.*Sell/s, 'UI should show clear stage labels');
+assert.match(mainSource, /loadSavedGame/, 'UI should load browser-local saves on startup');
+assert.match(mainSource, /saveGameState/, 'UI should save browser-local progress after actions and ticks');
+assert.match(mainSource, /New Game \/ Reset Save/, 'UI should expose a reset save button');
 
 const index = await readFile(new URL('../index.html', import.meta.url), 'utf8');
 assert.match(index, /viewport-fit=cover/, 'index should include an iPhone safe-area viewport');

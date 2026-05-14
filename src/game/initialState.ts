@@ -16,8 +16,8 @@ export const createInitialState = (): GameState => ({
     cases: 0
   },
   batches: [],
-  equipment: Object.fromEntries(starterEquipment.map((item) => [item.id, item])) as GameState['equipment'],
-  upgrades: Object.fromEntries(starterUpgrades.map((item) => [item.id, item])) as GameState['upgrades'],
+  equipment: Object.fromEntries(starterEquipment.map((item) => [item.id, { ...item }])) as GameState['equipment'],
+  upgrades: Object.fromEntries(starterUpgrades.map((item) => [item.id, { ...item }])) as GameState['upgrades'],
   demand: {
     accountName: 'Corner Café',
     casesRequested: 10,

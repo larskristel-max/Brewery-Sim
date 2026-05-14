@@ -412,3 +412,15 @@
   font-size: 0.63rem;
   font-weight: 900;
 }
+
+.save-card {
+  grid-column: span 3;
+}
+
+.reset-save-button {
+  width: 100%;
+  min-height: 0;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid rgba(255, 222, 171, 0.16);
+  background: rgba(15, 8, 6, 0.34);
+}
