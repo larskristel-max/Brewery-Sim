@@ -48,6 +48,27 @@ It should not feel like a production dashboard, ERP, brewery MES, or Operon admi
 - **Backend temptation:** Connecting Supabase or Operon too soon would slow gameplay discovery and create integration constraints before the game design is stable.
 - **Asset polish trap:** Spending too much time on art, animation, or detailed equipment visuals before the loop is fun could hide weak mechanics.
 
+
+## Playable TypeScript Prototype
+
+This repository now includes the first playable iPhone-oriented web prototype. It uses dependency-free TypeScript, compiled with `tsc`, to validate the garage brewery loop before deeper engine or Operon integration work.
+
+### Run locally
+
+```bash
+npm install
+npm run dev
+```
+
+This lightweight prototype has no runtime npm dependencies; it expects the TypeScript CLI (`tsc`) to be available in the development environment. Open the local URL on an iPhone-sized viewport. Tap equipment in the garage scene, brew a recipe, wait as the batch moves through mashing, fermentation, and packaging, then sell cases to fund upgrades.
+
+### Prototype scope
+
+- Scene-first garage floor with tappable kettle, fermenter, bottler, and brewer avatar.
+- Deterministic TypeScript simulation for inventory, production steps, equipment condition, sales, reputation, and upgrades.
+- Touch-friendly panels sized for iPhone playtesting.
+- Unit tests covering the first brew-package-sell loop.
+
 ## Proposed repo and project structure
 
 Start with a single Vite app and keep the game simulation separate from React UI components.

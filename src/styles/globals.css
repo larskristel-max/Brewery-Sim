@@ -1,0 +1,90 @@
+:root {
+  color: #ffe8c7;
+  background: #160d0a;
+  font-family: Inter, ui-rounded, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+  margin: 0;
+}
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  overflow-x: hidden;
+  background:
+    radial-gradient(circle at top left, rgba(255, 169, 78, 0.2), transparent 30rem),
+    linear-gradient(145deg, #130906 0%, #24130d 50%, #0f0908 100%);
+}
+
+button {
+  border: 0;
+  border-radius: 18px;
+  min-height: 48px;
+  padding: 0.85rem 1rem;
+  color: #fff7e8;
+  background: linear-gradient(180deg, #a75822, #74340f);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.22), inset 0 1px rgba(255, 255, 255, 0.18);
+  font: inherit;
+  font-weight: 800;
+  text-align: left;
+  touch-action: manipulation;
+}
+
+button:active {
+  transform: translateY(1px) scale(0.99);
+}
+
+button:disabled {
+  opacity: 0.48;
+}
+
+button small {
+  display: block;
+  margin-top: 0.25rem;
+  color: #ffd8a0;
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+h1,
+h2,
+p {
+  margin-top: 0;
+}
+
+progress {
+  width: 100%;
+  height: 0.7rem;
+  overflow: hidden;
+  border: 0;
+  border-radius: 999px;
+  background: #2d1b14;
+}
+
+progress::-webkit-progress-bar {
+  border-radius: 999px;
+  background: #2d1b14;
+}
+
+progress::-webkit-progress-value {
+  border-radius: 999px;
+  background: linear-gradient(90deg, #f2b55c, #ffdf8f);
+}
+
+progress::-moz-progress-bar {
+  border-radius: 999px;
+  background: linear-gradient(90deg, #f2b55c, #ffdf8f);
+}
