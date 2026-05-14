@@ -101,6 +101,31 @@ Real tasks should be tactile, but not endlessly repetitive. If a task stops bein
 
 Cleaning, hose work, packaging, recipe handling, and maintenance should feel physical. They should not become mandatory identical busywork every batch forever. The player should earn smoother operations through upgrades, layout improvements, and better routines.
 
+## Simulation system principles
+
+Core systems should interconnect enough to create readable cause and effect. Randomness should be weighted by player decisions and current brewery state, not arbitrary punishment.
+
+Useful early system chains:
+
+- Equipment condition affects process stability, contamination risk, speed, and maintenance pressure.
+- Cleaning quality affects contamination risk and later batch outcomes.
+- Batch quality affects reputation, demand, sale price, and future customer confidence.
+- Local demand affects production choices, stock pressure, and upgrade priorities.
+- Growth increases capacity but also increases cleaning load, packaging pressure, and bottleneck risk.
+
+Good failures should usually have warning signs. Players should be able to understand why something happened after the fact through logs, object states, batch notes, or visible scene feedback.
+
+A good emergent chain looks like this:
+
+1. The player delays cleaning to meet demand.
+2. The fermenter or packaging area stays visibly dirty.
+3. Contamination risk rises for the next batch.
+4. The finished batch receives a quality penalty or fails.
+5. Sales suffer and reputation drops.
+6. The player now needs to recover through cleaning, better equipment, conservative scheduling, or another successful batch.
+
+This kind of chain is valuable because it turns brewery reality into player-authored story instead of scripted punishment.
+
 ## Technical recommendation
 
 ### Recommendation
