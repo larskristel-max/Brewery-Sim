@@ -449,17 +449,13 @@
 
 .equipment-hotspot.next-tap::before,
 .case-hotspot.next-tap::before {
-  content: 'Tap next';
+  content: '';
   position: absolute;
-  top: -0.85rem;
-  right: 0.45rem;
-  padding: 0.1rem 0.38rem;
-  border-radius: 999px;
-  color: #1f1606;
-  background: var(--gold-strong);
-  font-size: 0.58rem;
-  font-weight: 900;
-  text-transform: uppercase;
+  inset: -5px;
+  border: 1px solid rgba(242, 196, 110, 0.3);
+  border-radius: calc(var(--radius-md) + 5px);
+  background: transparent;
+  animation: pulse 1.8s infinite;
 }
 
 .equipment-hotspot.active::after {
@@ -470,6 +466,35 @@
   border-radius: 20px;
   animation: pulse 1.4s infinite;
 }
+.equipment-hotspot.scene-silent,
+.case-hotspot.scene-silent {
+  opacity: 0.28;
+  filter: saturate(0.72) brightness(0.8);
+}
+
+.equipment-hotspot.contextual,
+.equipment-hotspot.next-tap,
+.case-hotspot.next-tap,
+.case-hotspot.active {
+  opacity: 0.94;
+}
+
+.mode-idle .supply-hotspot,
+.mode-idle .workshop-hotspot,
+.mode-idle .event-ticker,
+.mode-fermentation .hotspot-kettle,
+.mode-packaging .hotspot-kettle,
+.mode-packaging .hotspot-fermenter {
+  opacity: 0.24;
+  pointer-events: none;
+}
+
+.mode-fermentation .hotspot-fermenter,
+.mode-packaging .hotspot-bottler,
+.mode-packaging .case-hotspot {
+  opacity: 0.94;
+}
+
 
 .condition-clean {
   border-color: rgba(110, 207, 120, 0.45);
@@ -542,7 +567,8 @@
 .event-log h2 {
   margin: 0;
   color: #fff7e8;
-  font-size: 1rem;
+  font-size: var(--type-card-title-size);
+  line-height: var(--type-card-title-line);
 }
 
 .action-drawer p,
@@ -610,7 +636,7 @@
 
 .batch-card {
   display: grid;
-  gap: 0.55rem;
+  gap: var(--grid-gap);
 }
 
 .batch-card div {
@@ -649,8 +675,9 @@
 .eyebrow {
   display: block;
   color: var(--text-secondary);
-  font-size: 0.66rem;
-  font-weight: 800;
+  font-size: var(--type-eyebrow-size);
+  font-weight: 850;
+  line-height: var(--type-eyebrow-line);
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -1000,16 +1027,16 @@ body {
   height: 100dvh;
   min-height: 0;
   overflow: hidden;
-  padding: max(0.38rem, var(--safe-top)) 0.5rem max(0.45rem, var(--safe-bottom));
+  padding: var(--grid-edge-y) var(--grid-edge-x) max(var(--grid-edge-y), var(--safe-bottom));
 }
 
 .glass-panel,
 .top-hud,
 .side-nav,
 .workflow-dock {
-  border-color: rgba(255, 255, 255, 0.065);
-  background: linear-gradient(135deg, rgba(15, 18, 22, 0.68), rgba(8, 11, 14, 0.58));
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.34), inset 0 1px rgba(255, 255, 255, 0.08);
+  border-color: var(--glass-border);
+  background: var(--glass-bg);
+  box-shadow: var(--shadow-glass);
   backdrop-filter: blur(22px) saturate(130%);
 }
 
@@ -1069,10 +1096,10 @@ body {
 }
 
 .garage-scene {
-  height: calc(100dvh - max(0.38rem, var(--safe-top)) - max(0.45rem, var(--safe-bottom)));
+  height: calc(100dvh - var(--grid-edge-y) - max(var(--grid-edge-y), var(--safe-bottom)));
   min-height: 0;
   border-color: rgba(255, 255, 255, 0.055);
-  border-radius: 22px;
+  border-radius: var(--radius-lg);
 }
 
 .stage-summary {
@@ -1198,7 +1225,7 @@ body {
   right: 4.2rem;
   bottom: 1rem;
   width: min(25rem, 32vw);
-  min-height: 2.65rem;
+  min-height: 2.38rem;
 }
 
 .event-ticker strong {
@@ -1331,8 +1358,11 @@ body {
   inset: 0;
   z-index: 40;
   display: grid;
-  place-items: center;
-  padding: calc(max(0.38rem, var(--safe-top)) + 3.4rem) 1rem 1rem;
+  align-items: stretch;
+  justify-items: stretch;
+  min-height: 0;
+  overflow: hidden;
+  padding: calc(var(--grid-edge-y) + 3.1rem) var(--grid-edge-x) var(--grid-edge-y);
   pointer-events: none;
 }
 
@@ -1351,12 +1381,44 @@ body {
 .focus-overlay {
   position: relative;
   z-index: 1;
+  align-self: stretch;
+  justify-self: center;
   width: min(54rem, 72vw);
-  max-height: min(27rem, 72dvh);
-  overflow: auto;
-  padding: 0.9rem;
-  border-radius: 18px;
+  min-height: 0;
+  max-height: none;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
   pointer-events: auto;
+}
+
+.focus-recipes {
+  justify-self: start;
+  width: min(51rem, 68vw);
+  margin-left: 12vw;
+}
+
+.focus-production {
+  width: min(42rem, 54vw);
+  margin-top: 3vh;
+}
+
+.focus-inventory {
+  justify-self: end;
+  width: min(48rem, 58vw);
+  margin-right: 3vw;
+}
+
+.focus-upgrades,
+.focus-log {
+  justify-self: start;
+  width: min(36rem, 44vw);
+  margin-left: 3vw;
+}
+
+.focus-upgrades {
+  margin-top: 8vh;
 }
 
 .overlay-close {
@@ -1542,7 +1604,7 @@ body {
   }
 
   .focus-layer {
-    padding-top: 3.15rem;
+    padding-top: calc(var(--grid-edge-y) + 2.58rem);
   }
 
   .focus-overlay {
@@ -1591,9 +1653,9 @@ body {
 
 /* Scene-first edge cluster refinement: break the navbar into tactical glass and route detail work through OPS. */
 .top-hud {
-  top: max(0.5rem, var(--safe-top));
-  left: 0.9rem;
-  right: 0.9rem;
+  top: var(--grid-edge-y);
+  left: var(--grid-edge-x);
+  right: var(--grid-edge-x);
   display: grid;
   grid-template-columns: auto minmax(7rem, 1fr) auto auto;
   align-items: start;
@@ -1614,11 +1676,11 @@ body {
 }
 
 .hud-cluster {
-  min-height: 2.65rem;
-  border: 1px solid rgba(255, 255, 255, 0.075);
-  border-radius: 999px;
-  background: linear-gradient(135deg, rgba(13, 17, 21, 0.56), rgba(5, 8, 11, 0.44));
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.26), inset 0 1px rgba(255, 255, 255, 0.09);
+  min-height: 2.38rem;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-pill);
+  background: var(--glass-bg);
+  box-shadow: var(--shadow-glass);
   backdrop-filter: blur(20px) saturate(130%);
 }
 
@@ -1626,7 +1688,7 @@ body {
 .hud-stat,
 .hud-resources {
   gap: 0.5rem;
-  padding: 0.32rem 0.66rem;
+  padding: 0.28rem 0.58rem;
   border-right: 0;
 }
 
@@ -1635,20 +1697,20 @@ body {
 }
 
 .brand-mark {
-  width: 1.74rem;
-  height: 1.74rem;
+  width: 1.55rem;
+  height: 1.55rem;
   border-color: rgba(226, 179, 84, 0.42);
   background: rgba(226, 179, 84, 0.08);
   font-size: 0.54rem;
 }
 
 .brand-lockup strong {
-  font-size: clamp(0.78rem, 1.2vw, 0.98rem);
+  font-size: clamp(0.72rem, 1.05vw, 0.9rem);
   line-height: 1;
 }
 
 .brand-lockup span:last-child {
-  font-size: 0.5rem;
+  font-size: 0.48rem;
   opacity: 0.58;
 }
 
@@ -1711,13 +1773,13 @@ body {
 }
 
 .missions-control {
-  top: 3.85rem;
-  left: 0.95rem;
+  top: calc(var(--grid-edge-y) + 3rem);
+  left: var(--grid-edge-x);
 }
 
 .stage-summary {
-  top: 3.45rem;
-  opacity: 0.46;
+  top: calc(var(--grid-edge-y) + 2.85rem);
+  opacity: 0.34;
 }
 
 .scene-instruction {
@@ -1752,25 +1814,38 @@ body {
 
 .ops-control {
   position: absolute;
-  right: 1.05rem;
-  bottom: 1rem;
+  right: var(--grid-edge-x);
+  bottom: max(var(--grid-edge-y), var(--safe-bottom));
   z-index: 32;
 }
 
 .ops-button {
   position: relative;
   z-index: 35;
-  min-width: 3.55rem;
-  min-height: 3.55rem;
+  display: grid;
+  min-width: 3.05rem;
+  min-height: 3.05rem;
+  place-items: center;
   padding: 0;
-  border: 1px solid rgba(226, 179, 84, 0.56);
-  border-radius: 999px;
-  color: #1d1506;
-  background: radial-gradient(circle at 35% 25%, #ffe4a0, var(--gold-strong));
-  box-shadow: 0 15px 30px rgba(0, 0, 0, 0.42), 0 0 0 5px rgba(226, 179, 84, 0.13);
-  font-size: 0.74rem;
-  font-weight: 950;
-  letter-spacing: 0.12em;
+  border: 1px solid rgba(226, 179, 84, 0.32);
+  border-radius: var(--radius-pill);
+  color: rgba(255, 234, 184, 0.92);
+  background:
+    radial-gradient(circle at 50% 35%, rgba(242, 196, 110, 0.22), transparent 58%),
+    linear-gradient(145deg, rgba(46, 34, 14, 0.74), rgba(9, 10, 10, 0.66));
+  box-shadow: 0 14px 26px rgba(0, 0, 0, 0.36), 0 0 0 4px rgba(226, 179, 84, 0.055), inset 0 1px rgba(255, 255, 255, 0.1);
+  font-size: 1.65rem;
+  font-weight: 850;
+  line-height: 1;
+}
+
+.ops-control.open .ops-button {
+  border-color: rgba(242, 196, 110, 0.72);
+  color: #fff2cf;
+  background:
+    radial-gradient(circle at 50% 35%, rgba(242, 196, 110, 0.42), transparent 62%),
+    linear-gradient(145deg, rgba(70, 49, 18, 0.88), rgba(13, 14, 13, 0.74));
+  box-shadow: 0 16px 30px rgba(0, 0, 0, 0.42), 0 0 0 6px rgba(226, 179, 84, 0.1), 0 0 28px rgba(226, 179, 84, 0.16);
 }
 
 .ops-scrim {
@@ -1789,14 +1864,14 @@ body {
 .ops-menu {
   position: absolute;
   right: 0;
-  bottom: 4.35rem;
+  bottom: 3.85rem;
   z-index: 34;
   display: grid;
   gap: 0.75rem;
-  width: min(22rem, 32vw);
-  padding: 0.85rem;
-  border-radius: 20px 20px 8px 20px;
-  background: linear-gradient(145deg, rgba(16, 21, 25, 0.82), rgba(6, 9, 12, 0.72));
+  width: min(20.5rem, 30vw);
+  padding: var(--space-3);
+  border-radius: var(--radius-lg) var(--radius-lg) 8px var(--radius-lg);
+  background: var(--glass-bg-strong);
 }
 
 .ops-menu-heading {
@@ -1817,7 +1892,7 @@ body {
 .ops-actions {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.48rem;
+  gap: var(--space-2);
 }
 
 .ops-actions button {
@@ -1889,14 +1964,14 @@ body {
   }
 
   .ops-button {
-    min-width: 3rem;
-    min-height: 3rem;
-    font-size: 0.66rem;
+    min-width: 2.72rem;
+    min-height: 2.72rem;
+    font-size: 1.45rem;
   }
 
   .ops-menu {
-    bottom: 3.7rem;
-    width: min(20rem, 34vw);
+    bottom: 3.35rem;
+    width: min(19rem, 34vw);
     padding: 0.62rem;
   }
 
@@ -1932,6 +2007,16 @@ body {
   }
 
   .ops-menu {
-    width: min(18.5rem, 42vw);
+    width: min(18rem, 42vw);
+  }
+
+  .focus-recipes,
+  .focus-inventory,
+  .focus-production,
+  .focus-upgrades,
+  .focus-log {
+    width: min(34rem, 78vw);
+    margin-left: 0;
+    margin-right: 0;
   }
 }

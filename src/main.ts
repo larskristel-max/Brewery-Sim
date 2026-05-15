@@ -11,7 +11,6 @@ import {
   formatClock,
   formatCurrency,
   ingredientAmountLabel,
-  nextSuggestedAction,
   objectiveProgress,
   orderCost,
   recipeCanStart,
@@ -59,7 +58,6 @@ const displayEquipmentName = (equipment: Equipment): string => {
   return equipment.name;
 };
 
-const targetLabel = (target: SceneTarget): string => (target === 'cases' ? 'Cases' : displayEquipmentName(state.equipment[target]));
 
 const playBell = () => {
   if (!audioAllowed) return;
@@ -348,15 +346,19 @@ const shouldShowStorageHotspot = (area: 'dry-shelf' | 'cold-box' | 'utility-shel
   return false;
 };
 
-const sceneVisibility = () => ({
-  hasActiveBatch: state.batches.length > 0,
-  hasReadyCases: state.inventory.cases > 0,
-  hasPendingOrders: state.pendingOrders.length > 0,
-  showInstruction: state.batches.length === 0 && !expandedTarget,
-  showNextTarget: Boolean(expandedTarget) || state.batches.length > 0,
-  showFloorNoteTicker: notificationsOpen,
-  showWorkshopHotspot: false
-});
+const sceneVisibility = () => {
+  const workflow = currentWorkflowStage(state);
+  const fermenting = state.batches.some((batch) => batch.step === 'fermenting');
+  const packaging = state.batches.some((batch) => batch.step === 'packaging' || batch.step === 'ready') || state.inventory.cases > 0;
+
+  return {
+    showFloorNoteTicker: notificationsOpen,
+    showWorkshopHotspot: false,
+    showCases: packaging || workflow.tapTarget === 'cases',
+    spotlightTarget: workflow.tapTarget,
+    modeClass: packaging ? 'mode-packaging' : fermenting ? 'mode-fermentation' : state.batches.length > 0 ? 'mode-production' : 'mode-idle'
+  };
+};
 
 const renderSceneSupplyHotspots = () => {
   const use = storageUseByArea(state);
@@ -382,26 +384,6 @@ const renderSceneSupplyHotspots = () => {
 };
 
 
-const renderActiveBatchSign = () => {
-  const activeBatch = state.batches[0];
-  if (!activeBatch) {
-    return `
-      <button class="active-batch-sign idle" data-action="open-overlay" data-overlay="recipes" type="button">
-        <span class="eyebrow gold">Brew board</span>
-        <strong>No active batch</strong>
-        <small>Tap to choose a recipe</small>
-      </button>
-    `;
-  }
-  return `
-    <button class="active-batch-sign risk-${contaminationRiskTier(activeBatch.contaminationRisk)}" data-action="open-overlay" data-overlay="production" type="button">
-      <span class="eyebrow gold">Active batch</span>
-      <strong>${activeBatch.recipeName}</strong>
-      <small>${stepLabel(activeBatch.step)} · Q${activeBatch.quality} · ${activeBatch.contaminationRisk}% risk</small>
-    </button>
-  `;
-};
-
 const renderWorkshopHotspot = () => {
   const installed = Object.values(state.upgrades).filter((upgrade) => upgrade.purchased).length;
   const total = Object.values(state.upgrades).length;
@@ -424,20 +406,20 @@ const renderEventTicker = () => {
 
 const renderOpsControl = () => `
   <div class="ops-control ${opsOpen ? 'open' : ''}">
-    <button class="ops-button" data-action="toggle-ops" type="button" aria-expanded="${opsOpen}" aria-label="Open operations layer">OPS</button>
+    <button class="ops-button" data-action="toggle-ops" type="button" aria-expanded="${opsOpen}" aria-label="Open operations layer"><span aria-hidden="true">+</span></button>
     ${
       opsOpen
         ? `
           <button class="ops-scrim" data-action="toggle-ops" type="button" aria-label="Close operations layer"></button>
           <aside class="glass-panel ops-menu" aria-label="Brewery operations layer">
             <div class="ops-menu-heading">
-              <span class="eyebrow gold">Brewery tablet</span>
-              <strong>Operations</strong>
+              <span class="eyebrow gold">Operational layer</span>
+              <strong>Floor controls</strong>
               <small>${saveStatus}</small>
             </div>
             <div class="ops-actions">
               <button data-action="open-overlay" data-overlay="recipes" type="button"><span>Brew</span><strong>Recipes</strong></button>
-              <button data-action="open-overlay" data-overlay="production" type="button"><span>Batch board</span><strong>Production</strong></button>
+              <button data-action="open-overlay" data-overlay="production" type="button"><span>Flow state</span><strong>Production</strong></button>
               <button data-action="open-overlay" data-overlay="inventory" type="button"><span>Stockroom</span><strong>Inventory</strong></button>
               <button data-action="open-overlay" data-overlay="upgrades" type="button"><span>Bench</span><strong>Workshop</strong></button>
               <button data-action="open-overlay" data-overlay="log" type="button"><span>Clipboard</span><strong>Floor notes</strong></button>
@@ -467,7 +449,6 @@ const renderAtmosphere = () => {
 
 const renderGarage = () => {
   const position = brewerPosition();
-  const workflow = currentWorkflowStage(state);
   const visibility = sceneVisibility();
   const expandedClass = expandedTarget ? `has-expanded expanded-${expandedTarget}` : '';
   const equipment = Object.values(state.equipment)
@@ -476,6 +457,8 @@ const renderGarage = () => {
       const conditionTier = equipmentConditionTier(item.condition);
       const status = equipmentSceneStatus(item.id);
       const expanded = expandedTarget === item.id;
+      const contextual = item.id === visibility.spotlightTarget || activeForEquipment(item.id) || expanded;
+      const silent = !contextual && visibility.modeClass !== 'mode-idle';
       const obstructed =
         expandedTarget === 'fermenter'
           ? item.id === 'kettle' || item.id === 'bottler'
@@ -484,7 +467,7 @@ const renderGarage = () => {
             : false;
       return `
         <article
-          class="equipment-hotspot hotspot-${item.id} ${expanded ? 'expanded' : ''} ${obstructed ? 'obstructed-by-card' : ''} condition-${conditionTier} ${status.toneClass} ${item.id === state.selectedEquipmentId ? 'selected' : ''} ${activeForEquipment(item.id) ? 'active' : ''} ${isNextTapTarget(item.id) ? 'next-tap' : ''}"
+          class="equipment-hotspot hotspot-${item.id} ${expanded ? 'expanded' : ''} ${contextual ? 'contextual' : ''} ${silent ? 'scene-silent' : ''} ${obstructed ? 'obstructed-by-card' : ''} condition-${conditionTier} ${status.toneClass} ${item.id === state.selectedEquipmentId ? 'selected' : ''} ${activeForEquipment(item.id) ? 'active' : ''} ${isNextTapTarget(item.id) ? 'next-tap' : ''}"
           style="--x: ${pos.x}%; --y: ${pos.y}%"
         >
           <button class="hotspot-toggle" data-action="toggle-target" data-target="${item.id}" type="button" aria-expanded="${expanded}" aria-label="${expanded ? 'Collapse' : 'Expand'} ${displayEquipmentName(item)}">
@@ -499,18 +482,16 @@ const renderGarage = () => {
     .join('');
 
   return `
-    <section class="garage-scene ${expandedClass}" aria-label="Playable garage brewery floor">
+    <section class="garage-scene ${expandedClass} ${visibility.modeClass}" aria-label="Playable garage brewery floor">
       <div class="scene-vignette"></div>
       ${renderAtmosphere()}
       <div class="stage-summary" aria-label="Workflow overview">Mash · Ferment · Package · Sell</div>
-      ${visibility.showInstruction ? `<div class="scene-instruction glass-panel"><span class="eyebrow gold">Next</span><strong>${nextSuggestedAction(state)}</strong></div>` : ''}
       ${renderMissionsControl()}
       ${renderSceneSupplyHotspots()}
       ${visibility.showWorkshopHotspot ? renderWorkshopHotspot() : ''}
-      ${renderActiveBatchSign()}
       ${visibility.showFloorNoteTicker ? renderEventTicker() : ''}
       ${equipment}
-      ${visibility.hasReadyCases || isNextTapTarget('cases') ? `<article class="case-hotspot ${expandedTarget === 'cases' ? 'expanded' : ''} ${expandedTarget === 'bottler' ? 'obstructed-by-card' : ''} ${state.inventory.cases > 0 ? 'active' : ''} ${isNextTapTarget('cases') ? 'next-tap' : ''}">
+      ${visibility.showCases ? `<article class="case-hotspot ${expandedTarget === 'cases' ? 'expanded' : ''} ${expandedTarget === 'bottler' ? 'obstructed-by-card' : ''} ${state.inventory.cases > 0 ? 'active' : ''} ${isNextTapTarget('cases') ? 'next-tap' : ''}">
         <button class="hotspot-toggle" data-action="toggle-target" data-target="cases" type="button" aria-expanded="${expandedTarget === 'cases'}" aria-label="Expand cases">
           <span class="hotspot-name">Cases</span>
           <strong>${state.inventory.cases}</strong>
@@ -523,7 +504,6 @@ const renderGarage = () => {
         }
       </article>` : ''}
       <div class="brewer-avatar" style="left: ${position.left}; top: ${position.top}" aria-label="Brewer position"><span></span></div>
-      ${visibility.showNextTarget ? `<div class="next-target-label">Next: ${targetLabel(workflow.tapTarget)}</div>` : ''}
       ${renderOpsControl()}
     </section>
   `;
@@ -531,7 +511,7 @@ const renderGarage = () => {
 
 const renderBatchBoard = () => `
   <section class="overlay-section">
-    <div class="panel-heading"><span class="eyebrow gold">Production</span><h2>Batch board</h2></div>
+    <div class="panel-heading"><span class="eyebrow gold">Production</span><h2>Production flow</h2></div>
     ${
       state.batches.length === 0
         ? '<p>No active batch. Tap the brew system to choose a recipe.</p>'
@@ -635,7 +615,7 @@ const renderFocusOverlay = () =>
     ? `
       <div class="focus-layer" role="dialog" aria-modal="false" aria-label="${overlayTitle()}">
         <button class="focus-scrim" data-action="close-overlay" type="button" aria-label="Close overlay"></button>
-        <aside class="glass-panel focus-overlay">
+        <aside class="glass-panel focus-overlay focus-${activeOverlay}">
           <button class="overlay-close" data-action="close-overlay" type="button" aria-label="Close overlay">×</button>
           ${overlayContent()}
         </aside>
@@ -663,7 +643,7 @@ root.addEventListener('click', (event) => {
   if (!target) {
     const clickTarget = event.target as HTMLElement;
     const isInsideOpenSurface = Boolean(
-      clickTarget.closest('.equipment-hotspot, .case-hotspot, .supply-hotspot, .workshop-hotspot, .active-batch-sign, .event-ticker, .missions-control, .notification-control, .ops-control, .focus-overlay, button')
+      clickTarget.closest('.equipment-hotspot, .case-hotspot, .supply-hotspot, .workshop-hotspot, .event-ticker, .missions-control, .notification-control, .ops-control, .focus-overlay, button')
     );
     if ((expandedTarget || missionsOpen || notificationsOpen || opsOpen || activeOverlay) && !isInsideOpenSurface) {
       expandedTarget = null;
