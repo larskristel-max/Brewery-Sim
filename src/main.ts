@@ -48,6 +48,7 @@ let saveStatus = hadBrowserSave ? 'Browser save loaded' : 'Autosave ready';
 let expandedTarget: SceneTarget | null = null;
 let missionsOpen = false;
 let notificationsOpen = false;
+let opsOpen = false;
 let activeOverlay: FocusOverlay | null = null;
 let audioAllowed = false;
 
@@ -99,6 +100,7 @@ const resetGame = () => {
   expandedTarget = null;
   missionsOpen = false;
   notificationsOpen = false;
+  opsOpen = false;
   activeOverlay = null;
   saveStatus = 'New game started. Browser save cleared.';
   render();
@@ -199,21 +201,16 @@ const brewerPosition = () => {
 
 const renderTopHud = () => `
   <header class="top-hud" aria-label="Brewery status">
-    <div class="brand-lockup">
+    <div class="hud-cluster brand-lockup">
       <span class="brand-mark" aria-hidden="true">HH</span>
-      <div><strong>HOP HAVEN</strong><span>Garage</span></div>
+      <div><strong>HOP HAVEN</strong><span>Garage floor</span></div>
     </div>
-    <div class="hud-stat"><span class="eyebrow">Day ${state.day}</span><strong>${formatClock(state.minute)}</strong></div>
-    <div class="hud-stat rep-stat">
-      <span class="eyebrow">Reputation</span>
-      <strong>${state.reputation}</strong>
-      <span class="mini-meter"><i style="width: ${Math.min(100, state.reputation * 8)}%"></i></span>
+    <div class="hud-cluster hud-stat time-stat"><span class="eyebrow">Day ${state.day}</span><strong>${formatClock(state.minute)}</strong></div>
+    <div class="hud-cluster hud-resources">
+      <div><span class="eyebrow">Cash</span><strong>${formatCurrency(state.cash)}</strong></div>
+      <div class="rep-stat"><span class="eyebrow">Rep</span><strong>${state.reputation}</strong><span class="mini-meter"><i style="width: ${Math.min(100, state.reputation * 8)}%"></i></span></div>
     </div>
-    <div class="hud-stat"><span class="eyebrow">Cash</span><strong>${formatCurrency(state.cash)}</strong></div>
-    <div class="hud-save">
-      <span>${saveStatus}</span>
-      <button class="reset-save-button" data-action="reset-save" type="button" title="Clears this browser's local save">New Game / Reset Save</button>
-    </div>
+    ${renderNotificationControl()}
   </header>
 `;
 
@@ -345,25 +342,45 @@ const storageToneClass = (used: number, capacity: number, overflow: number): str
   return 'stocked';
 };
 
+const shouldShowStorageHotspot = (area: 'dry-shelf' | 'cold-box' | 'utility-shelf', used: number, capacity: number, overflow: number): boolean => {
+  if (overflow > 0 || (capacity > 0 && used / capacity >= 0.82)) return true;
+  if (area === 'utility-shelf') return state.inventory.ingredients.bottles.amount <= 18;
+  return false;
+};
+
+const sceneVisibility = () => ({
+  hasActiveBatch: state.batches.length > 0,
+  hasReadyCases: state.inventory.cases > 0,
+  hasPendingOrders: state.pendingOrders.length > 0,
+  showInstruction: state.batches.length === 0 && !expandedTarget,
+  showNextTarget: Boolean(expandedTarget) || state.batches.length > 0,
+  showFloorNoteTicker: notificationsOpen,
+  showWorkshopHotspot: false
+});
+
 const renderSceneSupplyHotspots = () => {
   const use = storageUseByArea(state);
   const capacity = storageCapacityByArea(state);
   const overflow = storageOverflowByArea(state);
-  const dryTone = storageToneClass(use['dry-shelf'], capacity['dry-shelf'], overflow['dry-shelf']);
-  const coldTone = storageToneClass(use['cold-box'], capacity['cold-box'], overflow['cold-box']);
-  const utilityTone = storageToneClass(use['utility-shelf'], capacity['utility-shelf'], overflow['utility-shelf']);
-  return `
-    <button class="supply-hotspot dry-shelf-hotspot ${dryTone}" data-action="open-overlay" data-overlay="inventory" type="button" aria-label="Dry shelf inventory">
-      <span>Dry shelf</span><strong>${use['dry-shelf'].toFixed(1)}/${capacity['dry-shelf']} kg</strong>
-    </button>
-    <button class="supply-hotspot cold-box-hotspot ${coldTone}" data-action="open-overlay" data-overlay="inventory" type="button" aria-label="Cold box inventory">
-      <span>Cold box</span><strong>${use['cold-box'].toFixed(2)}/${capacity['cold-box']} kg eq.</strong>
-    </button>
-    <button class="supply-hotspot utility-shelf-hotspot ${utilityTone}" data-action="open-overlay" data-overlay="inventory" type="button" aria-label="Utility shelf inventory">
-      <span>Bottles</span><strong>${use['utility-shelf'].toFixed(0)}/${capacity['utility-shelf']}</strong>
-    </button>
-  `;
+  const supplyCards = [
+    { area: 'dry-shelf' as const, label: 'Dry shelf', className: 'dry-shelf-hotspot', amount: `${use['dry-shelf'].toFixed(1)}/${capacity['dry-shelf']} kg` },
+    { area: 'cold-box' as const, label: 'Cold box', className: 'cold-box-hotspot', amount: `${use['cold-box'].toFixed(2)}/${capacity['cold-box']} kg eq.` },
+    { area: 'utility-shelf' as const, label: 'Bottles', className: 'utility-shelf-hotspot', amount: `${use['utility-shelf'].toFixed(0)}/${capacity['utility-shelf']}` }
+  ];
+
+  return supplyCards
+    .map((card) => ({ ...card, tone: storageToneClass(use[card.area], capacity[card.area], overflow[card.area]) }))
+    .filter((card) => shouldShowStorageHotspot(card.area, use[card.area], capacity[card.area], overflow[card.area]))
+    .map(
+      (card) => `
+        <button class="supply-hotspot ${card.className} ${card.tone}" data-action="open-overlay" data-overlay="inventory" type="button" aria-label="${card.label} inventory alert">
+          <span>${card.label}</span><strong>${card.amount}</strong>
+        </button>
+      `
+    )
+    .join('');
 };
+
 
 const renderActiveBatchSign = () => {
   const activeBatch = state.batches[0];
@@ -405,6 +422,34 @@ const renderEventTicker = () => {
   `;
 };
 
+const renderOpsControl = () => `
+  <div class="ops-control ${opsOpen ? 'open' : ''}">
+    <button class="ops-button" data-action="toggle-ops" type="button" aria-expanded="${opsOpen}" aria-label="Open operations layer">OPS</button>
+    ${
+      opsOpen
+        ? `
+          <button class="ops-scrim" data-action="toggle-ops" type="button" aria-label="Close operations layer"></button>
+          <aside class="glass-panel ops-menu" aria-label="Brewery operations layer">
+            <div class="ops-menu-heading">
+              <span class="eyebrow gold">Brewery tablet</span>
+              <strong>Operations</strong>
+              <small>${saveStatus}</small>
+            </div>
+            <div class="ops-actions">
+              <button data-action="open-overlay" data-overlay="recipes" type="button"><span>Brew</span><strong>Recipes</strong></button>
+              <button data-action="open-overlay" data-overlay="production" type="button"><span>Batch board</span><strong>Production</strong></button>
+              <button data-action="open-overlay" data-overlay="inventory" type="button"><span>Stockroom</span><strong>Inventory</strong></button>
+              <button data-action="open-overlay" data-overlay="upgrades" type="button"><span>Bench</span><strong>Workshop</strong></button>
+              <button data-action="open-overlay" data-overlay="log" type="button"><span>Clipboard</span><strong>Floor notes</strong></button>
+              <button data-action="reset-save" type="button"><span>Settings</span><strong>New Game / Reset Save</strong></button>
+            </div>
+          </aside>
+        `
+        : ''
+    }
+  </div>
+`;
+
 const renderAtmosphere = () => {
   const anyActive = state.batches.length > 0;
   const worstCondition = Math.min(...Object.values(state.equipment).map((equipment) => equipment.condition));
@@ -423,6 +468,7 @@ const renderAtmosphere = () => {
 const renderGarage = () => {
   const position = brewerPosition();
   const workflow = currentWorkflowStage(state);
+  const visibility = sceneVisibility();
   const expandedClass = expandedTarget ? `has-expanded expanded-${expandedTarget}` : '';
   const equipment = Object.values(state.equipment)
     .map((item) => {
@@ -457,18 +503,14 @@ const renderGarage = () => {
       <div class="scene-vignette"></div>
       ${renderAtmosphere()}
       <div class="stage-summary" aria-label="Workflow overview">Mash · Ferment · Package · Sell</div>
-      <div class="scene-instruction glass-panel">
-        <span class="eyebrow gold">Next</span>
-        <strong>${nextSuggestedAction(state)}</strong>
-      </div>
+      ${visibility.showInstruction ? `<div class="scene-instruction glass-panel"><span class="eyebrow gold">Next</span><strong>${nextSuggestedAction(state)}</strong></div>` : ''}
       ${renderMissionsControl()}
-      ${renderNotificationControl()}
       ${renderSceneSupplyHotspots()}
-      ${renderWorkshopHotspot()}
+      ${visibility.showWorkshopHotspot ? renderWorkshopHotspot() : ''}
       ${renderActiveBatchSign()}
-      ${renderEventTicker()}
+      ${visibility.showFloorNoteTicker ? renderEventTicker() : ''}
       ${equipment}
-      <article class="case-hotspot ${expandedTarget === 'cases' ? 'expanded' : ''} ${expandedTarget === 'bottler' ? 'obstructed-by-card' : ''} ${state.inventory.cases > 0 ? 'active' : ''} ${isNextTapTarget('cases') ? 'next-tap' : ''}">
+      ${visibility.hasReadyCases || isNextTapTarget('cases') ? `<article class="case-hotspot ${expandedTarget === 'cases' ? 'expanded' : ''} ${expandedTarget === 'bottler' ? 'obstructed-by-card' : ''} ${state.inventory.cases > 0 ? 'active' : ''} ${isNextTapTarget('cases') ? 'next-tap' : ''}">
         <button class="hotspot-toggle" data-action="toggle-target" data-target="cases" type="button" aria-expanded="${expandedTarget === 'cases'}" aria-label="Expand cases">
           <span class="hotspot-name">Cases</span>
           <strong>${state.inventory.cases}</strong>
@@ -479,9 +521,10 @@ const renderGarage = () => {
             ? `<div class="hotspot-actions"><button data-action="sell-cases" type="button" ${state.inventory.cases > 0 ? '' : 'disabled'}>Sell</button></div>`
             : ''
         }
-      </article>
+      </article>` : ''}
       <div class="brewer-avatar" style="left: ${position.left}; top: ${position.top}" aria-label="Brewer position"><span></span></div>
-      <div class="next-target-label">Next: ${targetLabel(workflow.tapTarget)}</div>
+      ${visibility.showNextTarget ? `<div class="next-target-label">Next: ${targetLabel(workflow.tapTarget)}</div>` : ''}
+      ${renderOpsControl()}
     </section>
   `;
 };
@@ -620,12 +663,13 @@ root.addEventListener('click', (event) => {
   if (!target) {
     const clickTarget = event.target as HTMLElement;
     const isInsideOpenSurface = Boolean(
-      clickTarget.closest('.equipment-hotspot, .case-hotspot, .supply-hotspot, .workshop-hotspot, .active-batch-sign, .event-ticker, .missions-control, .notification-control, .focus-overlay, button')
+      clickTarget.closest('.equipment-hotspot, .case-hotspot, .supply-hotspot, .workshop-hotspot, .active-batch-sign, .event-ticker, .missions-control, .notification-control, .ops-control, .focus-overlay, button')
     );
-    if ((expandedTarget || missionsOpen || notificationsOpen || activeOverlay) && !isInsideOpenSurface) {
+    if ((expandedTarget || missionsOpen || notificationsOpen || opsOpen || activeOverlay) && !isInsideOpenSurface) {
       expandedTarget = null;
       missionsOpen = false;
       notificationsOpen = false;
+      opsOpen = false;
       activeOverlay = null;
       render();
     }
@@ -635,6 +679,7 @@ root.addEventListener('click', (event) => {
   const action = target.dataset.action;
   if (action === 'close-overlay') {
     activeOverlay = null;
+    opsOpen = false;
     render();
     return;
   }
@@ -644,6 +689,17 @@ root.addEventListener('click', (event) => {
     expandedTarget = null;
     missionsOpen = false;
     notificationsOpen = false;
+    opsOpen = false;
+    render();
+    return;
+  }
+
+  if (action === 'toggle-ops') {
+    opsOpen = !opsOpen;
+    missionsOpen = false;
+    notificationsOpen = false;
+    expandedTarget = null;
+    activeOverlay = null;
     render();
     return;
   }
@@ -658,6 +714,7 @@ root.addEventListener('click', (event) => {
     notificationsOpen = false;
     expandedTarget = null;
     activeOverlay = null;
+    opsOpen = false;
     render();
     return;
   }
@@ -667,6 +724,7 @@ root.addEventListener('click', (event) => {
     missionsOpen = false;
     expandedTarget = null;
     activeOverlay = null;
+    opsOpen = false;
     render();
     return;
   }
@@ -677,6 +735,7 @@ root.addEventListener('click', (event) => {
     missionsOpen = false;
     notificationsOpen = false;
     activeOverlay = null;
+    opsOpen = false;
     render();
     return;
   }
@@ -688,12 +747,14 @@ root.addEventListener('click', (event) => {
 
   if (action === 'start-batch') {
     activeOverlay = null;
+    opsOpen = false;
     dispatch({ type: 'start-batch', recipeId: target.dataset.recipeId ?? 'garage-blonde' });
     return;
   }
 
   if (action === 'order-recipe') {
     activeOverlay = null;
+    opsOpen = false;
     dispatch({ type: 'order-recipe', recipeId: target.dataset.recipeId ?? 'garage-blonde', mode: target.dataset.orderMode === 'extra' ? 'extra' : 'missing' });
     return;
   }
@@ -705,6 +766,7 @@ root.addEventListener('click', (event) => {
 
   if (action === 'sell-cases') {
     activeOverlay = null;
+    opsOpen = false;
     dispatch({ type: 'sell-cases', cases: Math.min(6, state.inventory.cases) });
     return;
   }
