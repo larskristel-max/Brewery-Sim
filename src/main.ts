@@ -32,6 +32,7 @@ if (!root) {
 }
 
 type SceneTarget = EquipmentId | 'cases';
+type FocusOverlay = 'recipes' | 'production' | 'inventory' | 'upgrades' | 'log';
 
 const hasBrowserSave = (): boolean => {
   try {
@@ -47,6 +48,7 @@ let saveStatus = hadBrowserSave ? 'Browser save loaded' : 'Autosave ready';
 let expandedTarget: SceneTarget | null = null;
 let missionsOpen = false;
 let notificationsOpen = false;
+let activeOverlay: FocusOverlay | null = null;
 let audioAllowed = false;
 
 const displayEquipmentName = (equipment: Equipment): string => {
@@ -97,6 +99,7 @@ const resetGame = () => {
   expandedTarget = null;
   missionsOpen = false;
   notificationsOpen = false;
+  activeOverlay = null;
   saveStatus = 'New game started. Browser save cleared.';
   render();
 };
@@ -198,7 +201,7 @@ const renderTopHud = () => `
   <header class="top-hud" aria-label="Brewery status">
     <div class="brand-lockup">
       <span class="brand-mark" aria-hidden="true">HH</span>
-      <div><strong>HOP HAVEN</strong><span>Garage Brewery Co.</span></div>
+      <div><strong>HOP HAVEN</strong><span>Garage</span></div>
     </div>
     <div class="hud-stat"><span class="eyebrow">Day ${state.day}</span><strong>${formatClock(state.minute)}</strong></div>
     <div class="hud-stat rep-stat">
@@ -305,7 +308,7 @@ const renderEquipmentActions = (equipmentId: EquipmentId) => {
   if (equipmentId === 'kettle') {
     return `
       <div class="hotspot-actions">
-        <button data-action="use-equipment" data-equipment-id="kettle" type="button">Brew</button>
+        <button data-action="open-overlay" data-overlay="recipes" type="button">Brew</button>
         <button data-action="clean-equipment" data-equipment-id="kettle" type="button">Clean</button>
         <button type="button" disabled>Repair</button>
         <button type="button" disabled>Replace</button>
@@ -331,6 +334,89 @@ const renderEquipmentActions = (equipmentId: EquipmentId) => {
       <button type="button" disabled>Repair</button>
       <button type="button" disabled>Replace</button>
     </div>
+  `;
+};
+
+
+const storageToneClass = (used: number, capacity: number, overflow: number): string => {
+  if (overflow > 0) return 'overflowing';
+  if (capacity > 0 && used / capacity >= 0.82) return 'crowded';
+  if (used <= 0) return 'low-stock';
+  return 'stocked';
+};
+
+const renderSceneSupplyHotspots = () => {
+  const use = storageUseByArea(state);
+  const capacity = storageCapacityByArea(state);
+  const overflow = storageOverflowByArea(state);
+  const dryTone = storageToneClass(use['dry-shelf'], capacity['dry-shelf'], overflow['dry-shelf']);
+  const coldTone = storageToneClass(use['cold-box'], capacity['cold-box'], overflow['cold-box']);
+  const utilityTone = storageToneClass(use['utility-shelf'], capacity['utility-shelf'], overflow['utility-shelf']);
+  return `
+    <button class="supply-hotspot dry-shelf-hotspot ${dryTone}" data-action="open-overlay" data-overlay="inventory" type="button" aria-label="Dry shelf inventory">
+      <span>Dry shelf</span><strong>${use['dry-shelf'].toFixed(1)}/${capacity['dry-shelf']} kg</strong>
+    </button>
+    <button class="supply-hotspot cold-box-hotspot ${coldTone}" data-action="open-overlay" data-overlay="inventory" type="button" aria-label="Cold box inventory">
+      <span>Cold box</span><strong>${use['cold-box'].toFixed(2)}/${capacity['cold-box']} kg eq.</strong>
+    </button>
+    <button class="supply-hotspot utility-shelf-hotspot ${utilityTone}" data-action="open-overlay" data-overlay="inventory" type="button" aria-label="Utility shelf inventory">
+      <span>Bottles</span><strong>${use['utility-shelf'].toFixed(0)}/${capacity['utility-shelf']}</strong>
+    </button>
+  `;
+};
+
+const renderActiveBatchSign = () => {
+  const activeBatch = state.batches[0];
+  if (!activeBatch) {
+    return `
+      <button class="active-batch-sign idle" data-action="open-overlay" data-overlay="recipes" type="button">
+        <span class="eyebrow gold">Brew board</span>
+        <strong>No active batch</strong>
+        <small>Tap to choose a recipe</small>
+      </button>
+    `;
+  }
+  return `
+    <button class="active-batch-sign risk-${contaminationRiskTier(activeBatch.contaminationRisk)}" data-action="open-overlay" data-overlay="production" type="button">
+      <span class="eyebrow gold">Active batch</span>
+      <strong>${activeBatch.recipeName}</strong>
+      <small>${stepLabel(activeBatch.step)} · Q${activeBatch.quality} · ${activeBatch.contaminationRisk}% risk</small>
+    </button>
+  `;
+};
+
+const renderWorkshopHotspot = () => {
+  const installed = Object.values(state.upgrades).filter((upgrade) => upgrade.purchased).length;
+  const total = Object.values(state.upgrades).length;
+  return `
+    <button class="workshop-hotspot" data-action="open-overlay" data-overlay="upgrades" type="button" aria-label="Workshop upgrades">
+      <span>Workshop</span><strong>${installed}/${total} installed</strong>
+    </button>
+  `;
+};
+
+const renderEventTicker = () => {
+  const latest = state.events[0];
+  return `
+    <button class="event-ticker" data-action="open-overlay" data-overlay="log" type="button" aria-label="Open clipboard log">
+      <span class="eyebrow gold">Floor note</span>
+      <strong>${latest ? latest.message : 'No floor notes yet.'}</strong>
+    </button>
+  `;
+};
+
+const renderAtmosphere = () => {
+  const anyActive = state.batches.length > 0;
+  const worstCondition = Math.min(...Object.values(state.equipment).map((equipment) => equipment.condition));
+  const pending = state.pendingOrders.length > 0;
+  return `
+    ${activeForEquipment('kettle') ? '<div class="steam-wisp kettle-steam"></div>' : ''}
+    ${activeForEquipment('fermenter') ? '<div class="equipment-glow fermenter-glow"></div>' : ''}
+    ${activeForEquipment('bottler') ? '<div class="equipment-glow bottler-glow"></div>' : ''}
+    ${anyActive ? '<div class="hose-line"></div>' : ''}
+    ${state.inventory.cases > 0 ? `<div class="crate-stack" aria-label="${state.inventory.cases} finished cases"><span>${state.inventory.cases}</span></div>` : ''}
+    ${pending ? `<div class="delivery-pallet" aria-label="${state.pendingOrders.length} incoming deliveries"><span>${state.pendingOrders.length}</span></div>` : ''}
+    ${worstCondition < 62 ? '<div class="dirty-floor"></div>' : ''}
   `;
 };
 
@@ -369,6 +455,7 @@ const renderGarage = () => {
   return `
     <section class="garage-scene ${expandedClass}" aria-label="Playable garage brewery floor">
       <div class="scene-vignette"></div>
+      ${renderAtmosphere()}
       <div class="stage-summary" aria-label="Workflow overview">Mash · Ferment · Package · Sell</div>
       <div class="scene-instruction glass-panel">
         <span class="eyebrow gold">Next</span>
@@ -376,6 +463,10 @@ const renderGarage = () => {
       </div>
       ${renderMissionsControl()}
       ${renderNotificationControl()}
+      ${renderSceneSupplyHotspots()}
+      ${renderWorkshopHotspot()}
+      ${renderActiveBatchSign()}
+      ${renderEventTicker()}
       ${equipment}
       <article class="case-hotspot ${expandedTarget === 'cases' ? 'expanded' : ''} ${expandedTarget === 'bottler' ? 'obstructed-by-card' : ''} ${state.inventory.cases > 0 ? 'active' : ''} ${isNextTapTarget('cases') ? 'next-tap' : ''}">
         <button class="hotspot-toggle" data-action="toggle-target" data-target="cases" type="button" aria-expanded="${expandedTarget === 'cases'}" aria-label="Expand cases">
@@ -396,7 +487,7 @@ const renderGarage = () => {
 };
 
 const renderBatchBoard = () => `
-  <section class="glass-panel compact-panel">
+  <section class="overlay-section">
     <div class="panel-heading"><span class="eyebrow gold">Production</span><h2>Batch board</h2></div>
     ${
       state.batches.length === 0
@@ -426,7 +517,7 @@ const renderStorageStatus = () => {
   const capacity = storageCapacityByArea(state);
   const overflow = storageOverflowByArea(state);
   return `
-    <div class="inventory-list">
+    <div class="inventory-list storage-detail-list">
       <div><span>Dry shelf</span><strong>${use['dry-shelf'].toFixed(1)}/${capacity['dry-shelf']} kg${overflow['dry-shelf'] > 0 ? ' overflow' : ''}</strong></div>
       <div><span>Cold box</span><strong>${use['cold-box'].toFixed(2)}/${capacity['cold-box']} kg eq.${overflow['cold-box'] > 0 ? ' overflow' : ''}</strong></div>
       <div><span>Utility shelf</span><strong>${use['utility-shelf'].toFixed(0)}/${capacity['utility-shelf']} units${overflow['utility-shelf'] > 0 ? ' overflow' : ''}</strong></div>
@@ -435,8 +526,8 @@ const renderStorageStatus = () => {
 };
 
 const renderInventory = () => `
-  <section class="glass-panel compact-panel">
-    <div class="panel-heading"><span class="eyebrow gold">Supplies</span><h2>Inventory</h2></div>
+  <section class="overlay-section inventory-overlay-detail">
+    <div class="panel-heading"><span class="eyebrow gold">Supplies</span><h2>Inventory detail</h2></div>
     ${renderStorageStatus()}
     <div class="inventory-list">
       <div><span>Water</span><strong>${state.inventory.water} L</strong></div>
@@ -445,11 +536,12 @@ const renderInventory = () => `
       ${ingredients
         .map((ingredient) => {
           const stock = state.inventory.ingredients[ingredient.id];
-          return `<div><span>${ingredient.name}</span><strong>${ingredientAmountLabel(ingredient.id, stock.amount)} · ${Math.round(stock.condition)}%</strong><button data-action="order-ingredient" data-ingredient-id="${ingredient.id}" type="button" ${state.cash >= ingredient.packPrice ? '' : 'disabled'}>Order ${formatCurrency(ingredient.packPrice)}</button></div>`;
+          const lowClass = stock.amount <= 0 ? 'low-stock-row' : '';
+          return `<div class="${lowClass}"><span>${ingredient.name}</span><strong>${ingredientAmountLabel(ingredient.id, stock.amount)} · ${Math.round(stock.condition)}%</strong><button data-action="order-ingredient" data-ingredient-id="${ingredient.id}" type="button" ${state.cash >= ingredient.packPrice ? '' : 'disabled'}>Order ${formatCurrency(ingredient.packPrice)}</button></div>`;
         })
         .join('')}
     </div>
-    <div class="inventory-list">
+    <div class="inventory-list incoming-list">
       <div><span>Incoming orders</span><strong>${state.pendingOrders.length}</strong></div>
       ${state.pendingOrders
         .map((order) => `<div><span>Arrives day ${order.arrivalDay}</span><strong>${formatCurrency(order.cost)} · ${order.items.map((item) => `${getIngredient(item.ingredientId).name} x${item.packs}`).join(', ')}</strong></div>`)
@@ -459,14 +551,14 @@ const renderInventory = () => `
 `;
 
 const renderUpgrades = () => `
-  <section class="glass-panel compact-panel upgrade-shop">
-    <div class="panel-heading"><span class="eyebrow gold">Growth</span><h2>Upgrade shelf</h2></div>
+  <section class="overlay-section upgrade-shop workshop-overlay">
+    <div class="panel-heading"><span class="eyebrow gold">Workshop corner</span><h2>Equipment pallets</h2></div>
     ${Object.values(state.upgrades)
       .map(
         (upgrade) => `
-          <button type="button" data-action="buy-upgrade" data-upgrade-id="${upgrade.id}" ${upgrade.purchased ? 'disabled' : ''}>
-            <span>${upgrade.purchased ? 'Installed: ' : ''}${upgrade.name}</span>
-            <small>${upgrade.purchased ? 'Already installed' : formatCurrency(upgrade.cost)} · ${upgrade.description}</small>
+          <button class="upgrade-pallet ${upgrade.purchased ? 'upgrade-installed' : ''}" type="button" data-action="buy-upgrade" data-upgrade-id="${upgrade.id}" ${upgrade.purchased ? 'disabled' : ''}>
+            <span>${upgrade.purchased ? 'Installed: ' : 'Install: '}${upgrade.name}</span>
+            <small>${upgrade.purchased ? 'Bolted into the brewery floor' : formatCurrency(upgrade.cost)} · ${upgrade.description}</small>
           </button>
         `
       )
@@ -475,25 +567,45 @@ const renderUpgrades = () => `
 `;
 
 const renderEventLog = () => `
-  <section class="glass-panel event-log">
-    <div class="panel-heading"><span class="eyebrow gold">Floor log</span><h2>Recent activity</h2></div>
+  <section class="overlay-section clipboard-popover">
+    <div class="panel-heading"><span class="eyebrow gold">Clipboard</span><h2>Floor notes</h2></div>
     <ol>
       ${state.events.map((event) => `<li><time>${formatClock(event.minute)}</time><span>${event.message}</span></li>`).join('')}
     </ol>
   </section>
 `;
 
+const overlayContent = () => {
+  if (activeOverlay === 'recipes') return `<div class="focus-grid recipe-overlay">${renderRecipeCards()}</div>`;
+  if (activeOverlay === 'production') return renderBatchBoard();
+  if (activeOverlay === 'inventory') return renderInventory();
+  if (activeOverlay === 'upgrades') return renderUpgrades();
+  if (activeOverlay === 'log') return renderEventLog();
+  return '';
+};
+
+const overlayTitle = () =>
+  ({ recipes: 'Recipe / Brew', production: 'Production', inventory: 'Inventory detail', upgrades: 'Workshop upgrades', log: 'Clipboard log' })[activeOverlay ?? 'production'];
+
+const renderFocusOverlay = () =>
+  activeOverlay
+    ? `
+      <div class="focus-layer" role="dialog" aria-modal="false" aria-label="${overlayTitle()}">
+        <button class="focus-scrim" data-action="close-overlay" type="button" aria-label="Close overlay"></button>
+        <aside class="glass-panel focus-overlay">
+          <button class="overlay-close" data-action="close-overlay" type="button" aria-label="Close overlay">×</button>
+          ${overlayContent()}
+        </aside>
+      </div>
+    `
+    : '';
+
 const render = () => {
   root.innerHTML = `
     <main class="game-shell">
       ${renderTopHud()}
       ${renderGarage()}
-      <div class="lower-panels">
-        ${renderBatchBoard()}
-        ${renderInventory()}
-        ${renderUpgrades()}
-        ${renderEventLog()}
-      </div>
+      ${renderFocusOverlay()}
       <div class="rotate-blocker" role="dialog" aria-modal="true" aria-label="Rotate device">
         <strong>Brewery-Sim is played in landscape mode.</strong>
         <span>Rotate your device to continue brewing.</span>
@@ -508,18 +620,34 @@ root.addEventListener('click', (event) => {
   if (!target) {
     const clickTarget = event.target as HTMLElement;
     const isInsideOpenSurface = Boolean(
-      clickTarget.closest('.equipment-hotspot, .case-hotspot, .missions-control, .notification-control, button')
+      clickTarget.closest('.equipment-hotspot, .case-hotspot, .supply-hotspot, .workshop-hotspot, .active-batch-sign, .event-ticker, .missions-control, .notification-control, .focus-overlay, button')
     );
-    if ((expandedTarget || missionsOpen || notificationsOpen) && !isInsideOpenSurface) {
+    if ((expandedTarget || missionsOpen || notificationsOpen || activeOverlay) && !isInsideOpenSurface) {
       expandedTarget = null;
       missionsOpen = false;
       notificationsOpen = false;
+      activeOverlay = null;
       render();
     }
     return;
   }
 
   const action = target.dataset.action;
+  if (action === 'close-overlay') {
+    activeOverlay = null;
+    render();
+    return;
+  }
+
+  if (action === 'open-overlay') {
+    activeOverlay = target.dataset.overlay as FocusOverlay;
+    expandedTarget = null;
+    missionsOpen = false;
+    notificationsOpen = false;
+    render();
+    return;
+  }
+
   if (action === 'reset-save') {
     resetGame();
     return;
@@ -529,6 +657,7 @@ root.addEventListener('click', (event) => {
     missionsOpen = !missionsOpen;
     notificationsOpen = false;
     expandedTarget = null;
+    activeOverlay = null;
     render();
     return;
   }
@@ -537,6 +666,7 @@ root.addEventListener('click', (event) => {
     notificationsOpen = !notificationsOpen;
     missionsOpen = false;
     expandedTarget = null;
+    activeOverlay = null;
     render();
     return;
   }
@@ -546,6 +676,7 @@ root.addEventListener('click', (event) => {
     expandedTarget = expandedTarget === nextTarget ? null : nextTarget;
     missionsOpen = false;
     notificationsOpen = false;
+    activeOverlay = null;
     render();
     return;
   }
@@ -556,11 +687,13 @@ root.addEventListener('click', (event) => {
   }
 
   if (action === 'start-batch') {
+    activeOverlay = null;
     dispatch({ type: 'start-batch', recipeId: target.dataset.recipeId ?? 'garage-blonde' });
     return;
   }
 
   if (action === 'order-recipe') {
+    activeOverlay = null;
     dispatch({ type: 'order-recipe', recipeId: target.dataset.recipeId ?? 'garage-blonde', mode: target.dataset.orderMode === 'extra' ? 'extra' : 'missing' });
     return;
   }
@@ -571,6 +704,7 @@ root.addEventListener('click', (event) => {
   }
 
   if (action === 'sell-cases') {
+    activeOverlay = null;
     dispatch({ type: 'sell-cases', cases: Math.min(6, state.inventory.cases) });
     return;
   }
