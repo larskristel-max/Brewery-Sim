@@ -17,6 +17,29 @@
   --accent: #4c8bf5;
   --divider: rgba(255, 255, 255, 0.08);
   --border: rgba(255, 255, 255, 0.08);
+  --grid-edge-x: clamp(0.72rem, 1.45vw, 1.18rem);
+  --grid-edge-y: clamp(0.5rem, 1.05vw, 0.9rem);
+  --grid-gap: clamp(0.48rem, 0.9vw, 0.72rem);
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-pill: 999px;
+  --glass-border: rgba(255, 255, 255, 0.07);
+  --glass-bg: linear-gradient(135deg, rgba(13, 17, 21, 0.5), rgba(5, 8, 11, 0.38));
+  --glass-bg-strong: linear-gradient(145deg, rgba(16, 20, 24, 0.82), rgba(5, 8, 11, 0.7));
+  --shadow-glass: 0 12px 28px rgba(0, 0, 0, 0.3), inset 0 1px rgba(255, 255, 255, 0.08);
+  --type-eyebrow-size: 0.58rem;
+  --type-eyebrow-line: 1.05;
+  --type-card-title-size: 0.86rem;
+  --type-card-title-line: 1.15;
+  --type-support-size: 0.68rem;
+  --type-support-line: 1.35;
+  --type-metric-size: 0.98rem;
+  --type-metric-line: 1.05;
 }
 
 * {
@@ -98,34 +121,4 @@ progress::-webkit-progress-value {
 progress::-moz-progress-bar {
   border-radius: 999px;
   background: linear-gradient(90deg, var(--accent), var(--gold-strong));
-}
-
-/* Design discipline tokens: shared rhythm, typography, surfaces, and spatial grid. */
-:root {
-  --grid-edge-x: clamp(0.72rem, 1.45vw, 1.18rem);
-  --grid-edge-y: clamp(0.5rem, 1.05vw, 0.9rem);
-  --grid-gap: clamp(0.48rem, 0.9vw, 0.72rem);
-  --space-1: 0.25rem;
-  --space-2: 0.5rem;
-  --space-3: 0.75rem;
-  --space-4: 1rem;
-  --space-5: 1.25rem;
-  --radius-sm: 10px;
-  --radius-md: 14px;
-  --radius-lg: 20px;
-  --radius-pill: 999px;
-  --glass-border: rgba(255, 255, 255, 0.07);
-  --glass-bg: linear-gradient(135deg, rgba(13, 17, 21, 0.5), rgba(5, 8, 11, 0.38));
-  --glass-bg-strong: linear-gradient(145deg, rgba(16, 20, 24, 0.82), rgba(5, 8, 11, 0.7));
-  --shadow-glass: 0 12px 28px rgba(0, 0, 0, 0.3), inset 0 1px rgba(255, 255, 255, 0.08);
-  --type-eyebrow-size: 0.58rem;
-  --type-eyebrow-line: 1.05;
-  --type-card-title-size: 0.86rem;
-  --type-card-title-line: 1.15;
-  --type-support-size: 0.68rem;
-  --type-support-line: 1.35;
-  --type-alert-size: 0.72rem;
-  --type-alert-line: 1.25;
-  --type-metric-size: 0.98rem;
-  --type-metric-line: 1.05;
 }

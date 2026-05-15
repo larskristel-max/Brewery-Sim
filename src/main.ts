@@ -350,10 +350,8 @@ const sceneVisibility = () => {
   const workflow = currentWorkflowStage(state);
   const fermenting = state.batches.some((batch) => batch.step === 'fermenting');
   const packaging = state.batches.some((batch) => batch.step === 'packaging' || batch.step === 'ready') || state.inventory.cases > 0;
+
   return {
-    hasActiveBatch: state.batches.length > 0,
-    hasReadyCases: state.inventory.cases > 0,
-    hasPendingOrders: state.pendingOrders.length > 0,
     showFloorNoteTicker: notificationsOpen,
     showWorkshopHotspot: false,
     showCases: packaging || workflow.tapTarget === 'cases',
@@ -645,7 +643,7 @@ root.addEventListener('click', (event) => {
   if (!target) {
     const clickTarget = event.target as HTMLElement;
     const isInsideOpenSurface = Boolean(
-      clickTarget.closest('.equipment-hotspot, .case-hotspot, .supply-hotspot, .workshop-hotspot, .active-batch-sign, .event-ticker, .missions-control, .notification-control, .ops-control, .focus-overlay, button')
+      clickTarget.closest('.equipment-hotspot, .case-hotspot, .supply-hotspot, .workshop-hotspot, .event-ticker, .missions-control, .notification-control, .ops-control, .focus-overlay, button')
     );
     if ((expandedTarget || missionsOpen || notificationsOpen || opsOpen || activeOverlay) && !isInsideOpenSurface) {
       expandedTarget = null;
