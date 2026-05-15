@@ -19,8 +19,8 @@ export const starterEquipment = [
     },
     {
         id: 'bottler',
-        name: 'Bench capper',
-        description: 'Small-batch packaging with a satisfying clink. Better labeling helps local accounts remember you.',
+        name: 'Bottling station',
+        description: 'A bottling bucket, filler wand, caps and hand capper for small garage runs. Better labeling helps local accounts remember you.',
         level: 1,
         condition: 83,
         x: 76,

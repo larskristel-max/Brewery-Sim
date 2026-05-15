@@ -1,4 +1,5 @@
 import { starterEquipment } from '../data/equipment.js';
+import { createIngredientStock } from '../data/ingredients.js';
 import { starterUpgrades } from '../data/upgrades.js';
 export const createInitialState = () => ({
     cash: 140,
@@ -7,12 +8,18 @@ export const createInitialState = () => ({
     dayElapsedSeconds: 0,
     minute: 8 * 60,
     inventory: {
-        grain: 35,
-        hops: 10,
-        yeast: 8,
         water: 150,
-        cases: 0
+        cases: 0,
+        ingredients: createIngredientStock()
     },
+    pendingOrders: [],
+    storage: {
+        dryShelfCapacity: 35,
+        coldBoxCapacity: 2.5,
+        utilityShelfCapacity: 40
+    },
+    finishedBeerLots: [],
+    visibilityRisk: 0,
     batches: [],
     equipment: Object.fromEntries(starterEquipment.map((item) => [item.id, { ...item }])),
     upgrades: Object.fromEntries(starterUpgrades.map((item) => [item.id, { ...item }])),
@@ -26,7 +33,7 @@ export const createInitialState = () => ({
         {
             id: 'welcome',
             minute: 8 * 60,
-            message: 'Garage doors up. Tap the 40 L mash kettle to brew, then ferment, package and sell to local accounts.'
+            message: 'Garage doors up. Choose a recipe, keep ingredients stocked, then brew, package and sell through quiet local channels.'
         }
     ],
     selectedEquipmentId: 'kettle',

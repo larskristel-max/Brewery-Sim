@@ -1,12 +1,22 @@
 :root {
-  color: #ffe8c7;
-  background: #160d0a;
-  font-family: Inter, ui-rounded, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: rgba(255, 255, 255, 0.96);
+  background: #0e0e11;
+  font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --bg-0: #0e0e11;
+  --surface: rgba(255, 255, 255, 0.04);
+  --text-primary: rgba(255, 255, 255, 0.96);
+  --text-secondary: rgba(255, 255, 255, 0.68);
+  --text-tertiary: rgba(255, 255, 255, 0.45);
+  --gold: #e2b354;
+  --gold-strong: #f2c46e;
+  --accent: #4c8bf5;
+  --divider: rgba(255, 255, 255, 0.08);
+  --border: rgba(255, 255, 255, 0.08);
 }
 
 * {
@@ -25,18 +35,19 @@ body {
   min-height: 100vh;
   overflow-x: hidden;
   background:
-    radial-gradient(circle at top left, rgba(255, 169, 78, 0.2), transparent 30rem),
-    linear-gradient(145deg, #130906 0%, #24130d 50%, #0f0908 100%);
+    radial-gradient(120% 60% at 85% -10%, rgba(76, 139, 245, 0.14), transparent 50%),
+    radial-gradient(140% 80% at 0% 0%, rgba(226, 179, 84, 0.12), transparent 52%),
+    linear-gradient(180deg, #101014, var(--bg-0) 55%);
 }
 
 button {
   border: 0;
-  border-radius: 18px;
+  border-radius: 16px;
   min-height: 48px;
-  padding: 0.85rem 1rem;
-  color: #fff7e8;
-  background: linear-gradient(180deg, #a75822, #74340f);
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.22), inset 0 1px rgba(255, 255, 255, 0.18);
+  padding: 0.8rem 1rem;
+  color: var(--text-primary);
+  background: linear-gradient(145deg, #315fd1, var(--accent));
+  box-shadow: 0 10px 24px rgba(76, 139, 245, 0.22), inset 0 1px rgba(255, 255, 255, 0.18);
   font: inherit;
   font-weight: 800;
   text-align: left;
@@ -54,7 +65,7 @@ button:disabled {
 button small {
   display: block;
   margin-top: 0.25rem;
-  color: #ffd8a0;
+  color: rgba(255, 255, 255, 0.72);
   font-size: 0.74rem;
   font-weight: 700;
 }
@@ -71,20 +82,20 @@ progress {
   overflow: hidden;
   border: 0;
   border-radius: 999px;
-  background: #2d1b14;
+  background: rgba(255, 255, 255, 0.12);
 }
 
 progress::-webkit-progress-bar {
   border-radius: 999px;
-  background: #2d1b14;
+  background: rgba(255, 255, 255, 0.12);
 }
 
 progress::-webkit-progress-value {
   border-radius: 999px;
-  background: linear-gradient(90deg, #f2b55c, #ffdf8f);
+  background: linear-gradient(90deg, var(--accent), var(--gold-strong));
 }
 
 progress::-moz-progress-bar {
   border-radius: 999px;
-  background: linear-gradient(90deg, #f2b55c, #ffdf8f);
+  background: linear-gradient(90deg, var(--accent), var(--gold-strong));
 }

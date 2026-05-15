@@ -1,8 +1,10 @@
+import { ingredients } from '../data/ingredients.js';
 import { createInitialState } from './initialState.js';
-export const SAVE_VERSION = 1;
-export const STORAGE_KEY = 'brewery-sim-save-v1';
+export const SAVE_VERSION = 2;
+export const STORAGE_KEY = 'brewery-sim-save-v2';
 const equipmentIds = ['kettle', 'fermenter', 'bottler'];
 const upgradeIds = ['larger-kettle', 'temp-control', 'labeler'];
+const ingredientIds = ingredients.map((ingredient) => ingredient.id);
 const batchSteps = ['mashing', 'fermenting', 'packaging', 'ready'];
 const getBrowserStorage = () => {
     try {
@@ -18,7 +20,9 @@ const isRecord = (value) => typeof value === 'object' && value !== null;
 const hasNumber = (value, key) => typeof value[key] === 'number' && Number.isFinite(value[key]);
 const hasString = (value, key) => typeof value[key] === 'string';
 const hasBoolean = (value, key) => typeof value[key] === 'boolean';
-const isInventory = (value) => isRecord(value) && hasNumber(value, 'grain') && hasNumber(value, 'hops') && hasNumber(value, 'yeast') && hasNumber(value, 'water') && hasNumber(value, 'cases');
+const isIngredientStock = (value) => isRecord(value) && hasNumber(value, 'amount') && hasNumber(value, 'condition');
+const isIngredientRecord = (value) => isRecord(value) && ingredientIds.every((id) => isIngredientStock(value[id]));
+const isInventory = (value) => isRecord(value) && hasNumber(value, 'water') && hasNumber(value, 'cases') && isIngredientRecord(value.ingredients);
 const isEquipment = (value, id) => isRecord(value) &&
     value.id === id &&
     hasString(value, 'name') &&
@@ -39,7 +43,19 @@ const isBatch = (value) => isRecord(value) &&
     hasNumber(value, 'stepProgress') &&
     hasNumber(value, 'quality') &&
     hasNumber(value, 'casesExpected') &&
-    hasNumber(value, 'contaminationRisk');
+    hasNumber(value, 'contaminationRisk') &&
+    hasNumber(value, 'faultRisk') &&
+    hasNumber(value, 'storagePenalty') &&
+    Array.isArray(value.faultEventsTriggered);
+const isFinishedBeerLot = (value) => isRecord(value) && hasString(value, 'id') && hasString(value, 'recipeId') && hasString(value, 'recipeName') && hasNumber(value, 'cases') && hasNumber(value, 'quality') && hasNumber(value, 'marketAppeal');
+const isSupplyOrder = (value) => isRecord(value) &&
+    hasString(value, 'id') &&
+    hasNumber(value, 'dayOrdered') &&
+    hasNumber(value, 'arrivalDay') &&
+    hasNumber(value, 'cost') &&
+    Array.isArray(value.items) &&
+    value.items.every((item) => isRecord(item) && ingredientIds.includes(item.ingredientId) && hasNumber(item, 'amount') && hasNumber(item, 'packs'));
+const isStorageState = (value) => isRecord(value) && hasNumber(value, 'dryShelfCapacity') && hasNumber(value, 'coldBoxCapacity') && hasNumber(value, 'utilityShelfCapacity');
 const isLocalDemand = (value) => isRecord(value) && hasString(value, 'accountName') && hasNumber(value, 'casesRequested') && hasNumber(value, 'casesSold') && hasNumber(value, 'reputationReward');
 const isSavedGameState = (value) => {
     if (!isRecord(value))
@@ -52,11 +68,17 @@ const isSavedGameState = (value) => {
         isInventory(value.inventory) &&
         Array.isArray(value.batches) &&
         value.batches.every(isBatch) &&
+        Array.isArray(value.finishedBeerLots) &&
+        value.finishedBeerLots.every(isFinishedBeerLot) &&
+        Array.isArray(value.pendingOrders) &&
+        value.pendingOrders.every(isSupplyOrder) &&
+        isStorageState(value.storage) &&
         isEquipmentRecord(value.equipment) &&
         isUpgradeRecord(value.upgrades) &&
         isLocalDemand(value.demand) &&
         equipmentIds.includes(value.selectedEquipmentId) &&
-        hasNumber(value, 'salesToday'));
+        hasNumber(value, 'salesToday') &&
+        hasNumber(value, 'visibilityRisk'));
 };
 const parseSavedGame = (rawSave) => {
     const parsed = JSON.parse(rawSave);

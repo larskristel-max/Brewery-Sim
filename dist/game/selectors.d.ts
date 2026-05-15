@@ -1,9 +1,24 @@
-import type { BatchStep, GameState, Recipe } from './schema.js';
+import type { BatchStep, GameState, IngredientId, Recipe, RecipeIngredient, StorageArea } from './schema.js';
+export type EquipmentConditionTier = 'clean' | 'worn' | 'dirty' | 'critical';
+export type ContaminationRiskTier = 'low' | 'elevated' | 'high' | 'severe';
 export declare const formatClock: (minute: number) => string;
 export declare const formatCurrency: (amount: number) => string;
+export declare const ingredientAmountLabel: (ingredientId: IngredientId, amount: number) => string;
+export declare const ingredientUnitCost: (ingredientId: IngredientId) => number;
+export declare const recipeIngredientCost: (recipe: Recipe) => number;
+export declare const recipeMissingIngredients: (state: GameState, recipe: Recipe) => RecipeIngredient[];
 export declare const recipeCanStart: (state: GameState, recipe: Recipe) => boolean;
+export declare const orderCost: (items: RecipeIngredient[]) => number;
+export declare const recipeOrderItems: (state: GameState, recipe: Recipe, mode: "missing" | "extra") => RecipeIngredient[];
+export declare const storageUseByArea: (state: GameState) => Record<StorageArea, number>;
+export declare const storageCapacityByArea: (state: GameState) => Record<StorageArea, number>;
+export declare const storageOverflowByArea: (state: GameState) => Record<StorageArea, number>;
+export declare const totalStorageOverflow: (state: GameState) => number;
 export declare const readyToPackage: (state: GameState) => boolean;
 export declare const activeBatchForStep: (state: GameState, step: BatchStep) => import("./schema.js").Batch | undefined;
+export declare const equipmentConditionTier: (condition: number) => EquipmentConditionTier;
+export declare const equipmentConditionLabel: (condition: number) => string;
+export declare const contaminationRiskTier: (risk: number) => ContaminationRiskTier;
 export declare const objectiveProgress: (state: GameState) => {
     label: string;
     progress: number;
