@@ -1,13 +1,25 @@
-import type { BatchStep, GameState, IngredientId, Recipe, RecipeIngredient, StorageArea } from './schema.js';
+import type { BatchStep, EquipmentId, GameState, IngredientId, OwnedEquipment, Recipe, RecipeIngredient, StorageArea } from './schema.js';
 export type EquipmentConditionTier = 'clean' | 'worn' | 'dirty' | 'critical';
 export type ContaminationRiskTier = 'low' | 'elevated' | 'high' | 'severe';
 export declare const formatClock: (minute: number) => string;
 export declare const formatCurrency: (amount: number) => string;
+export declare const formatGameDate: (day: number) => string;
 export declare const ingredientAmountLabel: (ingredientId: IngredientId, amount: number) => string;
 export declare const ingredientUnitCost: (ingredientId: IngredientId) => number;
 export declare const recipeIngredientCost: (recipe: Recipe) => number;
 export declare const recipeMissingIngredients: (state: GameState, recipe: Recipe) => RecipeIngredient[];
 export declare const recipeCanStart: (state: GameState, recipe: Recipe) => boolean;
+export declare const ownedByStation: (state: GameState, equipmentId: EquipmentId) => OwnedEquipment[];
+export declare const activeOwnedEquipment: (state: GameState, equipmentId: EquipmentId) => OwnedEquipment;
+export declare const availableFermenters: (state: GameState) => OwnedEquipment[];
+export declare const garageSpaceAvailable: (state: GameState) => number;
+export declare const litersToCases: (liters: number) => number;
+export declare const recipeBatchCapacity: (state: GameState, recipe: Recipe) => {
+    liters: number;
+    cases: number;
+    reason: string;
+    fermenter?: OwnedEquipment;
+};
 export declare const orderCost: (items: RecipeIngredient[]) => number;
 export declare const recipeOrderItems: (state: GameState, recipe: Recipe, mode: "missing" | "extra") => RecipeIngredient[];
 export declare const storageUseByArea: (state: GameState) => Record<StorageArea, number>;

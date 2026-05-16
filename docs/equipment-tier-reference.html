@@ -1,0 +1,459 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Brewery-Sim Equipment Tier Reference</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #1f2520;
+        --muted: #626960;
+        --line: #d8ded5;
+        --paper: #f7f5ef;
+        --panel: #ffffff;
+        --accent: #426a54;
+        --accent-2: #8f5d33;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        color: var(--ink);
+        background: var(--paper);
+        line-height: 1.5;
+      }
+
+      header {
+        padding: 32px clamp(20px, 5vw, 64px) 20px;
+        background: #e6e0d4;
+        border-bottom: 1px solid var(--line);
+      }
+
+      main {
+        padding: 28px clamp(20px, 5vw, 64px) 64px;
+      }
+
+      h1,
+      h2,
+      h3 {
+        line-height: 1.15;
+        margin: 0;
+        letter-spacing: 0;
+      }
+
+      h1 {
+        max-width: 980px;
+        font-size: clamp(2rem, 4vw, 4.25rem);
+      }
+
+      h2 {
+        margin-top: 40px;
+        font-size: clamp(1.5rem, 2.5vw, 2.35rem);
+      }
+
+      h3 {
+        font-size: 1.05rem;
+      }
+
+      p {
+        max-width: 980px;
+        margin: 12px 0 0;
+        color: var(--muted);
+      }
+
+      a {
+        color: var(--accent);
+      }
+
+      .intro {
+        max-width: 1000px;
+        font-size: 1.05rem;
+      }
+
+      .note {
+        margin-top: 18px;
+        padding: 14px 16px;
+        max-width: 980px;
+        background: #fffaf0;
+        border: 1px solid #ead9ad;
+        border-radius: 8px;
+        color: #574428;
+      }
+
+      .section-head {
+        display: flex;
+        align-items: end;
+        justify-content: space-between;
+        gap: 20px;
+        margin: 42px 0 16px;
+        border-bottom: 1px solid var(--line);
+        padding-bottom: 12px;
+      }
+
+      .section-head p {
+        max-width: 620px;
+        margin: 0;
+        font-size: 0.95rem;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+        gap: 18px;
+      }
+
+      .card {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        overflow: hidden;
+      }
+
+      .card img {
+        display: block;
+        width: 100%;
+        aspect-ratio: 4 / 3;
+        object-fit: contain;
+        background: #f1f1ec;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .card-body {
+        padding: 14px;
+      }
+
+      .tag {
+        display: inline-block;
+        margin-bottom: 8px;
+        font-size: 0.72rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        color: var(--accent-2);
+      }
+
+      ul {
+        margin: 10px 0 0;
+        padding-left: 20px;
+        color: var(--muted);
+      }
+
+      li + li {
+        margin-top: 4px;
+      }
+
+      .wide {
+        grid-column: span 2;
+      }
+
+      .principles {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 16px;
+        margin-top: 18px;
+      }
+
+      .principle {
+        padding: 16px;
+        background: #eef2ea;
+        border: 1px solid #d2dccb;
+        border-radius: 8px;
+      }
+
+      .principle p {
+        margin-top: 8px;
+      }
+
+      @media (max-width: 680px) {
+        .section-head {
+          align-items: start;
+          flex-direction: column;
+        }
+
+        .wide {
+          grid-column: span 1;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Brewery-Sim Equipment Tier Reference</h1>
+      <p class="intro">
+        Visual reference board for the garage brewery equipment progression. Use this alongside
+        <a href="garage-loop-implementation-todo.md">garage-loop-implementation-todo.md</a> when implementing equipment, store cards, garage overlays, and gameplay constraints.
+      </p>
+      <div class="note">
+        These are reference images, not final game assets. They describe the intended equipment feeling: amateur homebrew at Tier 1, serious garage homebrew at Tier 2, and crowded nano-scale garage pressure at Tier 3.
+      </div>
+    </header>
+
+    <main>
+      <section>
+        <div class="section-head">
+          <div>
+            <h2>Tier 1 - Amateur Garage Brewing</h2>
+            <p>Start cheap and believable: all-grain brew-in-a-bag, plastic fermenters, bottle wand, and hand capper.</p>
+          </div>
+        </div>
+
+        <div class="grid">
+          <article class="card">
+            <img src="equipment-reference-assets/tier-1-generated-biab-fermenter-bottling.png" alt="Generated reference showing Tier 1 brew-in-a-bag, plastic fermenter, and bottling gear">
+            <div class="card-body">
+              <span class="tag">Starter setup</span>
+              <h3>BIAB pot, bucket, hand bottling</h3>
+              <ul>
+                <li>20 L enamel stock pot with brew bag.</li>
+                <li>One plastic fermentation bucket at start.</li>
+                <li>Hand capper and bottle wand.</li>
+              </ul>
+            </div>
+          </article>
+
+          <article class="card">
+            <img src="equipment-reference-assets/tier-1-generated-garage-setup.png" alt="Generated reference for a low-tier garage brewery scene">
+            <div class="card-body">
+              <span class="tag">Garage feeling</span>
+              <h3>Cheap, cluttered, still domestic</h3>
+              <ul>
+                <li>Equipment should not look professional yet.</li>
+                <li>Garage background stays visible.</li>
+                <li>Extra plastic fermenters can be added until space runs out.</li>
+              </ul>
+            </div>
+          </article>
+
+          <article class="card">
+            <img src="equipment-reference-assets/tier-1-generated-equipment-cards.png" alt="Generated reference for Tier 1 equipment cards">
+            <div class="card-body">
+              <span class="tag">UI reference</span>
+              <h3>Store card direction</h3>
+              <ul>
+                <li>Cards should show physical equipment, not abstract upgrades.</li>
+                <li>Effects should mention capacity, loss, risk, and attention.</li>
+                <li>Keep language simple and player-facing.</li>
+              </ul>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section>
+        <div class="section-head">
+          <div>
+            <h2>Tier 2 - Serious Homebrewer</h2>
+            <p>Better garage equipment, still not a legal professional brewery. The player can choose all-in-one systems or a three-vessel path.</p>
+          </div>
+        </div>
+
+        <div class="grid">
+          <article class="card">
+            <img src="equipment-reference-assets/tier-2-three-tier-homebrew-stand.jpeg" alt="Three-tier homebrew stand with stainless vessels">
+            <div class="card-body">
+              <span class="tag">Brewhouse</span>
+              <h3>Three-tier homebrew system</h3>
+              <ul>
+                <li>Useful reference for a serious garage three-vessel setup.</li>
+                <li>Can improve throughput by overlapping mash and boil steps.</li>
+                <li>Uses more space than all-in-one systems.</li>
+              </ul>
+            </div>
+          </article>
+
+          <article class="card">
+            <img src="equipment-reference-assets/tier-2-stainless-three-vessel-table.jpeg" alt="Stainless three-vessel brewing system on a table">
+            <div class="card-body">
+              <span class="tag">Brewhouse</span>
+              <h3>Stainless three-vessel table setup</h3>
+              <ul>
+                <li>Cleaner and more capable than Tier 1.</li>
+                <li>Still plausible in a large garage.</li>
+                <li>Good visual target for the Tier 2 three-vessel path.</li>
+              </ul>
+            </div>
+          </article>
+
+          <article class="card">
+            <img src="equipment-reference-assets/tier-2-semi-auto-filler-1.webp" alt="Semi-automatic bottle filler reference">
+            <div class="card-body">
+              <span class="tag">Packaging</span>
+              <h3>Semi-auto filler option</h3>
+              <ul>
+                <li>Faster than bottle wand and hand capper.</li>
+                <li>Reduces packaging time and some loss.</li>
+                <li>Still small enough for garage gameplay.</li>
+              </ul>
+            </div>
+          </article>
+
+          <article class="card">
+            <img src="equipment-reference-assets/tier-2-semi-auto-filler-2.webp" alt="Standing gravity or semi-auto bottle filler reference">
+            <div class="card-body">
+              <span class="tag">Packaging</span>
+              <h3>Small filler stand</h3>
+              <ul>
+                <li>Alternative visual reference for Tier 2 packaging.</li>
+                <li>Should feel expensive but not industrial.</li>
+                <li>Can pair with better bottle handling and lower case loss.</li>
+              </ul>
+            </div>
+          </article>
+        </div>
+
+        <div class="principles">
+          <div class="principle">
+            <h3>All-in-one path</h3>
+            <p>Player may buy up to 3 all-in-one systems because they use less space. A single unit should not drastically speed brewday, but it should reduce attention and allow more parallel work when multiple units are owned.</p>
+          </div>
+          <div class="principle">
+            <h3>Fermenter path</h3>
+            <p>Tier 2 fermentation should use small stainless conicals or stainless fermenters around 20-50 L. They reduce loss and risk, but still limit batch size.</p>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <div class="section-head">
+          <div>
+            <h2>Tier 3 - Last Garage Step</h2>
+            <p>Powerful but uncomfortable. The garage is nearly at its physical, fiscal, and social limit.</p>
+          </div>
+        </div>
+
+        <div class="grid">
+          <article class="card">
+            <img src="equipment-reference-assets/tier-3-compact-nano-brewhouse.jpeg" alt="Compact nano brewhouse skid">
+            <div class="card-body">
+              <span class="tag">Brewhouse</span>
+              <h3>Compact nano brewhouse</h3>
+              <ul>
+                <li>Reference for the top garage brewhouse tier.</li>
+                <li>Should trigger space, power, steam, and visibility pressure.</li>
+                <li>Needs matching fermentation capacity to matter.</li>
+              </ul>
+            </div>
+          </article>
+
+          <article class="card">
+            <img src="equipment-reference-assets/tier-3-hoist-basket-system.webp" alt="Hoist and basket brewing system reference">
+            <div class="card-body">
+              <span class="tag">Brewhouse</span>
+              <h3>Large basket or hoist system</h3>
+              <ul>
+                <li>Good reference for large all-in-one handling.</li>
+                <li>Should feel awkward in a garage.</li>
+                <li>Can add cleaning and safety pressure.</li>
+              </ul>
+            </div>
+          </article>
+
+          <article class="card">
+            <img src="equipment-reference-assets/tier-3-compact-three-vessel-system.jpeg" alt="Compact stainless three-vessel nano brewing system">
+            <div class="card-body">
+              <span class="tag">Brewhouse</span>
+              <h3>Compact three-vessel nano system</h3>
+              <ul>
+                <li>Higher throughput, higher complexity.</li>
+                <li>More hoses, pumps, cleaning, and maintenance.</li>
+                <li>Visually pushes the garage toward professional scale.</li>
+              </ul>
+            </div>
+          </article>
+
+          <article class="card">
+            <img src="equipment-reference-assets/tier-3-large-all-in-one-cutaway.jpeg" alt="Large all-in-one brewing system cutaway reference">
+            <div class="card-body">
+              <span class="tag">Brewhouse</span>
+              <h3>Large all-in-one system</h3>
+              <ul>
+                <li>Reference for Braumeister/Brewtools-style large system.</li>
+                <li>Large capacity should be capped by available fermenter capacity.</li>
+                <li>Better ease of use, not unlimited garage growth.</li>
+              </ul>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section>
+        <div class="section-head">
+          <div>
+            <h2>Tier 3 Packaging And Sales Pressure</h2>
+            <p>Packaging can become faster, but it also makes the operation more visible and more likely to run into invoice, traceability, and compliance pressure.</p>
+          </div>
+        </div>
+
+        <div class="grid">
+          <article class="card">
+            <img src="equipment-reference-assets/tier-3-can-reference.webp" alt="Plain beverage can reference">
+            <div class="card-body">
+              <span class="tag">Packaging format</span>
+              <h3>Cans as a visibility marker</h3>
+              <ul>
+                <li>Cans feel more public and retail-ready than loose bottles.</li>
+                <li>They should raise expectations for labels and compliance.</li>
+                <li>Use as a pressure signal, not a full canning line yet.</li>
+              </ul>
+            </div>
+          </article>
+
+          <article class="card">
+            <img src="equipment-reference-assets/tier-3-enolmatic-style-filler.webp" alt="Small bottle filling machine reference">
+            <div class="card-body">
+              <span class="tag">Packaging</span>
+              <h3>Advanced small filler</h3>
+              <ul>
+                <li>Faster bottling and lower loss.</li>
+                <li>Still feasible before a full professional line.</li>
+                <li>Pairs with larger finished-goods inventory.</li>
+              </ul>
+            </div>
+          </article>
+
+          <article class="card">
+            <img src="equipment-reference-assets/tier-3-small-can-seamer.webp" alt="Small can seamer reference">
+            <div class="card-body">
+              <span class="tag">Packaging</span>
+              <h3>Very small can seamer</h3>
+              <ul>
+                <li>Useful final garage packaging upgrade.</li>
+                <li>Not a real canning line.</li>
+                <li>Should increase attention from bars, events, and authorities.</li>
+              </ul>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section>
+        <div class="section-head">
+          <div>
+            <h2>Management Sim Reference</h2>
+            <p>Reference for crisis-style management pressure: the player should have responses when the business gets into trouble.</p>
+          </div>
+        </div>
+
+        <div class="grid">
+          <article class="card wide">
+            <img src="equipment-reference-assets/management-sim-crisis-reference-airline-tycoon.webp" alt="Airline Tycoon Deluxe reference image">
+            <div class="card-body">
+              <span class="tag">Crisis mechanics</span>
+              <h3>Airline Tycoon-style pressure</h3>
+              <ul>
+                <li>Use the spirit of crisis management, not the airline theme.</li>
+                <li>When cash, compliance, or reputation goes wrong, give the player concrete recovery actions.</li>
+                <li>Examples: pause risky sales, take a small loan, reduce public orders, spend on compliance, or accept a reputation hit.</li>
+              </ul>
+            </div>
+          </article>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>
+

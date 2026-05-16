@@ -1,12 +1,17 @@
-export type BatchStep = 'mashing' | 'fermenting' | 'packaging' | 'ready';
+export type BatchStep = 'brewing' | 'awaiting-transfer' | 'fermenting' | 'awaiting-packaging' | 'packaging' | 'bottle-conditioning' | 'ready';
+export type TimedBatchStep = 'brewing' | 'fermenting' | 'packaging' | 'bottle-conditioning';
 export type EquipmentId = 'kettle' | 'fermenter' | 'bottler';
+export type EquipmentItemId = 'stock-pot-20l' | 'all-in-one-40l' | 'three-vessel-60l' | 'nano-biab-150l' | 'plastic-bucket' | 'stainless-conical-50l' | 'unitank-150l' | 'wand-capper' | 'semi-auto-filler' | 'small-can-seamer';
+export type EquipmentTier = 1 | 2 | 3;
 export type UpgradeId = 'larger-kettle' | 'temp-control' | 'labeler';
+export type EquipmentStation = 'brewhouse' | 'fermentation' | 'packaging';
+export type SalesChannelId = 'friends-family' | 'private-event' | 'local-bar' | 'restaurant';
 export type IngredientCategory = 'malt' | 'hops' | 'yeast' | 'sugar' | 'packaging' | 'cleaning';
 export type StorageArea = 'dry-shelf' | 'cold-box' | 'utility-shelf';
 export type IngredientCondition = 'fresh' | 'stressed' | 'damp' | 'stale' | 'weak';
 export type IngredientUnit = 'kg' | 'g' | 'pack' | 'unit';
 export type OrderMode = 'missing' | 'extra';
-export type IngredientId = 'pilsner-malt' | 'pale-malt' | 'wheat-malt' | 'crystal-malt' | 'black-malt' | 'saaz-hops' | 'ipa-hops' | 'styrian-hops' | 'fuggles-hops' | 'ale-yeast' | 'lager-yeast' | 'wheat-yeast' | 'saison-yeast' | 'stout-yeast' | 'bottles' | 'cleaner';
+export type IngredientId = 'pilsner-malt' | 'pale-malt' | 'wheat-malt' | 'crystal-malt' | 'black-malt' | 'saaz-hops' | 'ipa-hops' | 'styrian-hops' | 'fuggles-hops' | 'ale-yeast' | 'lager-yeast' | 'wheat-yeast' | 'saison-yeast' | 'kveik-yeast' | 'stout-yeast' | 'bottles' | 'cleaner';
 export interface Ingredient {
     id: IngredientId;
     name: string;
@@ -27,7 +32,7 @@ export interface RecipeIngredient {
 }
 export interface BeerFaultEvent {
     id: string;
-    stage: Exclude<BatchStep, 'ready'>;
+    stage: TimedBatchStep;
     minRisk: number;
     qualityPenalty: number;
     message: string;
@@ -42,13 +47,14 @@ export interface Recipe {
     salePricePerCase: number;
     marketAppeal: number;
     batchSizeCases: number;
+    targetBatchLiters: number;
     qualityBase: number;
     difficulty: number;
     storageSensitivity: number;
     riskTags: string[];
     challenge: string;
     enabled: boolean;
-    stepDurations: Record<Exclude<BatchStep, 'ready'>, number>;
+    stepDurations: Record<TimedBatchStep, number>;
     faultEvents: BeerFaultEvent[];
 }
 export interface Inventory {
@@ -64,6 +70,8 @@ export interface Batch {
     stepProgress: number;
     quality: number;
     casesExpected: number;
+    volumeLiters: number;
+    fermenterInstanceId: string;
     contaminationRisk: number;
     faultRisk: number;
     storagePenalty: number;
@@ -96,12 +104,63 @@ export interface StorageState {
 }
 export interface Equipment {
     id: EquipmentId;
+    itemId?: EquipmentItemId;
     name: string;
     description: string;
+    tier: EquipmentTier;
     level: number;
     condition: number;
+    cost: number;
+    capacityCaseBonus: number;
+    qualityBonus: number;
+    riskModifier: number;
+    speedModifier: number;
+    capacityLiters: number;
+    spaceUsed: number;
+    visualClass: string;
+    operonTypeKey: string;
     x: number;
     y: number;
+}
+export interface EquipmentCatalogItem {
+    id: EquipmentItemId;
+    equipmentId: EquipmentId;
+    station: EquipmentStation;
+    name: string;
+    description: string;
+    tier: EquipmentTier;
+    cost: number;
+    spaceUsed: number;
+    capacityLiters: number;
+    batchTimeModifier: number;
+    attentionModifier: number;
+    lossModifier: number;
+    visualClass: string;
+    operonTypeKey: string;
+    maxOwned?: number;
+    qualityBonus: number;
+    riskModifier: number;
+    speedModifier: number;
+}
+export interface OwnedEquipment {
+    instanceId: string;
+    itemId: EquipmentItemId;
+    equipmentId: EquipmentId;
+    station: EquipmentStation;
+    name: string;
+    tier: EquipmentTier;
+    condition: number;
+    capacityLiters: number;
+    spaceUsed: number;
+    batchTimeModifier: number;
+    attentionModifier: number;
+    qualityBonus: number;
+    riskModifier: number;
+    lossModifier: number;
+    visualClass: string;
+    operonTypeKey: string;
+    occupiedBatchId?: string;
+    installed: boolean;
 }
 export interface Upgrade {
     id: UpgradeId;
@@ -112,9 +171,13 @@ export interface Upgrade {
 }
 export interface LocalDemand {
     accountName: string;
+    channelId: SalesChannelId;
+    channelName: string;
     casesRequested: number;
     casesSold: number;
     reputationReward: number;
+    invoiceRequired: boolean;
+    formalOrder: boolean;
 }
 export interface EventLogEntry {
     id: string;
@@ -127,9 +190,14 @@ export interface GameState {
     day: number;
     dayElapsedSeconds: number;
     minute: number;
+    energy: number;
     inventory: Inventory;
     batches: Batch[];
     equipment: Record<EquipmentId, Equipment>;
+    ownedEquipment: OwnedEquipment[];
+    activeEquipment: Record<EquipmentId, string>;
+    garageSpaceUsed: number;
+    garageSpaceLimit: number;
     upgrades: Record<UpgradeId, Upgrade>;
     demand: LocalDemand;
     events: EventLogEntry[];
@@ -139,10 +207,16 @@ export interface GameState {
     storage: StorageState;
     finishedBeerLots: FinishedBeerLot[];
     visibilityRisk: number;
+    householdPressure: number;
+    complianceRisk: number;
+    canInvoice: boolean;
+    fermenterTemperatureC: number;
 }
 export type GameAction = {
     type: 'tick';
     seconds: number;
+} | {
+    type: 'end-day';
 } | {
     type: 'select-equipment';
     equipmentId: EquipmentId;
@@ -152,6 +226,15 @@ export type GameAction = {
 } | {
     type: 'start-batch';
     recipeId: string;
+} | {
+    type: 'transfer-batch';
+    batchId: string;
+} | {
+    type: 'start-packaging';
+    batchId: string;
+} | {
+    type: 'ready-batch';
+    batchId: string;
 } | {
     type: 'order-ingredient';
     ingredientId: IngredientId;
@@ -167,8 +250,21 @@ export type GameAction = {
     type: 'sell-cases';
     cases: number;
 } | {
+    type: 'sell-channel';
+    channelId: SalesChannelId;
+    cases: number;
+} | {
     type: 'buy-upgrade';
     upgradeId: UpgradeId;
+} | {
+    type: 'buy-equipment';
+    equipmentItemId: EquipmentItemId;
+} | {
+    type: 'crisis-action';
+    actionId: 'pause-public-sales' | 'discount-informal' | 'paperwork-prep';
+} | {
+    type: 'set-fermenter-temperature';
+    temperatureC: number;
 } | {
     type: 'clean-equipment';
     equipmentId: EquipmentId;

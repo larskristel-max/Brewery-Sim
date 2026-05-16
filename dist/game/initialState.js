@@ -1,12 +1,13 @@
-import { starterEquipment } from '../data/equipment.js';
+import { starterEquipment, starterOwnedEquipment } from '../data/equipment.js';
 import { createIngredientStock } from '../data/ingredients.js';
 import { starterUpgrades } from '../data/upgrades.js';
 export const createInitialState = () => ({
-    cash: 140,
-    reputation: 8,
+    cash: 180,
+    reputation: 0,
     day: 1,
     dayElapsedSeconds: 0,
-    minute: 8 * 60,
+    minute: 7 * 60,
+    energy: 100,
     inventory: {
         water: 150,
         cases: 0,
@@ -20,20 +21,36 @@ export const createInitialState = () => ({
     },
     finishedBeerLots: [],
     visibilityRisk: 0,
+    householdPressure: 4,
+    complianceRisk: 0,
+    canInvoice: false,
+    fermenterTemperatureC: 18,
     batches: [],
     equipment: Object.fromEntries(starterEquipment.map((item) => [item.id, { ...item }])),
+    ownedEquipment: starterOwnedEquipment.map((item) => ({ ...item })),
+    activeEquipment: {
+        kettle: 'stock-pot-20l-1',
+        fermenter: 'plastic-bucket-1',
+        bottler: 'wand-capper-1'
+    },
+    garageSpaceUsed: starterOwnedEquipment.reduce((total, item) => total + item.spaceUsed, 0),
+    garageSpaceLimit: 16,
     upgrades: Object.fromEntries(starterUpgrades.map((item) => [item.id, { ...item }])),
     demand: {
-        accountName: 'Corner Café',
-        casesRequested: 10,
+        accountName: 'Friends and family',
+        channelId: 'friends-family',
+        channelName: 'Friends and family',
+        casesRequested: 4,
         casesSold: 0,
-        reputationReward: 2
+        reputationReward: 1,
+        invoiceRequired: false,
+        formalOrder: false
     },
     events: [
         {
             id: 'welcome',
-            minute: 8 * 60,
-            message: 'Garage doors up. Choose a recipe, keep ingredients stocked, then brew, package and sell through quiet local channels.'
+            minute: 7 * 60,
+            message: 'Garage doors up. Brew a 20 L BIAB batch, ferment it in the plastic bucket, bottle it by hand, then sell a few cases privately.'
         }
     ],
     selectedEquipmentId: 'kettle',

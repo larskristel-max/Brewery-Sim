@@ -1,31 +1,268 @@
-import type { Equipment } from '../game/schema.js';
+import type { Equipment, EquipmentCatalogItem, EquipmentId, EquipmentItemId, OwnedEquipment } from '../game/schema.js';
+
+export const equipmentCatalog: EquipmentCatalogItem[] = [
+  {
+    id: 'stock-pot-20l',
+    equipmentId: 'kettle',
+    station: 'brewhouse',
+    name: '20 L enamel stock pot',
+    description: 'BIAB enamel pot and grain bag. Slow, hands-on, and capped at one small garage batch.',
+    tier: 1,
+    cost: 0,
+    spaceUsed: 2,
+    capacityLiters: 20,
+    batchTimeModifier: 1.25,
+    attentionModifier: 1.3,
+    lossModifier: 0.08,
+    visualClass: 'visual-enamel-pot',
+    operonTypeKey: 'equipment.kettle',
+    qualityBonus: -2,
+    riskModifier: 2,
+    speedModifier: 1.25
+  },
+  {
+    id: 'all-in-one-40l',
+    equipmentId: 'kettle',
+    station: 'brewhouse',
+    name: '40 L all-in-one electric system',
+    description: 'A Grainfather-style single vessel. Cleaner process, less attention, and compact enough to own several.',
+    tier: 2,
+    cost: 360,
+    spaceUsed: 3,
+    capacityLiters: 40,
+    batchTimeModifier: 0.96,
+    attentionModifier: 0.75,
+    lossModifier: 0.04,
+    visualClass: 'visual-all-in-one',
+    operonTypeKey: 'equipment.mash_tun',
+    maxOwned: 3,
+    qualityBonus: 0,
+    riskModifier: -1,
+    speedModifier: 0.96
+  },
+  {
+    id: 'three-vessel-60l',
+    equipmentId: 'kettle',
+    station: 'brewhouse',
+    name: '60 L three-vessel homebrew stand',
+    description: 'Serious garage hot-side gear. Better overlap and cleaner wort, but it eats floor space.',
+    tier: 3,
+    cost: 760,
+    spaceUsed: 6,
+    capacityLiters: 60,
+    batchTimeModifier: 0.78,
+    attentionModifier: 0.85,
+    lossModifier: 0.03,
+    visualClass: 'visual-three-vessel',
+    operonTypeKey: 'equipment.brewhouse',
+    qualityBonus: 2,
+    riskModifier: -2,
+    speedModifier: 0.78
+  },
+  {
+    id: 'nano-biab-150l',
+    equipmentId: 'kettle',
+    station: 'brewhouse',
+    name: '150 L compact nano brewhouse',
+    description: 'Too much steam, power draw, and liquid for a house garage. Productive, but clearly the ceiling.',
+    tier: 3,
+    cost: 1600,
+    spaceUsed: 9,
+    capacityLiters: 150,
+    batchTimeModifier: 0.82,
+    attentionModifier: 1.05,
+    lossModifier: 0.03,
+    visualClass: 'visual-nano-brewhouse',
+    operonTypeKey: 'equipment.brewhouse',
+    qualityBonus: 3,
+    riskModifier: 4,
+    speedModifier: 0.82
+  },
+  {
+    id: 'plastic-bucket',
+    equipmentId: 'fermenter',
+    station: 'fermentation',
+    name: 'Plastic fermentation bucket',
+    description: 'One 20 L bucket with airlock. Adds one fermenter slot and rough ambient garage control.',
+    tier: 1,
+    cost: 45,
+    spaceUsed: 2,
+    capacityLiters: 20,
+    batchTimeModifier: 1.15,
+    attentionModifier: 1.25,
+    lossModifier: 0.08,
+    visualClass: 'visual-plastic-bucket',
+    operonTypeKey: 'equipment.fv',
+    maxOwned: 5,
+    qualityBonus: -3,
+    riskModifier: 9,
+    speedModifier: 1.15
+  },
+  {
+    id: 'stainless-conical-50l',
+    equipmentId: 'fermenter',
+    station: 'fermentation',
+    name: '50 L stainless conical fermenter',
+    description: 'Cleaner transfers, less trub loss, and steadier temperature than plastic buckets.',
+    tier: 2,
+    cost: 430,
+    spaceUsed: 3,
+    capacityLiters: 50,
+    batchTimeModifier: 0.94,
+    attentionModifier: 0.72,
+    lossModifier: 0.03,
+    visualClass: 'visual-stainless-conical',
+    operonTypeKey: 'equipment.fv',
+    maxOwned: 3,
+    qualityBonus: 3,
+    riskModifier: -4,
+    speedModifier: 0.94
+  },
+  {
+    id: 'unitank-150l',
+    equipmentId: 'fermenter',
+    station: 'fermentation',
+    name: '150 L unitank',
+    description: 'Professional-scale fermentation in a domestic garage. High throughput with serious visibility and household pressure.',
+    tier: 3,
+    cost: 1300,
+    spaceUsed: 7,
+    capacityLiters: 150,
+    batchTimeModifier: 0.78,
+    attentionModifier: 0.6,
+    lossModifier: 0.02,
+    visualClass: 'visual-unitank',
+    operonTypeKey: 'equipment.bbt',
+    maxOwned: 2,
+    qualityBonus: 5,
+    riskModifier: -9,
+    speedModifier: 0.78
+  },
+  {
+    id: 'wand-capper',
+    equipmentId: 'bottler',
+    station: 'packaging',
+    name: 'Bottle wand and hand capper',
+    description: 'Slow hand packaging. Expect spills and lost bottles when the station gets dirty.',
+    tier: 1,
+    cost: 0,
+    spaceUsed: 1,
+    capacityLiters: 20,
+    batchTimeModifier: 1.25,
+    attentionModifier: 1.35,
+    lossModifier: 0.09,
+    visualClass: 'visual-wand-capper',
+    operonTypeKey: 'equipment.packaging_bottle',
+    qualityBonus: -1,
+    riskModifier: 1,
+    speedModifier: 1.25
+  },
+  {
+    id: 'semi-auto-filler',
+    equipmentId: 'bottler',
+    station: 'packaging',
+    name: 'Semi-auto bottle filler',
+    description: 'Enolmatic-style filling for faster bottling, lower loss, and cleaner presentation.',
+    tier: 2,
+    cost: 320,
+    spaceUsed: 2,
+    capacityLiters: 60,
+    batchTimeModifier: 0.72,
+    attentionModifier: 0.65,
+    lossModifier: 0.03,
+    visualClass: 'visual-semi-auto-filler',
+    operonTypeKey: 'equipment.packaging_bottle',
+    qualityBonus: 1,
+    riskModifier: -1,
+    speedModifier: 0.72
+  },
+  {
+    id: 'small-can-seamer',
+    equipmentId: 'bottler',
+    station: 'packaging',
+    name: 'Small canning and seaming bench',
+    description: 'A tiny canning setup that draws attention. Useful for events, risky for an informal garage.',
+    tier: 3,
+    cost: 980,
+    spaceUsed: 4,
+    capacityLiters: 150,
+    batchTimeModifier: 0.58,
+    attentionModifier: 0.8,
+    lossModifier: 0.025,
+    visualClass: 'visual-small-seamer',
+    operonTypeKey: 'equipment.packaging_can',
+    qualityBonus: 2,
+    riskModifier: 2,
+    speedModifier: 0.58
+  }
+];
+
+export const getEquipmentCatalogItem = (itemId: EquipmentItemId): EquipmentCatalogItem => {
+  const item = equipmentCatalog.find((catalogItem) => catalogItem.id === itemId);
+  if (!item) throw new Error(`Unknown equipment item: ${itemId}`);
+  return item;
+};
+
+const createEquipment = (itemId: EquipmentItemId, condition: number, x: number, y: number): Equipment => {
+  const item = getEquipmentCatalogItem(itemId);
+  return {
+    id: item.equipmentId,
+    itemId: item.id,
+    name: item.name,
+    description: item.description,
+    tier: item.tier,
+    level: item.tier,
+    condition,
+    cost: item.cost,
+    capacityCaseBonus: 0,
+    qualityBonus: item.qualityBonus,
+    riskModifier: item.riskModifier,
+    speedModifier: item.speedModifier,
+    capacityLiters: item.capacityLiters,
+    spaceUsed: item.spaceUsed,
+    visualClass: item.visualClass,
+    operonTypeKey: item.operonTypeKey,
+    x,
+    y
+  };
+};
+
+export const createOwnedEquipment = (itemId: EquipmentItemId, instanceNumber = 1, installed = true): OwnedEquipment => {
+  const item = getEquipmentCatalogItem(itemId);
+  return {
+    instanceId: `${item.id}-${instanceNumber}`,
+    itemId: item.id,
+    equipmentId: item.equipmentId,
+    station: item.station,
+    name: item.name,
+    tier: item.tier,
+    condition: item.cost === 0 ? 74 : 94,
+    capacityLiters: item.capacityLiters,
+    spaceUsed: item.spaceUsed,
+    batchTimeModifier: item.batchTimeModifier,
+    attentionModifier: item.attentionModifier,
+    qualityBonus: item.qualityBonus,
+    riskModifier: item.riskModifier,
+    lossModifier: item.lossModifier,
+    visualClass: item.visualClass,
+    operonTypeKey: item.operonTypeKey,
+    installed
+  };
+};
+
+export const equipmentByStation = (equipmentId: EquipmentId): EquipmentCatalogItem[] =>
+  equipmentCatalog.filter((item) => item.equipmentId === equipmentId).sort((a, b) => a.tier - b.tier);
+
+export const topGarageTier = (equipmentId: EquipmentId): number => Math.max(...equipmentByStation(equipmentId).map((item) => item.tier));
 
 export const starterEquipment: Equipment[] = [
-  {
-    id: 'kettle',
-    name: '40 L mash kettle',
-    description: 'Where every batch begins. A clean kettle protects wort quality and the larger model mashes faster.',
-    level: 1,
-    condition: 92,
-    x: 17,
-    y: 42
-  },
-  {
-    id: 'fermenter',
-    name: '18°C fermenter',
-    description: 'A humble vessel where wort becomes beer. Dirt raises contamination risk; temperature control makes it safer.',
-    level: 1,
-    condition: 88,
-    x: 50,
-    y: 35
-  },
-  {
-    id: 'bottler',
-    name: 'Bottling station',
-    description: 'A bottling bucket, filler wand, caps and hand capper for small garage runs. Better labeling helps local accounts remember you.',
-    level: 1,
-    condition: 83,
-    x: 76,
-    y: 56
-  }
+  createEquipment('stock-pot-20l', 76, 17, 42),
+  createEquipment('plastic-bucket', 72, 50, 35),
+  createEquipment('wand-capper', 70, 76, 56)
+];
+
+export const starterOwnedEquipment: OwnedEquipment[] = [
+  createOwnedEquipment('stock-pot-20l', 1, true),
+  createOwnedEquipment('plastic-bucket', 1, true),
+  createOwnedEquipment('wand-capper', 1, true)
 ];

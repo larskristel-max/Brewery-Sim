@@ -214,6 +214,13 @@
   color: #1f1606;
   background: var(--gold-strong);
   font-size: 0.72rem;
+  line-height: 1;
+  text-align: center;
+}
+
+.missions-button strong {
+  width: 1.85rem;
+  height: 1.85rem;
 }
 
 .bell-button {
@@ -260,8 +267,8 @@
 
 .bell-button .notification-badge {
   position: absolute;
-  top: -0.22rem;
-  right: -0.24rem;
+  top: -0.02rem;
+  right: -0.08rem;
   min-width: 1.18rem;
   height: 1.18rem;
   border: 2px solid rgba(7, 10, 13, 0.96);
@@ -430,6 +437,27 @@
   background: rgba(255, 255, 255, 0.05);
 }
 
+.temperature-note {
+  display: grid;
+  grid-column: 1 / -1;
+  gap: 0.08rem;
+  padding: 0.42rem 0.5rem;
+  border: 1px solid rgba(226, 179, 84, 0.2);
+  border-radius: 10px;
+  background: rgba(226, 179, 84, 0.08);
+}
+
+.temperature-note strong {
+  color: #fff4d8;
+  font-size: 0.76rem;
+}
+
+.temperature-note span {
+  color: var(--text-secondary);
+  font-size: 0.62rem;
+  font-weight: 800;
+}
+
 .hotspot-kettle {
   --x: 25%;
   --y: 50%;
@@ -517,6 +545,7 @@
 
 .brewer-avatar {
   position: absolute;
+  display: none;
   z-index: 8;
   width: 1.35rem;
   height: 1.35rem;
@@ -912,8 +941,8 @@
   .equipment-hotspot.expanded,
   .case-hotspot.expanded {
     width: 11.5rem;
-    max-height: 8.85rem;
-    overflow: hidden;
+    max-height: 12.4rem;
+    overflow: visible;
   }
 
   .hotspot-bottler {
@@ -1129,6 +1158,11 @@ body {
   min-width: 1.35rem;
   height: 1.35rem;
   font-size: 0.62rem;
+}
+
+.missions-button strong {
+  width: 1.74rem;
+  height: 1.74rem;
 }
 
 .bell-button {
@@ -1391,6 +1425,28 @@ body {
   padding: var(--space-4);
   border-radius: var(--radius-lg);
   pointer-events: auto;
+  scrollbar-color: rgba(198, 217, 232, 0.52) rgba(8, 20, 31, 0.42);
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+}
+
+.focus-overlay::-webkit-scrollbar {
+  width: 0.42rem;
+}
+
+.focus-overlay::-webkit-scrollbar-track {
+  margin: 0.72rem 0;
+  border-radius: 999px;
+  background: rgba(8, 20, 31, 0.42);
+}
+
+.focus-overlay::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(198, 217, 232, 0.56);
+}
+
+.focus-overlay::-webkit-scrollbar-corner {
+  background: transparent;
 }
 
 .focus-recipes {
@@ -1426,13 +1482,37 @@ body {
   top: 0;
   float: right;
   z-index: 2;
+  display: grid;
   width: 2rem;
   min-height: 2rem;
+  place-items: center;
   padding: 0;
   border-radius: 999px;
+  color: #fff7e8;
   background: rgba(255, 255, 255, 0.08);
   box-shadow: none;
-  text-align: center;
+}
+
+.overlay-close::before,
+.overlay-close::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 1rem;
+  height: 0.16rem;
+  border-radius: 999px;
+  background: currentColor;
+  translate: -50% -50%;
+  transform-origin: center;
+}
+
+.overlay-close::before {
+  transform: rotate(45deg);
+}
+
+.overlay-close::after {
+  transform: rotate(-45deg);
 }
 
 .focus-grid,
@@ -1733,25 +1813,30 @@ body {
 
 .hud-resources {
   justify-self: end;
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(4.5rem, 1fr) minmax(3.6rem, 0.78fr);
   align-items: center;
+  column-gap: 0.68rem;
   min-width: 11rem;
 }
 
 .hud-resources > div {
   display: grid;
   gap: 0.08rem;
+  justify-items: center;
+  text-align: center;
 }
 
 .hud-resources .rep-stat {
-  grid-template-columns: auto auto;
-  column-gap: 0.35rem;
+  grid-template-columns: 1fr;
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+  justify-items: center;
   min-width: 3.7rem;
 }
 
 .hud-resources .rep-stat .eyebrow,
 .hud-resources .rep-stat .mini-meter {
-  grid-column: 1 / -1;
+  grid-column: auto;
 }
 
 .mini-meter {
@@ -1761,7 +1846,7 @@ body {
 
 .top-hud .notification-control {
   position: relative;
-  top: auto;
+  top: 0.32rem;
   right: auto;
   z-index: 25;
   justify-self: end;
@@ -1837,6 +1922,34 @@ body {
   font-size: 1.65rem;
   font-weight: 850;
   line-height: 1;
+}
+
+.ops-button span {
+  position: relative;
+  display: block;
+  width: 1.12rem;
+  height: 1.12rem;
+}
+
+.ops-button span::before,
+.ops-button span::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  border-radius: 999px;
+  background: currentColor;
+  translate: -50% -50%;
+}
+
+.ops-button span::before {
+  width: 1.12rem;
+  height: 0.2rem;
+}
+
+.ops-button span::after {
+  width: 0.2rem;
+  height: 1.12rem;
 }
 
 .ops-control.open .ops-button {
@@ -1921,6 +2034,201 @@ body {
   font-size: 0.76rem;
 }
 
+.garage-pressure-strip {
+  position: absolute;
+  left: 50%;
+  bottom: max(0.7rem, var(--safe-bottom));
+  z-index: 10;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(5.8rem, 1fr));
+  gap: 0.42rem;
+  width: min(28rem, 42vw);
+  translate: -50% 0;
+  pointer-events: none;
+}
+
+.garage-pressure-strip div {
+  display: grid;
+  gap: 0.08rem;
+  min-height: 2.1rem;
+  padding: 0.34rem 0.52rem;
+  border: 1px solid rgba(255, 255, 255, 0.075);
+  border-radius: 10px;
+  color: #fff7e8;
+  background: linear-gradient(135deg, rgba(12, 15, 18, 0.6), rgba(4, 6, 8, 0.45));
+  box-shadow: 0 9px 18px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(14px);
+}
+
+.garage-pressure-strip span {
+  color: var(--text-secondary);
+  font-size: 0.5rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.garage-pressure-strip strong {
+  overflow: hidden;
+  color: #fff5dc;
+  font-size: 0.66rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.garage-pressure-strip .pressure-watch {
+  border-color: rgba(255, 159, 10, 0.52);
+}
+
+.garage-pressure-strip .pressure-alert {
+  border-color: rgba(255, 93, 93, 0.74);
+  box-shadow: 0 0 0 3px rgba(255, 93, 93, 0.1), 0 9px 18px rgba(0, 0, 0, 0.3);
+}
+
+.mode-idle .workshop-hotspot {
+  opacity: 0.94;
+  pointer-events: auto;
+}
+
+.capacity-note {
+  display: grid;
+  gap: 0.12rem;
+  padding: 0.52rem 0.58rem;
+  border: 1px solid rgba(110, 207, 120, 0.22);
+  border-radius: 10px;
+  background: rgba(110, 207, 120, 0.08);
+}
+
+.capacity-note.blocked {
+  border-color: rgba(255, 159, 10, 0.48);
+  background: rgba(255, 159, 10, 0.08);
+}
+
+.capacity-note strong {
+  color: #fff4d8;
+  font-size: 0.76rem;
+}
+
+.capacity-note span,
+.button-reason {
+  color: var(--text-secondary);
+  font-size: 0.68rem;
+}
+
+.hotspot-actions button {
+  display: grid;
+  align-content: center;
+  gap: 0.08rem;
+}
+
+.hotspot-actions button small,
+.inventory-list button small,
+.upgrade-pallet small,
+.upgrade-pallet em {
+  display: block;
+  color: var(--text-secondary);
+  font-size: 0.6rem;
+  font-style: normal;
+  line-height: 1.25;
+}
+
+.hotspot-actions button:disabled,
+.inventory-list button:disabled,
+.upgrade-pallet:disabled {
+  border-color: rgba(255, 255, 255, 0.1);
+  color: rgba(221, 230, 236, 0.52);
+  background: rgba(255, 255, 255, 0.045);
+  cursor: not-allowed;
+  filter: saturate(0.72);
+  opacity: 0.76;
+}
+
+.hotspot-actions button:disabled small,
+.inventory-list button:disabled small,
+.upgrade-pallet:disabled em {
+  color: rgba(255, 190, 128, 0.78);
+}
+
+.focus-upgrades {
+  width: min(58rem, 74vw);
+  margin-top: 2vh;
+}
+
+.store-heading {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: end;
+}
+
+.store-heading h2 {
+  justify-self: start;
+}
+
+.store-heading small,
+.store-group-heading small {
+  color: var(--text-secondary);
+  font-size: 0.68rem;
+}
+
+.equipment-store-group {
+  display: grid;
+  gap: 0.48rem;
+  padding-top: 0.65rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.store-group-heading {
+  display: grid;
+  grid-template-columns: minmax(7rem, 0.8fr) minmax(10rem, 1.2fr) auto;
+  gap: 0.62rem;
+  align-items: baseline;
+}
+
+.store-group-heading strong {
+  color: #fff7e8;
+  font-size: 0.86rem;
+}
+
+.equipment-store-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.52rem;
+}
+
+.equipment-store-card {
+  display: grid;
+  grid-template-rows: auto auto 1fr auto auto;
+  align-content: stretch;
+  gap: 0.26rem;
+  min-height: 9.6rem;
+  padding: 0.68rem;
+  border-radius: 10px;
+  text-align: left;
+}
+
+.equipment-store-card span {
+  color: #fff5dc;
+  font-size: 0.78rem;
+  font-weight: 900;
+  line-height: 1.18;
+}
+
+.equipment-store-card strong {
+  align-self: end;
+  color: var(--gold);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+}
+
+.equipment-store-card.upgrade-installed {
+  border-color: rgba(110, 207, 120, 0.42);
+  background: rgba(110, 207, 120, 0.1);
+}
+
+.equipment-store-card.upgrade-locked {
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
 @media (orientation: landscape) and (max-height: 520px) {
   .top-hud {
     top: 0.34rem;
@@ -1979,10 +2287,34 @@ body {
     min-height: 2.55rem;
     padding: 0.36rem 0.48rem;
   }
+
+  .garage-pressure-strip {
+    bottom: 0.48rem;
+    width: min(24rem, 42vw);
+  }
+
+  .garage-pressure-strip div {
+    min-height: 1.82rem;
+    padding: 0.26rem 0.4rem;
+  }
+
+  .garage-pressure-strip strong {
+    font-size: 0.58rem;
+  }
+
+  .equipment-store-grid {
+    grid-template-columns: repeat(3, minmax(8.4rem, 1fr));
+  }
+
+  .equipment-store-card {
+    min-height: 8.4rem;
+    padding: 0.52rem;
+  }
 }
 
 @media (max-width: 900px) and (orientation: landscape) {
   .top-hud {
+    right: max(1.5rem, calc(var(--grid-edge-x) + 0.55rem));
     grid-template-columns: auto minmax(4.9rem, 1fr) auto auto;
   }
 
@@ -1995,15 +2327,40 @@ body {
   }
 
   .hud-resources {
-    min-width: 8.2rem;
+    grid-template-columns: minmax(4.1rem, 1fr) minmax(2.8rem, 0.76fr);
+    column-gap: 0.5rem;
+    min-width: 9.1rem;
   }
 
   .hud-resources .eyebrow {
     font-size: 0.52rem;
   }
 
+  .hud-resources .rep-stat {
+    min-width: 0;
+  }
+
   .mini-meter {
     width: 2.5rem;
+  }
+
+  .mission-popover {
+    top: 12.95rem;
+    width: min(20rem, 34vw);
+    padding: 0.68rem 0.75rem;
+  }
+
+  .mission-popover strong {
+    margin: 0.42rem 0 0.5rem;
+    font-size: 0.98rem;
+  }
+
+  .objective-demand {
+    font-size: 0.72rem;
+  }
+
+  .mission-popover progress {
+    margin-top: 0.38rem;
   }
 
   .ops-menu {
@@ -2018,5 +2375,28 @@ body {
     width: min(34rem, 78vw);
     margin-left: 0;
     margin-right: 0;
+  }
+
+  .garage-pressure-strip {
+    grid-template-columns: repeat(3, minmax(4.4rem, 1fr));
+    width: min(20rem, 38vw);
+  }
+
+  .garage-pressure-strip div {
+    padding: 0.24rem 0.34rem;
+  }
+
+  .garage-pressure-strip span {
+    font-size: 0.45rem;
+  }
+
+  .garage-pressure-strip strong {
+    font-size: 0.54rem;
+  }
+
+  .store-heading,
+  .store-group-heading,
+  .equipment-store-grid {
+    grid-template-columns: 1fr;
   }
 }
