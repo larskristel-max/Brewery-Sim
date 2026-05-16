@@ -6,9 +6,12 @@
   "scripts": {
     "build": "tsc",
     "dev": "npm run build && node scripts/dev-server.mjs",
-    "test": "npm run build && node scripts/run-tests.mjs"
+    "test": "npm run build && node scripts/run-tests.mjs",
+    "test:browser": "npm run build && node scripts/run-browser-regression.mjs",
+    "test:all": "npm run test && npm run test:browser"
   },
   "devDependencies": {
+    "playwright": "^1.60.0",
     "typescript": "^6.0.3"
   }
 }

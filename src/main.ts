@@ -1,5 +1,6 @@
+import { equipmentByStation } from './data/equipment.js';
 import { ingredients, getIngredient } from './data/ingredients.js';
-import type { Equipment, EquipmentId, GameAction, IngredientId, UpgradeId } from './game/schema.js';
+import type { Equipment, EquipmentCatalogItem, EquipmentId, EquipmentItemId, GameAction, IngredientId, SalesChannelId } from './game/schema.js';
 import { createInitialState } from './game/initialState.js';
 import { loadSavedGame, resetSavedGame, saveGameState, STORAGE_KEY } from './game/persistence.js';
 import {
@@ -8,6 +9,7 @@ import {
   demandProgress,
   equipmentConditionLabel,
   equipmentConditionTier,
+  formatGameDate,
   formatClock,
   formatCurrency,
   ingredientAmountLabel,
@@ -32,6 +34,7 @@ if (!root) {
 
 type SceneTarget = EquipmentId | 'cases';
 type FocusOverlay = 'recipes' | 'production' | 'inventory' | 'upgrades' | 'log';
+type StoreStation = 'kettle' | 'fermenter' | 'bottler';
 
 const hasBrowserSave = (): boolean => {
   try {
@@ -51,11 +54,102 @@ let opsOpen = false;
 let activeOverlay: FocusOverlay | null = null;
 let audioAllowed = false;
 
-const displayEquipmentName = (equipment: Equipment): string => {
-  if (equipment.id === 'kettle') return equipment.level > 1 ? '60 L brew system' : '40 L brew system';
-  if (equipment.id === 'fermenter') return '18 C fermenter';
-  if (equipment.id === 'bottler') return 'Bottling station';
-  return equipment.name;
+const stationLabels: Record<StoreStation, string> = {
+  kettle: 'Brewhouse',
+  fermenter: 'Fermentation',
+  bottler: 'Packaging'
+};
+
+const stationNouns: Record<StoreStation, string> = {
+  kettle: 'brewhouse',
+  fermenter: 'fermenter',
+  bottler: 'packaging station'
+};
+
+const displayEquipmentName = (equipment: Equipment): string => equipment.name;
+
+const equipmentCapacityLabel = (equipment: Equipment): string => {
+  const liters = equipment.capacityLiters;
+  if (equipment.id === 'bottler') return liters > 0 ? `${liters} L packaging run` : 'Packaging capacity pending';
+  return liters > 0 ? `${liters} L capacity` : 'Capacity pending';
+};
+
+const garageSpaceUsed = (): number => state.garageSpaceUsed;
+const garageSpaceLimit = (): number => state.garageSpaceLimit;
+
+const fermenterReservation = (): { blocked: boolean; label: string; detail: string } => {
+  const openSlots = state.ownedEquipment.filter((item) => item.equipmentId === 'fermenter' && !item.occupiedBatchId).length;
+  const occupyingBatch = state.batches.find((batch) => batch.step === 'fermenting' || batch.step === 'awaiting-packaging');
+  if (occupyingBatch) {
+    return {
+      blocked: openSlots === 0,
+      label: openSlots === 0 ? 'Fermenters occupied' : `${openSlots} fermenter slot open`,
+      detail: `${occupyingBatch.recipeName} is ${stepLabel(occupyingBatch.step).toLowerCase()}.`
+    };
+  }
+
+  const reservedBatch = state.batches.find((batch) => batch.step === 'brewing' || batch.step === 'awaiting-transfer');
+  if (reservedBatch) {
+    return {
+      blocked: openSlots === 0,
+      label: openSlots === 0 ? 'Fermenters reserved' : `${openSlots} fermenter slot open`,
+      detail: `${reservedBatch.recipeName} has a fermenter reserved after mash.`
+    };
+  }
+
+  return {
+    blocked: false,
+    label: `${openSlots} fermenter slot${openSlots === 1 ? '' : 's'} open`,
+    detail: `${displayEquipmentName(state.equipment.fermenter)} ready for the next transfer.`
+  };
+};
+
+const recipeStartBlocker = (recipe: ReturnType<typeof visibleRecipes>[number]): string => {
+  const reservation = fermenterReservation();
+  if (!recipe.enabled) return 'Recipe locked';
+  if (state.inventory.water < recipe.waterCost) return `Need ${recipe.waterCost} L water`;
+  if (recipeMissingIngredients(state, recipe).length > 0) return 'Missing ingredients';
+  if (state.energy < 35) return 'Low energy';
+  if (state.batches.some((batch) => batch.step === 'brewing')) return 'Brewhouse busy';
+  if (reservation.blocked) return reservation.label;
+  return '';
+};
+
+const incomingForIngredient = (ingredientId: IngredientId): { amount: number; arrivalDay: number | null } =>
+  state.pendingOrders.reduce(
+    (summary, order) => {
+      const amount = order.items.filter((item) => item.ingredientId === ingredientId).reduce((total, item) => total + item.amount, 0);
+      if (amount <= 0) return summary;
+      return {
+        amount: summary.amount + amount,
+        arrivalDay: summary.arrivalDay === null ? order.arrivalDay : Math.min(summary.arrivalDay, order.arrivalDay)
+      };
+    },
+    { amount: 0, arrivalDay: null as number | null }
+  );
+
+const missingOrderStatus = (missing: ReturnType<typeof recipeMissingIngredients>): { fullyIncoming: boolean; label: string; arrivalDay: number | null } => {
+  if (missing.length === 0) return { fullyIncoming: false, label: '', arrivalDay: null };
+  const arrivals = missing.map((item) => incomingForIngredient(item.ingredientId));
+  const fullyIncoming = missing.every((item, index) => arrivals[index].amount >= item.amount);
+  const earliest = arrivals.map((arrival) => arrival.arrivalDay).filter((day): day is number => day !== null).sort((a, b) => a - b)[0] ?? null;
+  return {
+    fullyIncoming,
+    arrivalDay: earliest,
+    label: fullyIncoming && earliest ? `Already ordered. Arrives ${formatGameDate(earliest)}.` : earliest ? `Some supplies arrive ${formatGameDate(earliest)}.` : ''
+  };
+};
+
+const fermenterTemperatureHint = (): string => {
+  const fermenting = state.batches.find((batch) => batch.step === 'fermenting');
+  const recipe = fermenting ? visibleRecipes().find((item) => item.id === fermenting.recipeId) : null;
+  if (!recipe) return 'Set for next batch';
+  const ingredientIds = recipe.ingredients.map((ingredient) => ingredient.ingredientId);
+  if (ingredientIds.includes('lager-yeast')) return 'Lager target 9-14 C';
+  if (ingredientIds.includes('kveik-yeast') || recipe.style.toLowerCase().includes('kveik')) return 'Kveik target 28-40 C';
+  if (ingredientIds.includes('saison-yeast')) return 'Saison target 20-30 C';
+  if (ingredientIds.includes('wheat-yeast')) return 'Wheat target 18-24 C';
+  return 'Ale target 17-22 C';
 };
 
 
@@ -85,11 +179,16 @@ const playBell = () => {
 
 const dispatch = (action: GameAction) => {
   const previousEventId = state.events[0]?.id;
+  const overlayScrollTop = document.querySelector<HTMLElement>('.focus-overlay')?.scrollTop ?? 0;
   state = reduceGame(state, action);
   saveGameState(state);
   saveStatus = `Saved locally ${formatClock(state.minute)}`;
   if (state.events[0]?.id && state.events[0]?.id !== previousEventId) playBell();
   render();
+  if (activeOverlay) {
+    const overlay = document.querySelector<HTMLElement>('.focus-overlay');
+    if (overlay) overlay.scrollTop = overlayScrollTop;
+  }
 };
 
 const resetGame = () => {
@@ -105,15 +204,23 @@ const resetGame = () => {
 };
 
 const stepLabel = (step: string) =>
-  ({ mashing: 'Mashing', fermenting: 'Fermenting', packaging: 'Packaging', ready: 'Ready' })[step] ?? step;
+  ({
+    brewing: 'Brewing',
+    'awaiting-transfer': 'Awaiting transfer',
+    fermenting: 'Fermenting',
+    'awaiting-packaging': 'Awaiting packaging',
+    packaging: 'Packaging',
+    'bottle-conditioning': 'Bottle conditioning',
+    ready: 'Ready'
+  })[step] ?? step;
 
 const activeForEquipment = (equipmentId: EquipmentId) => {
-  const stepByEquipment = { kettle: 'mashing', fermenter: 'fermenting', bottler: 'packaging' } as const;
+  const stepByEquipment = { kettle: 'brewing', fermenter: 'fermenting', bottler: 'packaging' } as const;
   return state.batches.some((batch) => batch.step === stepByEquipment[equipmentId]);
 };
 
 const batchForEquipment = (equipmentId: EquipmentId) => {
-  const stepByEquipment = { kettle: 'mashing', fermenter: 'fermenting', bottler: 'packaging' } as const;
+  const stepByEquipment = { kettle: 'brewing', fermenter: 'fermenting', bottler: 'packaging' } as const;
   return state.batches.find((batch) => batch.step === stepByEquipment[equipmentId]);
 };
 
@@ -127,6 +234,8 @@ const riskLabel = (risk: number): string => {
   return 'Severe risk';
 };
 
+const equipmentMetaLine = (equipment: Equipment): string => `${equipmentCapacityLabel(equipment)} - ${equipment.spaceUsed || '?'} space`;
+
 const equipmentSceneStatus = (equipmentId: EquipmentId): { label: string; detail: string; toneClass: string } => {
   const equipment = state.equipment[equipmentId];
   const activeBatch = batchForEquipment(equipmentId);
@@ -134,25 +243,46 @@ const equipmentSceneStatus = (equipmentId: EquipmentId): { label: string; detail
   const conditionDetail = `${Math.round(equipment.condition)}% clean`;
 
   if (equipmentId === 'fermenter') {
+    const waitingTransfer = state.batches.find((batch) => batch.step === 'awaiting-transfer');
+    if (waitingTransfer) {
+      return {
+        label: 'Transfer waiting',
+        detail: `${waitingTransfer.recipeName} needs player input`,
+        toneClass: 'risk-high'
+      };
+    }
     const fermenting = activeBatch ?? state.batches.find((batch) => batch.step === 'fermenting');
     if (fermenting) {
       const tier = contaminationRiskTier(fermenting.contaminationRisk);
       return {
-        label: `${fermenting.contaminationRisk}% contamination`,
-        detail: riskLabel(fermenting.contaminationRisk),
+        label: `${state.fermenterTemperatureC} C fermentation`,
+        detail: `${riskLabel(fermenting.contaminationRisk)} - ${fermenterTemperatureHint()}`,
         toneClass: `risk-${tier}`
       };
     }
+    return {
+      label: `${state.fermenterTemperatureC} C`,
+      detail: `${equipmentMetaLine(equipment)} - ${fermenterTemperatureHint()}`,
+      toneClass: `condition-${equipmentConditionTier(equipment.condition)}`
+    };
   }
 
   if (equipmentId === 'bottler') {
-    const readyBatch = state.batches.find((batch) => batch.step === 'ready');
+    const readyBatch = state.batches.find((batch) => batch.step === 'awaiting-packaging');
+    const conditioningBatch = state.batches.find((batch) => batch.step === 'bottle-conditioning');
     const tier = equipmentConditionTier(equipment.condition);
     if (readyBatch) {
       return {
         label: `${readyBatch.casesExpected} cases waiting`,
         detail: tier === 'dirty' || tier === 'critical' ? 'Packaging loss risk' : 'Ready to bottle',
         toneClass: tier === 'dirty' || tier === 'critical' ? 'risk-high' : 'risk-low'
+      };
+    }
+    if (conditioningBatch) {
+      return {
+        label: 'Conditioning',
+        detail: `${Math.round(conditioningBatch.stepProgress)}% complete`,
+        toneClass: 'risk-low'
       };
     }
     if (tier === 'dirty' || tier === 'critical') {
@@ -174,24 +304,29 @@ const equipmentSceneStatus = (equipmentId: EquipmentId): { label: string; detail
 
   return {
     label: conditionLabel,
-    detail: conditionDetail,
+    detail: `${conditionDetail} - ${equipmentMetaLine(equipment)}`,
     toneClass: `condition-${equipmentConditionTier(equipment.condition)}`
   };
 };
 
-const hotspotPosition = (equipmentId: EquipmentId) =>
-  ({
+const hotspotPosition = (equipmentId: EquipmentId) => {
+  if (equipmentId === 'fermenter' && state.equipment.fermenter.tier === 1) return { x: 56, y: 55 };
+  return {
     kettle: { x: 24, y: 49 },
     fermenter: { x: 51, y: 29 },
     bottler: { x: 75, y: 48 }
-  })[equipmentId];
+  }[equipmentId];
+};
 
 const brewerPosition = () => {
   const focus = state.batches[0]?.step ?? 'idle';
   return {
-    mashing: { left: '28%', top: '58%' },
+    brewing: { left: '28%', top: '58%' },
+    'awaiting-transfer': { left: '46%', top: '58%' },
     fermenting: { left: '52%', top: '51%' },
+    'awaiting-packaging': { left: '70%', top: '60%' },
     packaging: { left: '76%', top: '63%' },
+    'bottle-conditioning': { left: '82%', top: '70%' },
     ready: { left: '82%', top: '70%' },
     idle: { left: '38%', top: '68%' }
   }[focus];
@@ -203,9 +338,10 @@ const renderTopHud = () => `
       <span class="brand-mark" aria-hidden="true">HH</span>
       <div><strong>HOP HAVEN</strong><span>Garage floor</span></div>
     </div>
-    <div class="hud-cluster hud-stat time-stat"><span class="eyebrow">Day ${state.day}</span><strong>${formatClock(state.minute)}</strong></div>
+    <div class="hud-cluster hud-stat time-stat"><span class="eyebrow">${formatGameDate(state.day)}</span><strong>${formatClock(state.minute)}</strong></div>
     <div class="hud-cluster hud-resources">
       <div><span class="eyebrow">Cash</span><strong>${formatCurrency(state.cash)}</strong></div>
+      <div class="rep-stat"><span class="eyebrow">Energy</span><strong>${state.energy}</strong><span class="mini-meter"><i style="width: ${state.energy}%"></i></span></div>
       <div class="rep-stat"><span class="eyebrow">Rep</span><strong>${state.reputation}</strong><span class="mini-meter"><i style="width: ${Math.min(100, state.reputation * 8)}%"></i></span></div>
     </div>
     ${renderNotificationControl()}
@@ -244,6 +380,7 @@ const renderNotificationControl = () => {
   const bottlerTier = equipmentConditionTier(state.equipment.bottler.condition);
   const fermenterStatus = fermenting ? `${fermenting.contaminationRisk}% ${riskLabel(fermenting.contaminationRisk)}` : equipmentConditionLabel(state.equipment.fermenter.condition);
   const packagingStatus = bottlerTier === 'dirty' || bottlerTier === 'critical' ? 'Loss risk' : equipmentConditionLabel(state.equipment.bottler.condition);
+  const storageOverflow = Object.values(storageOverflowByArea(state)).reduce((total, amount) => total + amount, 0);
   const eventCount = Math.min(9, state.events.length);
   return `
     <div class="notification-control">
@@ -260,6 +397,9 @@ const renderNotificationControl = () => {
                 <div><span>Fermenter</span><strong>${fermenterStatus}</strong></div>
                 <div><span>Packaging</span><strong>${packagingStatus}</strong></div>
                 <div><span>Cases</span><strong>${state.inventory.cases} ready</strong></div>
+                <div><span>Channel</span><strong>${state.demand.accountName}</strong></div>
+                <div><span>Compliance</span><strong>${state.visibilityRisk >= 30 ? 'Invoice pressure' : `${state.visibilityRisk}/30 visible`}</strong></div>
+                <div><span>Garage space</span><strong>${garageSpaceUsed()}/${garageSpaceLimit()}${storageOverflow > 0 ? ' plus clutter' : ''}</strong></div>
               </div>
               <ol>
                 ${state.events.slice(0, 4).map((event) => `<li><time>${formatClock(event.minute)}</time><span>${event.message}</span></li>`).join('')}
@@ -276,23 +416,41 @@ const renderRecipeCards = () =>
   visibleRecipes()
     .map((recipe) => {
       const missing = recipeMissingIngredients(state, recipe);
+      const incomingMissing = missingOrderStatus(missing);
       const missingCost = orderCost(missing);
       const extraCost = orderCost(recipeOrderItems(state, recipe, 'extra'));
-      const canStart = recipeCanStart(state, recipe);
+      const startBlocker = recipeStartBlocker(recipe);
+      const canStart = recipeCanStart(state, recipe) && startBlocker === '';
+      const reservation = fermenterReservation();
+      const batchLiters = Math.min(state.equipment.kettle.capacityLiters, state.equipment.fermenter.capacityLiters);
+      const capStation = state.equipment.kettle.capacityLiters <= state.equipment.fermenter.capacityLiters ? stationNouns.kettle : stationNouns.fermenter;
+      const capacityText =
+        state.equipment.kettle.capacityLiters === state.equipment.fermenter.capacityLiters
+          ? `${batchLiters} L garage batch with the current setup.`
+          : `${batchLiters} L batch capped by the ${capStation}.`;
+      const missingLabel = missing.map((item) => `${getIngredient(item.ingredientId).name} ${ingredientAmountLabel(item.ingredientId, item.amount)}`).join(', ');
+      const missingOrderBlocker = missing.length === 0 ? 'Nothing missing' : incomingMissing.fullyIncoming ? incomingMissing.label : `Need ${formatCurrency(missingCost)}`;
+      const extraOrderBlocker = `Need ${formatCurrency(extraCost)}`;
+      const estimatedArrivalDay = state.day + 3;
+      const estimatedDelivery = `Estimated delivery: ${formatGameDate(estimatedArrivalDay)}. Arrives in 3 days.`;
       return `
         <article class="batch-card recipe-card">
           <div><strong>${recipe.name}</strong><span>${recipe.style} · ${formatCurrency(recipe.salePricePerCase)}/case</span></div>
           <small>${recipe.challenge}</small>
+          <div class="capacity-note ${reservation.blocked ? 'blocked' : ''}">
+            <strong>${reservation.label}</strong>
+            <span>${capacityText} ${reservation.detail}</span>
+          </div>
           <small>Batch cost now ${formatCurrency(recipeIngredientCost(recipe))} · market ${Math.round(recipe.marketAppeal * 100)}%</small>
           ${
             missing.length > 0
-              ? `<small>Missing ${missing.map((item) => `${getIngredient(item.ingredientId).name} ${ingredientAmountLabel(item.ingredientId, item.amount)}`).join(', ')}</small>`
+              ? `<small class="button-reason">Missing ${missingLabel}${incomingMissing.label ? ` - ${incomingMissing.label}` : ''}</small>`
               : '<small>Ingredients ready.</small>'
           }
           <div class="hotspot-actions">
-            <button data-action="start-batch" data-recipe-id="${recipe.id}" type="button" ${canStart ? '' : 'disabled'}>${recipe.enabled ? 'Brew' : 'Coming later'}</button>
-            <button data-action="order-recipe" data-order-mode="missing" data-recipe-id="${recipe.id}" type="button" ${recipe.enabled && missing.length > 0 && state.cash >= missingCost ? '' : 'disabled'}>Order missing ${formatCurrency(missingCost)}</button>
-            <button data-action="order-recipe" data-order-mode="extra" data-recipe-id="${recipe.id}" type="button" ${recipe.enabled && state.cash >= extraCost ? '' : 'disabled'}>Order extra ${formatCurrency(extraCost)}</button>
+            <button data-action="start-batch" data-recipe-id="${recipe.id}" type="button" ${canStart ? '' : `disabled title="${startBlocker || 'Blocked'}"`}>${canStart ? 'Brew' : 'Blocked'}${!canStart && recipe.enabled ? `<small>${startBlocker}</small>` : ''}</button>
+            <button data-action="order-recipe" data-order-mode="missing" data-recipe-id="${recipe.id}" type="button" ${recipe.enabled && missing.length > 0 && !incomingMissing.fullyIncoming && state.cash >= missingCost ? `title="${estimatedDelivery}"` : `disabled title="${missingOrderBlocker}"`}>${incomingMissing.fullyIncoming ? 'Ordered' : `Order missing ${formatCurrency(missingCost)}`}${missing.length === 0 ? '<small>Stock ready</small>' : incomingMissing.fullyIncoming ? `<small>Arrives ${formatGameDate(incomingMissing.arrivalDay ?? state.day)}</small>` : state.cash < missingCost ? '<small>Not enough cash</small>' : `<small>Arrives ${formatGameDate(estimatedArrivalDay)}</small>`}</button>
+            <button data-action="order-recipe" data-order-mode="extra" data-recipe-id="${recipe.id}" type="button" ${recipe.enabled && state.cash >= extraCost ? `title="${estimatedDelivery}"` : `disabled title="${extraOrderBlocker}"`}>Order extra ${formatCurrency(extraCost)}${state.cash < extraCost ? '<small>Not enough cash</small>' : `<small>Arrives ${formatGameDate(estimatedArrivalDay)}</small>`}</button>
           </div>
         </article>
       `;
@@ -300,34 +458,40 @@ const renderRecipeCards = () =>
     .join('');
 
 const renderEquipmentActions = (equipmentId: EquipmentId) => {
+  const cleanCost = 18;
+  const canClean = state.cash >= cleanCost;
   if (equipmentId === 'kettle') {
+    const reservation = fermenterReservation();
     return `
       <div class="hotspot-actions">
         <button data-action="open-overlay" data-overlay="recipes" type="button">Brew</button>
-        <button data-action="clean-equipment" data-equipment-id="kettle" type="button">Clean</button>
-        <button type="button" disabled>Repair</button>
-        <button type="button" disabled>Replace</button>
+        <button data-action="clean-equipment" data-equipment-id="kettle" type="button" ${canClean ? '' : `disabled title="Need ${formatCurrency(cleanCost)}"`}>Clean${canClean ? '' : '<small>Need cash</small>'}</button>
+        <button type="button" disabled title="${reservation.label}">Slot<small>${reservation.label}</small></button>
+        <button data-action="open-overlay" data-overlay="upgrades" type="button">Store<small>Equipment</small></button>
       </div>
     `;
   }
 
   if (equipmentId === 'fermenter') {
+    const waitingTransfer = state.batches.find((batch) => batch.step === 'awaiting-transfer');
     return `
       <div class="hotspot-actions">
-        <button data-action="use-equipment" data-equipment-id="fermenter" type="button">Inspect</button>
-        <button data-action="clean-equipment" data-equipment-id="fermenter" type="button">Clean</button>
-        <button type="button" disabled>Repair</button>
-        <button type="button" disabled>Replace</button>
+        <button data-action="${waitingTransfer ? 'transfer-batch' : 'use-equipment'}" ${waitingTransfer ? `data-batch-id="${waitingTransfer.id}"` : 'data-equipment-id="fermenter"'} type="button">${waitingTransfer ? 'Transfer' : 'Inspect'}${waitingTransfer ? `<small>${waitingTransfer.recipeName}</small>` : ''}</button>
+        <button data-action="set-fermenter-temperature" data-temperature="${state.fermenterTemperatureC - 1}" type="button">Cool<small>${state.fermenterTemperatureC - 1} C</small></button>
+        <button data-action="set-fermenter-temperature" data-temperature="${state.fermenterTemperatureC + 1}" type="button">Warm<small>${state.fermenterTemperatureC + 1} C</small></button>
+        <button data-action="clean-equipment" data-equipment-id="fermenter" type="button" ${canClean ? '' : `disabled title="Need ${formatCurrency(cleanCost)}"`}>Clean${canClean ? '' : '<small>Need cash</small>'}</button>
+        <div class="temperature-note"><strong>${state.fermenterTemperatureC} C</strong><span>${fermenterTemperatureHint()}</span></div>
       </div>
     `;
   }
 
+  const readyBatch = state.batches.find((batch) => batch.step === 'awaiting-packaging');
   return `
     <div class="hotspot-actions">
-      <button data-action="use-equipment" data-equipment-id="bottler" type="button">Bottle</button>
-      <button data-action="clean-equipment" data-equipment-id="bottler" type="button">Clean</button>
-      <button type="button" disabled>Repair</button>
-      <button type="button" disabled>Replace</button>
+      <button data-action="start-packaging" data-batch-id="${readyBatch?.id ?? ''}" type="button" ${readyBatch ? '' : 'disabled title="No fermented batch waiting"'}>Package${readyBatch ? `<small>${readyBatch.casesExpected} cases</small>` : '<small>No batch ready</small>'}</button>
+      <button data-action="clean-equipment" data-equipment-id="bottler" type="button" ${canClean ? '' : `disabled title="Need ${formatCurrency(cleanCost)}"`}>Clean${canClean ? '' : '<small>Need cash</small>'}</button>
+      <button type="button" disabled title="Use the store for equipment changes">Repair<small>No repair bench</small></button>
+      <button data-action="open-overlay" data-overlay="upgrades" type="button">Store<small>Equipment</small></button>
     </div>
   `;
 };
@@ -349,12 +513,13 @@ const shouldShowStorageHotspot = (area: 'dry-shelf' | 'cold-box' | 'utility-shel
 const sceneVisibility = () => {
   const workflow = currentWorkflowStage(state);
   const fermenting = state.batches.some((batch) => batch.step === 'fermenting');
-  const packaging = state.batches.some((batch) => batch.step === 'packaging' || batch.step === 'ready') || state.inventory.cases > 0;
+  const packaging = state.batches.some((batch) => batch.step === 'awaiting-packaging' || batch.step === 'packaging' || batch.step === 'bottle-conditioning') || state.inventory.cases > 0;
+  const hasSellableCases = state.inventory.cases > 0;
 
   return {
     showFloorNoteTicker: notificationsOpen,
-    showWorkshopHotspot: false,
-    showCases: packaging || workflow.tapTarget === 'cases',
+    showWorkshopHotspot: true,
+    showCases: hasSellableCases && workflow.tapTarget === 'cases',
     spotlightTarget: workflow.tapTarget,
     modeClass: packaging ? 'mode-packaging' : fermenting ? 'mode-fermentation' : state.batches.length > 0 ? 'mode-production' : 'mode-idle'
   };
@@ -385,14 +550,46 @@ const renderSceneSupplyHotspots = () => {
 
 
 const renderWorkshopHotspot = () => {
-  const installed = Object.values(state.upgrades).filter((upgrade) => upgrade.purchased).length;
-  const total = Object.values(state.upgrades).length;
+  const installed = Object.values(state.equipment).reduce((total, equipment) => total + equipment.tier, 0);
+  const total = Object.values(state.equipment).reduce((sum, equipment) => sum + equipmentByStation(equipment.id).length, 0);
   return `
-    <button class="workshop-hotspot" data-action="open-overlay" data-overlay="upgrades" type="button" aria-label="Workshop upgrades">
-      <span>Workshop</span><strong>${installed}/${total} installed</strong>
+    <button class="workshop-hotspot" data-action="open-overlay" data-overlay="upgrades" type="button" aria-label="Equipment store">
+      <span>Equipment</span><strong>${installed}/${total} tiers - ${garageSpaceUsed()}/${garageSpaceLimit()} space</strong>
     </button>
   `;
 };
+
+const renderGaragePressure = () => {
+  const storageOverflow = Object.values(storageOverflowByArea(state)).reduce((total, amount) => total + amount, 0);
+  const complianceTone = state.visibilityRisk >= 30 ? 'pressure-alert' : state.visibilityRisk >= 18 ? 'pressure-watch' : '';
+  const householdTone = storageOverflow > 0 || state.pendingOrders.length > 1 ? 'pressure-watch' : '';
+  return `
+    <div class="garage-pressure-strip" aria-label="Garage pressure">
+      <div><span>Channel</span><strong>${state.demand.accountName}</strong></div>
+      <div class="${complianceTone}"><span>Compliance</span><strong>${state.visibilityRisk >= 30 ? 'Invoice risk' : `${state.visibilityRisk}/30`}</strong></div>
+      <div class="${householdTone}"><span>Household</span><strong>${storageOverflow > 0 ? 'Clutter' : `${state.pendingOrders.length} deliveries`}</strong></div>
+    </div>
+  `;
+};
+
+const salesOffers = () => [
+  { id: 'friends-family', name: 'Friends and family', cases: 4, price: 12, risk: 'Very low visibility', invoice: 'No invoice' },
+  { id: 'private-event', name: 'Private event', cases: 8, price: 18, risk: 'Medium visibility', invoice: 'Informal receipt' },
+  { id: 'local-bar', name: 'Local bar', cases: 12, price: 22, risk: 'High formal risk', invoice: state.canInvoice ? 'Invoice ready' : 'May ask for invoice' }
+] as const;
+
+const renderSalesOffers = () => `
+  <div class="hotspot-actions sales-offers">
+    ${salesOffers()
+      .map((offer) => {
+        const cases = Math.min(offer.cases, state.inventory.cases);
+        return `<button data-action="sell-channel" data-channel-id="${offer.id}" data-cases="${cases}" type="button" ${cases > 0 ? '' : 'disabled'}>
+          ${offer.name}<small>${cases}/${offer.cases} cases - ${formatCurrency(cases * offer.price)} - ${offer.risk} - ${offer.invoice}</small>
+        </button>`;
+      })
+      .join('')}
+  </div>
+`;
 
 const renderEventTicker = () => {
   const latest = state.events[0];
@@ -406,7 +603,7 @@ const renderEventTicker = () => {
 
 const renderOpsControl = () => `
   <div class="ops-control ${opsOpen ? 'open' : ''}">
-    <button class="ops-button" data-action="toggle-ops" type="button" aria-expanded="${opsOpen}" aria-label="Open operations layer"><span aria-hidden="true">+</span></button>
+    <button class="ops-button" data-action="toggle-ops" type="button" aria-expanded="${opsOpen}" aria-label="Open operations layer"><span aria-hidden="true"></span></button>
     ${
       opsOpen
         ? `
@@ -423,6 +620,7 @@ const renderOpsControl = () => `
               <button data-action="open-overlay" data-overlay="inventory" type="button"><span>Stockroom</span><strong>Inventory</strong></button>
               <button data-action="open-overlay" data-overlay="upgrades" type="button"><span>Bench</span><strong>Workshop</strong></button>
               <button data-action="open-overlay" data-overlay="log" type="button"><span>Clipboard</span><strong>Floor notes</strong></button>
+              <button data-action="end-day" type="button"><span>Time</span><strong>End day</strong></button>
               <button data-action="reset-save" type="button"><span>Settings</span><strong>New Game / Reset Save</strong></button>
             </div>
           </aside>
@@ -469,6 +667,8 @@ const renderGarage = () => {
         <article
           class="equipment-hotspot hotspot-${item.id} ${expanded ? 'expanded' : ''} ${contextual ? 'contextual' : ''} ${silent ? 'scene-silent' : ''} ${obstructed ? 'obstructed-by-card' : ''} condition-${conditionTier} ${status.toneClass} ${item.id === state.selectedEquipmentId ? 'selected' : ''} ${activeForEquipment(item.id) ? 'active' : ''} ${isNextTapTarget(item.id) ? 'next-tap' : ''}"
           style="--x: ${pos.x}%; --y: ${pos.y}%"
+          data-action="toggle-target"
+          data-target="${item.id}"
         >
           <button class="hotspot-toggle" data-action="toggle-target" data-target="${item.id}" type="button" aria-expanded="${expanded}" aria-label="${expanded ? 'Collapse' : 'Expand'} ${displayEquipmentName(item)}">
             <span class="hotspot-name">${displayEquipmentName(item)}</span>
@@ -487,11 +687,12 @@ const renderGarage = () => {
       ${renderAtmosphere()}
       <div class="stage-summary" aria-label="Workflow overview">Mash · Ferment · Package · Sell</div>
       ${renderMissionsControl()}
+      ${renderGaragePressure()}
       ${renderSceneSupplyHotspots()}
       ${visibility.showWorkshopHotspot ? renderWorkshopHotspot() : ''}
       ${visibility.showFloorNoteTicker ? renderEventTicker() : ''}
       ${equipment}
-      ${visibility.showCases ? `<article class="case-hotspot ${expandedTarget === 'cases' ? 'expanded' : ''} ${expandedTarget === 'bottler' ? 'obstructed-by-card' : ''} ${state.inventory.cases > 0 ? 'active' : ''} ${isNextTapTarget('cases') ? 'next-tap' : ''}">
+      ${visibility.showCases ? `<article class="case-hotspot ${expandedTarget === 'cases' ? 'expanded' : ''} ${expandedTarget === 'bottler' ? 'obstructed-by-card' : ''} ${state.inventory.cases > 0 ? 'active' : ''} ${isNextTapTarget('cases') ? 'next-tap' : ''}" data-action="toggle-target" data-target="cases">
         <button class="hotspot-toggle" data-action="toggle-target" data-target="cases" type="button" aria-expanded="${expandedTarget === 'cases'}" aria-label="Expand cases">
           <span class="hotspot-name">Cases</span>
           <strong>${state.inventory.cases}</strong>
@@ -499,7 +700,7 @@ const renderGarage = () => {
         </button>
         ${
           expandedTarget === 'cases'
-            ? `<div class="hotspot-actions"><button data-action="sell-cases" type="button" ${state.inventory.cases > 0 ? '' : 'disabled'}>Sell</button></div>`
+            ? renderSalesOffers()
             : ''
         }
       </article>` : ''}
@@ -509,32 +710,44 @@ const renderGarage = () => {
   `;
 };
 
-const renderBatchBoard = () => `
-  <section class="overlay-section">
-    <div class="panel-heading"><span class="eyebrow gold">Production</span><h2>Production flow</h2></div>
-    ${
-      state.batches.length === 0
-        ? '<p>No active batch. Tap the brew system to choose a recipe.</p>'
-        : state.batches
-            .map(
-              (batch) => `
+const renderBatchBoard = () => {
+  const batchCards =
+    state.batches.length === 0
+      ? '<p>No active batch. Tap the brew system to choose a recipe.</p>'
+      : state.batches
+          .map((batch) => {
+            const recipe = visibleRecipes().find((item) => item.id === batch.recipeId);
+            const duration = recipe && batch.step in recipe.stepDurations ? recipe.stepDurations[batch.step as keyof typeof recipe.stepDurations] : 0;
+            const remaining = duration > 0 ? Math.max(0, Math.round(duration * (1 - batch.stepProgress / 100))) : 0;
+            const progress = batch.step === 'awaiting-transfer' || batch.step === 'awaiting-packaging' ? 100 : batch.stepProgress;
+            return `
               <article class="batch-card">
-                <div><strong>${batch.recipeName}</strong><span>${stepLabel(batch.step)} · Q${batch.quality}</span></div>
-                <small>${batch.casesExpected} cases expected · contamination risk ${batch.contaminationRisk}% · storage penalty ${batch.storagePenalty}</small>
-                <progress value="${batch.step === 'ready' ? 100 : batch.stepProgress}" max="100"></progress>
+                <div><strong>${batch.recipeName}</strong><span>${stepLabel(batch.step)} - Q${batch.quality}</span></div>
+                <small>${batch.casesExpected} cases expected - ${remaining > 0 ? `${remaining} in-game minutes remaining` : 'Waiting for player input'} - contamination risk ${batch.contaminationRisk}%</small>
+                <progress value="${progress}" max="100"></progress>
+                ${
+                  batch.step === 'awaiting-transfer'
+                    ? `<button data-action="transfer-batch" data-batch-id="${batch.id}" type="button">Transfer to fermenter</button>`
+                    : batch.step === 'awaiting-packaging'
+                      ? `<button data-action="start-packaging" data-batch-id="${batch.id}" type="button">Package</button>`
+                      : ''
+                }
               </article>
-            `
-            )
-            .join('')
-    }
-    ${
-      state.finishedBeerLots.length > 0
-        ? state.finishedBeerLots.map((lot) => `<article class="batch-card"><div><strong>${lot.recipeName}</strong><span>${lot.cases} cases · Q${lot.quality}</span></div><small>Market appeal ${Math.round(lot.marketAppeal * 100)}%</small></article>`).join('')
-        : ''
-    }
-  </section>
-`;
-
+            `;
+          })
+          .join('');
+  const lotCards =
+    state.finishedBeerLots.length > 0
+      ? `${state.finishedBeerLots.map((lot) => `<article class="batch-card"><div><strong>${lot.recipeName}</strong><span>${lot.cases} cases - Q${lot.quality}</span></div><small>Market appeal ${Math.round(lot.marketAppeal * 100)}%</small></article>`).join('')}${renderSalesOffers()}`
+      : '';
+  return `
+    <section class="overlay-section">
+      <div class="panel-heading"><span class="eyebrow gold">Production</span><h2>Production flow</h2></div>
+      ${batchCards}
+      ${lotCards}
+    </section>
+  `;
+};
 const renderStorageStatus = () => {
   const use = storageUseByArea(state);
   const capacity = storageCapacityByArea(state);
@@ -555,7 +768,9 @@ const renderInventory = () => `
     <div class="inventory-list">
       <div><span>Water</span><strong>${state.inventory.water} L</strong></div>
       <div><span>Cases</span><strong>${state.inventory.cases}</strong></div>
-      <div><span>Garage visibility</span><strong>${state.visibilityRisk}</strong></div>
+      <div><span>Garage equipment space</span><strong>${garageSpaceUsed()}/${garageSpaceLimit()}</strong></div>
+      <div><span>Sales channel</span><strong>${state.demand.accountName}</strong></div>
+      <div><span>Compliance pressure</span><strong>${state.visibilityRisk >= 30 ? 'Invoice risk' : `${state.visibilityRisk}/30 visible`}</strong></div>
       ${ingredients
         .map((ingredient) => {
           const stock = state.inventory.ingredients[ingredient.id];
@@ -567,22 +782,61 @@ const renderInventory = () => `
     <div class="inventory-list incoming-list">
       <div><span>Incoming orders</span><strong>${state.pendingOrders.length}</strong></div>
       ${state.pendingOrders
-        .map((order) => `<div><span>Arrives day ${order.arrivalDay}</span><strong>${formatCurrency(order.cost)} · ${order.items.map((item) => `${getIngredient(item.ingredientId).name} x${item.packs}`).join(', ')}</strong></div>`)
+        .map((order) => `<div><span>Ordered / Arrives ${formatGameDate(order.arrivalDay)}</span><strong>${formatCurrency(order.cost)} · ${order.items.map((item) => `${getIngredient(item.ingredientId).name} x${item.packs}`).join(', ')}</strong></div>`)
         .join('')}
     </div>
   </section>
 `;
 
-const renderUpgrades = () => `
+
+const equipmentStoreButtonState = (item: EquipmentCatalogItem): { disabled: boolean; label: string; reason: string; className: string } => {
+  const current = state.equipment[item.equipmentId];
+  const ownedCount = state.ownedEquipment.filter((owned) => owned.itemId === item.id).length;
+  const canOwnMore = Boolean(item.maxOwned && ownedCount < item.maxOwned);
+  const projectedSpace = garageSpaceUsed() + item.spaceUsed;
+  if (item.id === current.itemId && !canOwnMore) return { disabled: true, label: 'Installed', reason: 'On the garage floor now', className: 'upgrade-installed' };
+  if (!item.maxOwned && ownedCount > 0) return { disabled: true, label: 'Owned', reason: 'Already installed', className: 'upgrade-installed' };
+  if (item.maxOwned && ownedCount >= item.maxOwned) return { disabled: true, label: 'Limit', reason: `${ownedCount}/${item.maxOwned} owned`, className: 'upgrade-locked' };
+  if (state.cash < item.cost) return { disabled: true, label: 'Need cash', reason: `Need ${formatCurrency(item.cost)}`, className: 'upgrade-locked' };
+  if (projectedSpace > garageSpaceLimit()) return { disabled: true, label: 'No space', reason: `${projectedSpace}/${garageSpaceLimit()} garage space`, className: 'upgrade-locked' };
+  return { disabled: false, label: canOwnMore ? 'Add another' : 'Buy', reason: `${formatCurrency(item.cost)} - ${projectedSpace}/${garageSpaceLimit()} space after purchase`, className: '' };
+};
+
+const renderEquipmentStoreCard = (item: EquipmentCatalogItem) => {
+  const buttonState = equipmentStoreButtonState(item);
+  const current = state.equipment[item.equipmentId];
+  const isCurrent = item.id === current.itemId;
+  return `
+    <button class="upgrade-pallet equipment-store-card tier-${item.tier} ${buttonState.className}" type="button" data-action="buy-equipment" data-equipment-item-id="${item.id}" ${buttonState.disabled ? `disabled title="${buttonState.reason}"` : ''}>
+      <span>${isCurrent ? 'Installed: ' : ''}${item.name}</span>
+      <small>Tier ${item.tier} ${stationLabels[item.equipmentId]} - ${item.capacityLiters} L - ${item.spaceUsed} space</small>
+      <small>${item.description}</small>
+      <strong>${buttonState.label}</strong>
+      <em>${buttonState.reason}</em>
+    </button>
+  `;
+};
+
+const renderEquipmentStore = () => `
   <section class="overlay-section upgrade-shop workshop-overlay">
-    <div class="panel-heading"><span class="eyebrow gold">Workshop corner</span><h2>Equipment pallets</h2></div>
-    ${Object.values(state.upgrades)
+    <div class="panel-heading store-heading">
+      <span class="eyebrow gold">Equipment store</span>
+      <h2>Garage equipment</h2>
+      <small>${garageSpaceUsed()}/${garageSpaceLimit()} garage space used</small>
+    </div>
+    ${(Object.keys(stationLabels) as StoreStation[])
       .map(
-        (upgrade) => `
-          <button class="upgrade-pallet ${upgrade.purchased ? 'upgrade-installed' : ''}" type="button" data-action="buy-upgrade" data-upgrade-id="${upgrade.id}" ${upgrade.purchased ? 'disabled' : ''}>
-            <span>${upgrade.purchased ? 'Installed: ' : 'Install: '}${upgrade.name}</span>
-            <small>${upgrade.purchased ? 'Bolted into the brewery floor' : formatCurrency(upgrade.cost)} · ${upgrade.description}</small>
-          </button>
+        (station) => `
+          <section class="equipment-store-group">
+            <div class="store-group-heading">
+              <span class="eyebrow">${stationLabels[station]}</span>
+              <strong>${displayEquipmentName(state.equipment[station])}</strong>
+              <small>${equipmentCapacityLabel(state.equipment[station])} - ${state.equipment[station].spaceUsed} space</small>
+            </div>
+            <div class="equipment-store-grid">
+              ${equipmentByStation(station).map(renderEquipmentStoreCard).join('')}
+            </div>
+          </section>
         `
       )
       .join('')}
@@ -602,21 +856,21 @@ const overlayContent = () => {
   if (activeOverlay === 'recipes') return `<div class="focus-grid recipe-overlay">${renderRecipeCards()}</div>`;
   if (activeOverlay === 'production') return renderBatchBoard();
   if (activeOverlay === 'inventory') return renderInventory();
-  if (activeOverlay === 'upgrades') return renderUpgrades();
+  if (activeOverlay === 'upgrades') return renderEquipmentStore();
   if (activeOverlay === 'log') return renderEventLog();
   return '';
 };
 
 const overlayTitle = () =>
-  ({ recipes: 'Recipe / Brew', production: 'Production', inventory: 'Inventory detail', upgrades: 'Workshop upgrades', log: 'Clipboard log' })[activeOverlay ?? 'production'];
+  ({ recipes: 'Recipe / Brew', production: 'Production', inventory: 'Inventory detail', upgrades: 'Equipment store', log: 'Clipboard log' })[activeOverlay ?? 'production'];
 
 const renderFocusOverlay = () =>
   activeOverlay
     ? `
       <div class="focus-layer" role="dialog" aria-modal="false" aria-label="${overlayTitle()}">
-        <button class="focus-scrim" data-action="close-overlay" type="button" aria-label="Close overlay"></button>
+        <button class="focus-scrim" data-action="close-overlay" type="button" aria-label="Dismiss overlay background"></button>
         <aside class="glass-panel focus-overlay focus-${activeOverlay}">
-          <button class="overlay-close" data-action="close-overlay" type="button" aria-label="Close overlay">×</button>
+          <button class="overlay-close" data-action="close-overlay" type="button" aria-label="Close overlay"></button>
           ${overlayContent()}
         </aside>
       </div>
@@ -639,7 +893,7 @@ const render = () => {
 
 root.addEventListener('click', (event) => {
   audioAllowed = true;
-  const target = (event.target as HTMLElement).closest<HTMLButtonElement>('button[data-action]');
+  const target = (event.target as HTMLElement).closest<HTMLElement>('[data-action]');
   if (!target) {
     const clickTarget = event.target as HTMLElement;
     const isInsideOpenSurface = Boolean(
@@ -689,6 +943,12 @@ root.addEventListener('click', (event) => {
     return;
   }
 
+  if (action === 'end-day') {
+    opsOpen = false;
+    dispatch({ type: 'end-day' });
+    return;
+  }
+
   if (action === 'toggle-missions') {
     missionsOpen = !missionsOpen;
     notificationsOpen = false;
@@ -711,6 +971,24 @@ root.addEventListener('click', (event) => {
 
   if (action === 'toggle-target') {
     const nextTarget = target.dataset.target as SceneTarget;
+    if (nextTarget === 'kettle') {
+      activeOverlay = 'recipes';
+      expandedTarget = null;
+      missionsOpen = false;
+      notificationsOpen = false;
+      opsOpen = false;
+      render();
+      return;
+    }
+    const waitingTransfer = state.batches.find((batch) => batch.step === 'awaiting-transfer');
+    if (nextTarget === 'fermenter' && waitingTransfer) {
+      dispatch({ type: 'transfer-batch', batchId: waitingTransfer.id });
+      return;
+    }
+    if (nextTarget === 'bottler' && state.batches.some((batch) => batch.step === 'awaiting-packaging')) {
+      dispatch({ type: 'use-equipment', equipmentId: 'bottler' });
+      return;
+    }
     expandedTarget = expandedTarget === nextTarget ? null : nextTarget;
     missionsOpen = false;
     notificationsOpen = false;
@@ -733,7 +1011,6 @@ root.addEventListener('click', (event) => {
   }
 
   if (action === 'order-recipe') {
-    activeOverlay = null;
     opsOpen = false;
     dispatch({ type: 'order-recipe', recipeId: target.dataset.recipeId ?? 'garage-blonde', mode: target.dataset.orderMode === 'extra' ? 'extra' : 'missing' });
     return;
@@ -744,6 +1021,16 @@ root.addEventListener('click', (event) => {
     return;
   }
 
+  if (action === 'transfer-batch') {
+    dispatch({ type: 'transfer-batch', batchId: target.dataset.batchId ?? '' });
+    return;
+  }
+
+  if (action === 'start-packaging') {
+    dispatch({ type: 'start-packaging', batchId: target.dataset.batchId ?? '' });
+    return;
+  }
+
   if (action === 'sell-cases') {
     activeOverlay = null;
     opsOpen = false;
@@ -751,10 +1038,16 @@ root.addEventListener('click', (event) => {
     return;
   }
 
-  if (action === 'buy-upgrade') dispatch({ type: 'buy-upgrade', upgradeId: target.dataset.upgradeId as UpgradeId });
+  if (action === 'sell-channel') {
+    activeOverlay = null;
+    opsOpen = false;
+    dispatch({ type: 'sell-channel', channelId: target.dataset.channelId as SalesChannelId, cases: Number(target.dataset.cases ?? 0) });
+    return;
+  }
+
+  if (action === 'buy-equipment') dispatch({ type: 'buy-equipment', equipmentItemId: target.dataset.equipmentItemId as EquipmentItemId });
+  if (action === 'set-fermenter-temperature') dispatch({ type: 'set-fermenter-temperature', temperatureC: Number(target.dataset.temperature ?? state.fermenterTemperatureC) });
   if (action === 'clean-equipment') dispatch({ type: 'clean-equipment', equipmentId: target.dataset.equipmentId as EquipmentId });
 });
-
-window.setInterval(() => dispatch({ type: 'tick', seconds: 1 }), 1000);
 
 render();

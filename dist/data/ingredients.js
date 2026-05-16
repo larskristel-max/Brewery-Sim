@@ -130,6 +130,16 @@ export const ingredients = [
         sourceNote: 'Specialty saison yeast is modeled above standard ale yeast.'
     },
     {
+        id: 'kveik-yeast',
+        name: 'Kveik yeast',
+        category: 'yeast',
+        unit: 'pack',
+        storageArea: 'cold-box',
+        packSize: 1,
+        packPrice: 4.2,
+        sourceNote: 'Norwegian farmhouse-style yeast modeled for hot, fast fermentations.'
+    },
+    {
         id: 'stout-yeast',
         name: 'Stout yeast',
         category: 'yeast',

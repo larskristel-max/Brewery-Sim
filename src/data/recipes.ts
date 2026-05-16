@@ -5,7 +5,7 @@ export const recipes: Recipe[] = [
     id: 'garage-blonde',
     name: 'Garage Blonde',
     style: 'Blonde',
-    description: 'A simple pale garage beer with broad appeal and little room to hide flaws.',
+    description: 'A simple pale garage beer made for the first friends-and-family batch.',
     ingredients: [
       { ingredientId: 'pilsner-malt', amount: 4.2 },
       { ingredientId: 'saaz-hops', amount: 45 },
@@ -16,27 +16,28 @@ export const recipes: Recipe[] = [
     salePricePerCase: 18,
     marketAppeal: 1,
     batchSizeCases: 8,
+    targetBatchLiters: 20,
     qualityBase: 68,
     difficulty: 8,
     storageSensitivity: 0.8,
-    riskTags: ['acetaldehyde', 'diacetyl', 'low body'],
-    challenge: 'Cheap and sellable, but clean beer exposes green apple or buttery faults.',
+    riskTags: ['young beer', 'rushed fermentation', 'low body'],
+    challenge: 'Low-cost, approachable and quick to understand. Good for learning the garage loop.',
     enabled: true,
-    stepDurations: { mashing: 10, fermenting: 10, packaging: 10 },
+    stepDurations: { brewing: 360, fermenting: 10 * 720, packaging: 120, 'bottle-conditioning': 1440 },
     faultEvents: [
       {
         id: 'blonde-acetaldehyde',
         stage: 'fermenting',
         minRisk: 20,
         qualityPenalty: 6,
-        message: 'The Blonde tasted young. Acetaldehyde showed up as green apple. Quality -6.'
+        message: 'The Blonde tasted too young and unfinished. Give future batches more stable fermentation time. Quality -6.'
       },
       {
         id: 'blonde-diacetyl',
         stage: 'fermenting',
         minRisk: 28,
         qualityPenalty: 7,
-        message: 'The Blonde exposed a buttery diacetyl note from rushed fermentation. Quality -7.'
+        message: 'The Blonde picked up a soft slick note from rushed fermentation. Quality -7.'
       }
     ]
   },
@@ -56,13 +57,14 @@ export const recipes: Recipe[] = [
     salePricePerCase: 26,
     marketAppeal: 1.08,
     batchSizeCases: 9,
+    targetBatchLiters: 22,
     qualityBase: 74,
     difficulty: 18,
     storageSensitivity: 1.5,
     riskTags: ['oxidation', 'polyphenols', 'chlorophyll', 'hop creep'],
     challenge: 'High hop cost and high reward; old or warm hops can turn grassy and harsh.',
     enabled: true,
-    stepDurations: { mashing: 11, fermenting: 11, packaging: 10 },
+    stepDurations: { brewing: 360, fermenting: 11 * 720, packaging: 120, 'bottle-conditioning': 1440 },
     faultEvents: [
       {
         id: 'ipa-grassy',
@@ -95,17 +97,18 @@ export const recipes: Recipe[] = [
     salePricePerCase: 21,
     marketAppeal: 1.1,
     batchSizeCases: 8,
+    targetBatchLiters: 20,
     qualityBase: 72,
     difficulty: 22,
     storageSensitivity: 1.2,
     riskTags: ['DMS', 'diacetyl', 'hydrogen sulfide'],
     challenge: 'Broad demand, but pilsner malt and lager yeast punish weak temperature control.',
     enabled: true,
-    stepDurations: { mashing: 11, fermenting: 16, packaging: 10 },
+    stepDurations: { brewing: 360, fermenting: 16 * 720, packaging: 120, 'bottle-conditioning': 1440 },
     faultEvents: [
       {
         id: 'pils-dms',
-        stage: 'mashing',
+        stage: 'brewing',
         minRisk: 24,
         qualityPenalty: 8,
         message: 'The Pils picked up dimethyl sulfide (DMS): cooked corn and cabbage from a weak boil. Quality -8.'
@@ -135,13 +138,14 @@ export const recipes: Recipe[] = [
     salePricePerCase: 19,
     marketAppeal: 0.95,
     batchSizeCases: 8,
+    targetBatchLiters: 20,
     qualityBase: 70,
     difficulty: 13,
     storageSensitivity: 1,
     riskTags: ['isoamyl acetate', '4-vinyl guaiacol', 'haze'],
     challenge: 'Quick to brew, but warm yeast can push banana and clove too hard.',
     enabled: true,
-    stepDurations: { mashing: 10, fermenting: 9, packaging: 10 },
+    stepDurations: { brewing: 360, fermenting: 9 * 720, packaging: 120, 'bottle-conditioning': 1440 },
     faultEvents: [
       {
         id: 'wheat-banana',
@@ -175,13 +179,14 @@ export const recipes: Recipe[] = [
     salePricePerCase: 20,
     marketAppeal: 0.86,
     batchSizeCases: 8,
+    targetBatchLiters: 20,
     qualityBase: 73,
     difficulty: 12,
     storageSensitivity: 0.7,
     riskTags: ['over-attenuation', 'fusel alcohols', 'phenolics'],
     challenge: 'Forgives a warm garage but sells slower without the right audience.',
     enabled: true,
-    stepDurations: { mashing: 10, fermenting: 9, packaging: 10 },
+    stepDurations: { brewing: 360, fermenting: 9 * 720, packaging: 120, 'bottle-conditioning': 1440 },
     faultEvents: [
       {
         id: 'saison-fusel',
@@ -208,20 +213,55 @@ export const recipes: Recipe[] = [
     salePricePerCase: 23,
     marketAppeal: 0.82,
     batchSizeCases: 7,
+    targetBatchLiters: 18,
     qualityBase: 75,
     difficulty: 15,
     storageSensitivity: 0.9,
     riskTags: ['roast harshness', 'astringency', 'slow sell-through'],
     challenge: 'Good margin, but roasted malt can turn harsh and demand is smaller.',
     enabled: true,
-    stepDurations: { mashing: 11, fermenting: 12, packaging: 10 },
+    stepDurations: { brewing: 360, fermenting: 12 * 720, packaging: 120, 'bottle-conditioning': 1440 },
     faultEvents: [
       {
         id: 'stout-astringent',
-        stage: 'mashing',
+        stage: 'brewing',
         minRisk: 25,
         qualityPenalty: 7,
         message: 'The Stout extracted tannins from dark grain and finished roasty-astringent. Quality -7.'
+      }
+    ]
+  },
+  {
+    id: 'hot-garage-kveik',
+    name: 'Hot Garage Kveik',
+    style: 'Kveik',
+    description: 'A hot-fermented farmhouse pale beer that turns garage heat into speed and citrusy yeast character.',
+    ingredients: [
+      { ingredientId: 'pale-malt', amount: 4.6 },
+      { ingredientId: 'wheat-malt', amount: 0.5 },
+      { ingredientId: 'styrian-hops', amount: 65 },
+      { ingredientId: 'kveik-yeast', amount: 1 },
+      { ingredientId: 'bottles', amount: 8 }
+    ],
+    waterCost: 25,
+    salePricePerCase: 22,
+    marketAppeal: 0.9,
+    batchSizeCases: 8,
+    targetBatchLiters: 20,
+    qualityBase: 72,
+    difficulty: 10,
+    storageSensitivity: 0.8,
+    riskTags: ['citrus esters', 'underpitch stress', 'old fruit'],
+    challenge: 'Thrives when the garage is hot, but cool fermentation can make it sluggish and odd.',
+    enabled: true,
+    stepDurations: { brewing: 360, fermenting: 7 * 720, packaging: 120, 'bottle-conditioning': 1440 },
+    faultEvents: [
+      {
+        id: 'kveik-cool-stress',
+        stage: 'fermenting',
+        minRisk: 26,
+        qualityPenalty: 6,
+        message: 'The Kveik ran too cool and lost its clean citrus snap. Quality -6.'
       }
     ]
   },
@@ -235,13 +275,14 @@ export const recipes: Recipe[] = [
     salePricePerCase: 0,
     marketAppeal: 0,
     batchSizeCases: 0,
+    targetBatchLiters: 0,
     qualityBase: 0,
     difficulty: 0,
     storageSensitivity: 0,
     riskTags: ['coming later'],
     challenge: 'Custom recipe design is coming later.',
     enabled: false,
-    stepDurations: { mashing: 10, fermenting: 10, packaging: 10 },
+    stepDurations: { brewing: 360, fermenting: 10 * 720, packaging: 120, 'bottle-conditioning': 1440 },
     faultEvents: []
   }
 ];

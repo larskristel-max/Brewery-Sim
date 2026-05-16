@@ -1,6 +1,8 @@
 import { getIngredient } from '../data/ingredients.js';
 import { getRecipe, recipes } from '../data/recipes.js';
-import type { BatchStep, GameState, IngredientId, Recipe, RecipeIngredient, StorageArea } from './schema.js';
+import type { BatchStep, EquipmentId, GameState, IngredientId, OwnedEquipment, Recipe, RecipeIngredient, StorageArea } from './schema.js';
+
+const gameStartDateUtc = Date.UTC(2026, 4, 16);
 
 export type EquipmentConditionTier = 'clean' | 'worn' | 'dirty' | 'critical';
 export type ContaminationRiskTier = 'low' | 'elevated' | 'high' | 'severe';
@@ -15,6 +17,11 @@ export const formatClock = (minute: number): string => {
 };
 
 export const formatCurrency = (amount: number): string => `EUR ${amount}`;
+
+export const formatGameDate = (day: number): string => {
+  const date = new Date(gameStartDateUtc + Math.max(0, day - 1) * 24 * 60 * 60 * 1000);
+  return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(date);
+};
 
 export const ingredientAmountLabel = (ingredientId: IngredientId, amount: number): string => {
   const ingredient = getIngredient(ingredientId);
@@ -44,7 +51,40 @@ export const recipeCanStart = (state: GameState, recipe: Recipe): boolean =>
   recipe.enabled &&
   state.inventory.water >= recipe.waterCost &&
   recipeMissingIngredients(state, recipe).length === 0 &&
-  !state.batches.some((batch) => batch.step === 'mashing');
+  state.energy >= 35 &&
+  !state.batches.some((batch) => batch.step === 'brewing') &&
+  availableFermenters(state).length > 0;
+
+export const ownedByStation = (state: GameState, equipmentId: EquipmentId): OwnedEquipment[] =>
+  state.ownedEquipment.filter((item) => item.equipmentId === equipmentId);
+
+export const activeOwnedEquipment = (state: GameState, equipmentId: EquipmentId): OwnedEquipment => {
+  const activeId = state.activeEquipment[equipmentId];
+  const owned = state.ownedEquipment.find((item) => item.instanceId === activeId) ?? ownedByStation(state, equipmentId)[0];
+  if (!owned) throw new Error(`No owned equipment for ${equipmentId}`);
+  return owned;
+};
+
+export const availableFermenters = (state: GameState): OwnedEquipment[] =>
+  ownedByStation(state, 'fermenter').filter((item) => !item.occupiedBatchId);
+
+export const garageSpaceAvailable = (state: GameState): number => Math.max(0, state.garageSpaceLimit - state.garageSpaceUsed);
+
+export const litersToCases = (liters: number): number => Math.max(1, Math.floor((liters * 0.92) / 7.92));
+
+export const recipeBatchCapacity = (state: GameState, recipe: Recipe): { liters: number; cases: number; reason: string; fermenter?: OwnedEquipment } => {
+  const brewhouse = activeOwnedEquipment(state, 'kettle');
+  const fermenter = availableFermenters(state).sort((a, b) => b.capacityLiters - a.capacityLiters)[0];
+  if (!fermenter) return { liters: 0, cases: 0, reason: 'Blocked: no empty fermenter.' };
+  const liters = Math.min(recipe.targetBatchLiters, brewhouse.capacityLiters, fermenter.capacityLiters);
+  const limit =
+    liters === fermenter.capacityLiters && fermenter.capacityLiters < brewhouse.capacityLiters
+      ? `${fermenter.name} caps the batch`
+      : liters === brewhouse.capacityLiters && brewhouse.capacityLiters < recipe.targetBatchLiters
+        ? `${brewhouse.name} caps the batch`
+        : 'Can brew now';
+  return { liters, cases: litersToCases(liters), reason: `${limit}: ${liters} L into ${fermenter.name}.`, fermenter };
+};
 
 export const orderCost = (items: RecipeIngredient[]): number =>
   Math.round(
@@ -92,7 +132,7 @@ export const totalStorageOverflow = (state: GameState): number => {
   return overflow['dry-shelf'] + overflow['cold-box'] + overflow['utility-shelf'];
 };
 
-export const readyToPackage = (state: GameState): boolean => state.batches.some((batch) => batch.step === 'ready');
+export const readyToPackage = (state: GameState): boolean => state.batches.some((batch) => batch.step === 'awaiting-packaging');
 
 export const activeBatchForStep = (state: GameState, step: BatchStep) => state.batches.find((batch) => batch.step === step);
 
@@ -119,23 +159,22 @@ export const contaminationRiskTier = (risk: number): ContaminationRiskTier => {
 };
 
 export const objectiveProgress = (state: GameState): { label: string; progress: number; complete: boolean } => {
-  const hasKettle = state.upgrades['larger-kettle'].purchased;
-  const hasLabeler = state.upgrades.labeler.purchased;
-  const cashProgress = Math.min(state.cash, 500);
-  if (hasKettle && !hasLabeler) {
-    const labelerCost = state.upgrades.labeler.cost;
-    const labelerProgress = Math.min(state.cash, labelerCost);
+  const soldFirstCases = state.demand.casesSold > 0 || state.salesToday > 0;
+  const extraFermenter = ownedByStation(state, 'fermenter').length > 1;
+  if (soldFirstCases && !extraFermenter) {
+    const fermenterCost = 45;
+    const labelerProgress = Math.min(state.cash, fermenterCost);
     return {
-      label: `Next objective: install the hand labeler. EUR ${labelerProgress}/EUR ${labelerCost}`,
-      progress: Math.round((labelerProgress / labelerCost) * 100),
+      label: `Next objective: add a second plastic fermenter. EUR ${labelerProgress}/EUR ${fermenterCost}`,
+      progress: Math.round((labelerProgress / fermenterCost) * 100),
       complete: false
     };
   }
 
   return {
-    label: hasKettle ? 'Objective complete: larger kettle and hand labeler installed.' : `Earn EUR 500 and buy the larger kettle. EUR ${cashProgress}/EUR 500`,
-    progress: hasKettle ? 100 : Math.round((cashProgress / 500) * 100),
-    complete: hasKettle
+    label: soldFirstCases ? 'Objective complete: first private cases sold.' : 'Brew, bottle and sell the first Garage Blonde.',
+    progress: soldFirstCases ? 100 : Math.round(Math.min(100, (state.batches.length > 0 ? 45 : 0) + (state.inventory.cases > 0 ? 35 : 0))),
+    complete: soldFirstCases
   };
 };
 
@@ -149,12 +188,21 @@ export type WorkflowStage = {
 };
 
 export const currentWorkflowStage = (state: GameState): WorkflowStage => {
-  const readyBatch = state.batches.find((batch) => batch.step === 'ready');
-  if (readyBatch) {
+  const transferBatch = state.batches.find((batch) => batch.step === 'awaiting-transfer');
+  if (transferBatch) {
+    return {
+      stage: 'Ferment',
+      tapTarget: 'fermenter',
+      instruction: `Tap Transfer to fermenter for ${transferBatch.recipeName}.`
+    };
+  }
+
+  const packageBatch = state.batches.find((batch) => batch.step === 'awaiting-packaging');
+  if (packageBatch) {
     return {
       stage: 'Package',
       tapTarget: 'bottler',
-      instruction: `Tap the bottling station to stack ${readyBatch.casesExpected} cases.`
+      instruction: `Tap Package to bottle ${packageBatch.recipeName}.`
     };
   }
 
@@ -171,15 +219,15 @@ export const currentWorkflowStage = (state: GameState): WorkflowStage => {
     return {
       stage: 'Mash',
       tapTarget: 'kettle',
-      instruction: 'Tap the 40 L mash kettle and choose a recipe.'
+      instruction: 'Tap the 20 L BIAB stock pot and choose a recipe.'
     };
   }
 
-  if (activeBatch.step === 'mashing') {
+  if (activeBatch.step === 'brewing') {
     return {
       stage: 'Mash',
       tapTarget: 'kettle',
-      instruction: 'Mash is running. Watch the kettle finish its stage.'
+      instruction: 'Brew day is underway.'
     };
   }
 
@@ -191,6 +239,14 @@ export const currentWorkflowStage = (state: GameState): WorkflowStage => {
     };
   }
 
+  if (activeBatch.step === 'bottle-conditioning') {
+    return {
+      stage: 'Package',
+      tapTarget: 'bottler',
+      instruction: 'Bottles are conditioning. Advance time to make cases ready.'
+    };
+  }
+
   return {
     stage: 'Package',
     tapTarget: 'bottler',
@@ -199,8 +255,8 @@ export const currentWorkflowStage = (state: GameState): WorkflowStage => {
 };
 
 export const nextSuggestedAction = (state: GameState): string => {
-  if (!state.upgrades['larger-kettle'].purchased && state.cash >= 500) {
-    return 'Buy the larger kettle upgrade.';
+  if (ownedByStation(state, 'fermenter').length < 2 && state.cash >= 45) {
+    return 'Add a second plastic fermenter.';
   }
   return currentWorkflowStage(state).instruction;
 };

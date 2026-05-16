@@ -1,9 +1,9 @@
 import { ingredients } from '../data/ingredients.js';
 import { createInitialState } from './initialState.js';
-import type { Batch, Equipment, EquipmentId, FinishedBeerLot, GameState, IngredientId, IngredientStock, Inventory, LocalDemand, StorageState, SupplyOrder, Upgrade, UpgradeId } from './schema.js';
+import type { Batch, Equipment, EquipmentId, FinishedBeerLot, GameState, IngredientId, IngredientStock, Inventory, LocalDemand, OwnedEquipment, StorageState, SupplyOrder, Upgrade, UpgradeId } from './schema.js';
 
-export const SAVE_VERSION = 2;
-export const STORAGE_KEY = 'brewery-sim-save-v2';
+export const SAVE_VERSION = 4;
+export const STORAGE_KEY = 'brewery-sim-save-v4';
 
 type BrowserStorage = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
 
@@ -15,7 +15,9 @@ type SaveEnvelope = {
 const equipmentIds: EquipmentId[] = ['kettle', 'fermenter', 'bottler'];
 const upgradeIds: UpgradeId[] = ['larger-kettle', 'temp-control', 'labeler'];
 const ingredientIds = ingredients.map((ingredient) => ingredient.id);
-const batchSteps = ['mashing', 'fermenting', 'packaging', 'ready'];
+const batchSteps = ['brewing', 'awaiting-transfer', 'fermenting', 'awaiting-packaging', 'packaging', 'bottle-conditioning', 'ready'];
+const minFermenterTemperatureC = 8;
+const maxFermenterTemperatureC = 40;
 
 const getBrowserStorage = (): BrowserStorage | null => {
   try {
@@ -33,6 +35,9 @@ const hasNumber = (value: Record<string, unknown>, key: string): boolean => type
 const hasString = (value: Record<string, unknown>, key: string): boolean => typeof value[key] === 'string';
 
 const hasBoolean = (value: Record<string, unknown>, key: string): boolean => typeof value[key] === 'boolean';
+
+const clampFermenterTemperature = (temperatureC: number): number =>
+  Math.min(maxFermenterTemperatureC, Math.max(minFermenterTemperatureC, Math.round(temperatureC)));
 
 const isIngredientStock = (value: unknown): value is IngredientStock => isRecord(value) && hasNumber(value, 'amount') && hasNumber(value, 'condition');
 
@@ -55,6 +60,17 @@ const isEquipment = (value: unknown, id: EquipmentId): value is Equipment =>
 const isEquipmentRecord = (value: unknown): value is GameState['equipment'] =>
   isRecord(value) && equipmentIds.every((id) => isEquipment(value[id], id));
 
+const isOwnedEquipment = (value: unknown): value is OwnedEquipment =>
+  isRecord(value) &&
+  hasString(value, 'instanceId') &&
+  equipmentIds.includes(value.equipmentId as EquipmentId) &&
+  hasString(value, 'name') &&
+  hasNumber(value, 'tier') &&
+  hasNumber(value, 'condition') &&
+  hasNumber(value, 'capacityLiters') &&
+  hasNumber(value, 'spaceUsed') &&
+  hasBoolean(value, 'installed');
+
 const isUpgrade = (value: unknown, id: UpgradeId): value is Upgrade =>
   isRecord(value) && value.id === id && hasString(value, 'name') && hasString(value, 'description') && hasNumber(value, 'cost') && hasBoolean(value, 'purchased');
 
@@ -71,6 +87,8 @@ const isBatch = (value: unknown): value is Batch =>
   hasNumber(value, 'stepProgress') &&
   hasNumber(value, 'quality') &&
   hasNumber(value, 'casesExpected') &&
+  hasNumber(value, 'volumeLiters') &&
+  hasString(value, 'fermenterInstanceId') &&
   hasNumber(value, 'contaminationRisk') &&
   hasNumber(value, 'faultRisk') &&
   hasNumber(value, 'storagePenalty') &&
@@ -92,7 +110,17 @@ const isStorageState = (value: unknown): value is StorageState =>
   isRecord(value) && hasNumber(value, 'dryShelfCapacity') && hasNumber(value, 'coldBoxCapacity') && hasNumber(value, 'utilityShelfCapacity');
 
 const isLocalDemand = (value: unknown): value is LocalDemand =>
-  isRecord(value) && hasString(value, 'accountName') && hasNumber(value, 'casesRequested') && hasNumber(value, 'casesSold') && hasNumber(value, 'reputationReward');
+  isRecord(value) &&
+  hasString(value, 'accountName') &&
+  hasString(value, 'channelId') &&
+  hasString(value, 'channelName') &&
+  hasNumber(value, 'casesRequested') &&
+  hasNumber(value, 'casesSold') &&
+  hasNumber(value, 'reputationReward') &&
+  hasBoolean(value, 'invoiceRequired') &&
+  hasBoolean(value, 'formalOrder');
+
+const isEventLogEntry = (value: unknown): boolean => isRecord(value) && hasString(value, 'id') && hasNumber(value, 'minute') && hasString(value, 'message');
 
 const isSavedGameState = (value: unknown): value is GameState => {
   if (!isRecord(value)) return false;
@@ -102,6 +130,7 @@ const isSavedGameState = (value: unknown): value is GameState => {
     hasNumber(value, 'day') &&
     hasNumber(value, 'dayElapsedSeconds') &&
     hasNumber(value, 'minute') &&
+    hasNumber(value, 'energy') &&
     isInventory(value.inventory) &&
     Array.isArray(value.batches) &&
     value.batches.every(isBatch) &&
@@ -111,18 +140,33 @@ const isSavedGameState = (value: unknown): value is GameState => {
     value.pendingOrders.every(isSupplyOrder) &&
     isStorageState(value.storage) &&
     isEquipmentRecord(value.equipment) &&
+    Array.isArray(value.ownedEquipment) &&
+    value.ownedEquipment.every(isOwnedEquipment) &&
+    isRecord(value.activeEquipment) &&
+    equipmentIds.every((id) => hasString(value.activeEquipment as Record<string, unknown>, id)) &&
+    hasNumber(value, 'garageSpaceUsed') &&
+    hasNumber(value, 'garageSpaceLimit') &&
     isUpgradeRecord(value.upgrades) &&
     isLocalDemand(value.demand) &&
+    Array.isArray(value.events) &&
+    value.events.every(isEventLogEntry) &&
     equipmentIds.includes(value.selectedEquipmentId as EquipmentId) &&
     hasNumber(value, 'salesToday') &&
-    hasNumber(value, 'visibilityRisk')
+    hasNumber(value, 'visibilityRisk') &&
+    hasNumber(value, 'householdPressure') &&
+    hasNumber(value, 'complianceRisk') &&
+    hasBoolean(value, 'canInvoice')
   );
 };
 
 const parseSavedGame = (rawSave: string): GameState | null => {
   const parsed = JSON.parse(rawSave) as unknown;
   if (!isRecord(parsed) || parsed.version !== SAVE_VERSION || !isSavedGameState(parsed.state)) return null;
-  return parsed.state;
+  const savedState = parsed.state as GameState & Record<string, unknown>;
+  return {
+    ...savedState,
+    fermenterTemperatureC: clampFermenterTemperature(hasNumber(savedState, 'fermenterTemperatureC') ? savedState.fermenterTemperatureC : createInitialState().fermenterTemperatureC)
+  };
 };
 
 export const loadSavedGame = (storage: BrowserStorage | null = getBrowserStorage()): GameState => {
