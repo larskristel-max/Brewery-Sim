@@ -514,11 +514,12 @@ const sceneVisibility = () => {
   const workflow = currentWorkflowStage(state);
   const fermenting = state.batches.some((batch) => batch.step === 'fermenting');
   const packaging = state.batches.some((batch) => batch.step === 'awaiting-packaging' || batch.step === 'packaging' || batch.step === 'bottle-conditioning') || state.inventory.cases > 0;
+  const hasSellableCases = state.inventory.cases > 0;
 
   return {
     showFloorNoteTicker: notificationsOpen,
     showWorkshopHotspot: true,
-    showCases: packaging || workflow.tapTarget === 'cases',
+    showCases: hasSellableCases && workflow.tapTarget === 'cases',
     spotlightTarget: workflow.tapTarget,
     modeClass: packaging ? 'mode-packaging' : fermenting ? 'mode-fermentation' : state.batches.length > 0 ? 'mode-production' : 'mode-idle'
   };
@@ -666,6 +667,7 @@ const renderGarage = () => {
         <article
           class="equipment-hotspot hotspot-${item.id} ${expanded ? 'expanded' : ''} ${contextual ? 'contextual' : ''} ${silent ? 'scene-silent' : ''} ${obstructed ? 'obstructed-by-card' : ''} condition-${conditionTier} ${status.toneClass} ${item.id === state.selectedEquipmentId ? 'selected' : ''} ${activeForEquipment(item.id) ? 'active' : ''} ${isNextTapTarget(item.id) ? 'next-tap' : ''}"
           style="--x: ${pos.x}%; --y: ${pos.y}%"
+          data-action="toggle-target"
           data-target="${item.id}"
         >
           <button class="hotspot-toggle" data-action="toggle-target" data-target="${item.id}" type="button" aria-expanded="${expanded}" aria-label="${expanded ? 'Collapse' : 'Expand'} ${displayEquipmentName(item)}">
@@ -690,7 +692,7 @@ const renderGarage = () => {
       ${visibility.showWorkshopHotspot ? renderWorkshopHotspot() : ''}
       ${visibility.showFloorNoteTicker ? renderEventTicker() : ''}
       ${equipment}
-      ${visibility.showCases ? `<article class="case-hotspot ${expandedTarget === 'cases' ? 'expanded' : ''} ${expandedTarget === 'bottler' ? 'obstructed-by-card' : ''} ${state.inventory.cases > 0 ? 'active' : ''} ${isNextTapTarget('cases') ? 'next-tap' : ''}" data-target="cases">
+      ${visibility.showCases ? `<article class="case-hotspot ${expandedTarget === 'cases' ? 'expanded' : ''} ${expandedTarget === 'bottler' ? 'obstructed-by-card' : ''} ${state.inventory.cases > 0 ? 'active' : ''} ${isNextTapTarget('cases') ? 'next-tap' : ''}" data-action="toggle-target" data-target="cases">
         <button class="hotspot-toggle" data-action="toggle-target" data-target="cases" type="button" aria-expanded="${expandedTarget === 'cases'}" aria-label="Expand cases">
           <span class="hotspot-name">Cases</span>
           <strong>${state.inventory.cases}</strong>

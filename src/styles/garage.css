@@ -484,6 +484,7 @@
   border-radius: calc(var(--radius-md) + 5px);
   background: transparent;
   animation: pulse 1.8s infinite;
+  pointer-events: none;
 }
 
 .equipment-hotspot.active::after {
@@ -493,11 +494,13 @@
   border: 2px dashed rgba(76, 139, 245, 0.8);
   border-radius: 20px;
   animation: pulse 1.4s infinite;
+  pointer-events: none;
 }
 .equipment-hotspot.scene-silent,
 .case-hotspot.scene-silent {
   opacity: 0.28;
   filter: saturate(0.72) brightness(0.8);
+  pointer-events: none;
 }
 
 .equipment-hotspot.contextual,
