@@ -26,7 +26,7 @@ There are existing modified files in the repo from earlier work. Before starting
 
 ## Latest Pause Handoff
 
-Updated May 16, 2026 after the first manual-gated garage loop implementation pass.
+Updated May 16, 2026 after the garage hotspot stabilization pass.
 
 ### Implemented In Current Worktree
 
@@ -62,6 +62,15 @@ Updated May 16, 2026 after the first manual-gated garage loop implementation pas
   - Friends and family
   - Private event
   - Local bar
+- Stabilized the direct garage-floor hotspot loop:
+  - Equipment hotspot cards now handle direct clicks even when the nested button is not the exact click target.
+  - Fermenter direct clicks can transfer waiting batches.
+  - Bottler direct clicks can package batches waiting for packaging.
+  - Cases direct clicks can open buyer offers and complete the first sale path.
+- Hid the cases hotspot until finished sellable cases exist, so awaiting-packaging and bottle-conditioning states no longer imply packaged stock is ready.
+- Added a browser-level regression script for the full direct hotspot loop:
+  `stockpot -> brew -> transfer -> end days -> package -> condition -> buyer offer`.
+- Added `npm run test:browser` and `npm run test:all`.
 - Bumped local save version to `v4` so old prototype saves reset cleanly.
 - Rebuilt `dist` from `src`; `src` and tracked `dist` are currently in sync.
 
@@ -78,16 +87,16 @@ Updated May 16, 2026 after the first manual-gated garage loop implementation pas
   - Packaging starts bottle conditioning instead of creating sellable cases immediately.
   - End day advances conditioning until cases become sellable.
   - Buyer offers render in the production view once finished cases exist.
+  - Direct fermenter, bottler, and cases hotspot paths complete the first loop.
+  - Cases stay hidden until sellable inventory exists.
   - Phone portrait blocker still appears.
   - iPad-like landscape viewport remains usable.
+- `npm.cmd run test:browser` covers the direct hotspot path in an 844x390 browser viewport.
 
 ### Known Follow-Up Before More Feature Work
 
-- The garage-floor direct hotspot click path is still fragile for some expanded/action states. The production overlay path is reliable, but a focused UI hit-testing pass should make fermenter, bottler, and cases direct clicks consistently perform the intended action.
-- Cases can still appear as a hotspot before sellable cases exist during awaiting-packaging/conditioning states. Either hide it until inventory cases are greater than zero or label the waiting state more explicitly.
-- Buyer offers are reliable in the production overlay; make the main cases hotspot path equally reliable after the hotspot cleanup.
-- Add a browser-level regression script for the full loop:
-  `stockpot -> brew -> transfer -> end days -> package -> condition -> buyer offer`.
+- Keep the new browser regression in the normal verification path when touching garage UI, production state, sales, or hotspot hit testing.
+- The direct hotspot path is covered for the first loop, but future expanded/action states should still get browser coverage when they are added.
 - The proper empty-garage plus fixed equipment-slot visual asset system remains future work. Do not reintroduce CSS-drawn fake equipment.
 
 ## Latest Planning Handoff
