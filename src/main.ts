@@ -410,6 +410,15 @@ const equipmentSceneStatus = (equipmentId: EquipmentId): { label: string; detail
 };
 
 
+const hotspotPosition = (equipmentId: EquipmentId) => {
+  if (equipmentId === 'fermenter' && state.equipment.fermenter.tier === 1) return { x: 56, y: 55 };
+  return {
+    kettle: { x: 24, y: 49 },
+    fermenter: { x: 51, y: 29 },
+    bottler: { x: 75, y: 48 }
+  }[equipmentId];
+};
+
 const brewerPosition = () => {
   const focus = state.batches[0]?.step ?? 'idle';
   return {
@@ -745,8 +754,6 @@ const renderGarage = () => {
     .map((item) => {
       const itemId = activeEquipmentItemId(item);
       const visual = itemId ? garageEquipmentLayoutByItem[itemId] : null;
-      if (!itemId || !visual?.sprite) return '';
-
       const conditionTier = equipmentConditionTier(item.condition);
       const status = equipmentSceneStatus(item.id);
       const expanded = expandedTarget === item.id;
@@ -758,6 +765,26 @@ const renderGarage = () => {
           : expandedTarget === 'bottler'
             ? item.id === 'fermenter'
             : false;
+
+      if (!itemId || !visual?.sprite) {
+        const pos = hotspotPosition(item.id);
+        return `
+          <article
+            class="equipment-hotspot hotspot-${item.id} ${expanded ? 'expanded' : ''} ${contextual ? 'contextual' : ''} ${silent ? 'scene-silent' : ''} ${obstructed ? 'obstructed-by-card' : ''} condition-${conditionTier} ${status.toneClass} ${item.id === state.selectedEquipmentId ? 'selected' : ''} ${activeForEquipment(item.id) ? 'active' : ''} ${isNextTapTarget(item.id) ? 'next-tap' : ''}"
+            style="--x: ${pos.x}%; --y: ${pos.y}%"
+            data-action="toggle-target"
+            data-target="${item.id}"
+          >
+            <button class="hotspot-toggle" data-action="toggle-target" data-target="${item.id}" type="button" aria-expanded="${expanded}" aria-label="${expanded ? 'Collapse' : 'Expand'} ${displayEquipmentName(item)}">
+              <span class="hotspot-name">${displayEquipmentName(item)}</span>
+              <strong>${status.label}</strong>
+              ${expanded ? `<small>${status.detail}</small>` : ''}
+            </button>
+            ${expanded ? renderEquipmentActions(item.id) : ''}
+          </article>
+        `;
+      }
+
       return renderEquipmentObject(
         item,
         `
@@ -1012,7 +1039,7 @@ root.addEventListener('click', (event) => {
   if (!target) {
     const clickTarget = event.target as HTMLElement;
     const isInsideOpenSurface = Boolean(
-      clickTarget.closest('.equipment-object, .case-hotspot, .supply-hotspot, .workshop-hotspot, .event-ticker, .missions-control, .notification-control, .ops-control, .layout-debug-panel, .focus-overlay, button')
+      clickTarget.closest('.equipment-object, .equipment-hotspot, .case-hotspot, .supply-hotspot, .workshop-hotspot, .event-ticker, .missions-control, .notification-control, .ops-control, .layout-debug-panel, .focus-overlay, button')
     );
     if ((expandedTarget || missionsOpen || notificationsOpen || opsOpen || activeOverlay) && !isInsideOpenSurface) {
       expandedTarget = null;
