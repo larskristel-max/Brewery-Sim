@@ -6,7 +6,11 @@ export interface GarageEquipmentPlacement {
   width: number;
 }
 
+export type GarageEquipmentTier = 'tier1' | 'tier2';
 export type GarageEquipmentSpritePath = `/assets/garage/equipment/tier1/${string}` | `/assets/garage/equipment/tier2/${string}`;
+
+export const garageEquipmentAssetPath = (tier: GarageEquipmentTier, filename: string): GarageEquipmentSpritePath =>
+  `/assets/garage/equipment/${tier}/${filename}` as GarageEquipmentSpritePath;
 
 export const garageEquipmentLayout: Record<EquipmentId, GarageEquipmentPlacement> = {
   kettle: { x: 24, y: 69, width: 18 },

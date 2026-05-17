@@ -1,3 +1,4 @@
+export const garageEquipmentAssetPath = (tier, filename) => `/assets/garage/equipment/${tier}/${filename}`;
 export const garageEquipmentLayout = {
     kettle: { x: 24, y: 69, width: 18 },
     fermenter: { x: 52, y: 64, width: 14 },
