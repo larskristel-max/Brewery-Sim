@@ -1,4 +1,5 @@
 import { equipmentByStation } from './data/equipment.js';
+import { garageEquipmentLayout, garageEquipmentSpriteByItem, type GarageEquipmentPlacement } from './data/garageLayout.js';
 import { ingredients, getIngredient } from './data/ingredients.js';
 import type { Equipment, EquipmentCatalogItem, EquipmentId, EquipmentItemId, GameAction, IngredientId, SalesChannelId } from './game/schema.js';
 import { createInitialState } from './game/initialState.js';
@@ -35,6 +36,7 @@ if (!root) {
 type SceneTarget = EquipmentId | 'cases';
 type FocusOverlay = 'recipes' | 'production' | 'inventory' | 'upgrades' | 'log';
 type StoreStation = 'kettle' | 'fermenter' | 'bottler';
+type GarageLayoutDraft = Record<EquipmentId, GarageEquipmentPlacement>;
 
 const hasBrowserSave = (): boolean => {
   try {
@@ -54,6 +56,10 @@ let opsOpen = false;
 let activeOverlay: FocusOverlay | null = null;
 let audioAllowed = false;
 
+const equipmentSceneOrder: EquipmentId[] = ['kettle', 'fermenter', 'bottler'];
+const layoutDebugEnabled = new URLSearchParams(globalThis.location.search).get('layoutDebug') === '1';
+const garageLayoutDraft: GarageLayoutDraft = structuredClone(garageEquipmentLayout);
+
 const stationLabels: Record<StoreStation, string> = {
   kettle: 'Brewhouse',
   fermenter: 'Fermentation',
@@ -65,6 +71,84 @@ const stationNouns: Record<StoreStation, string> = {
   fermenter: 'fermenter',
   bottler: 'packaging station'
 };
+
+
+const garageLayoutJson = (): string => JSON.stringify(garageLayoutDraft, null, 2);
+
+const applySpritePlacement = (equipmentId: EquipmentId) => {
+  const placement = garageLayoutDraft[equipmentId];
+  const sprite = root.querySelector<HTMLElement>(`.equipment-sprite[data-equipment-id="${equipmentId}"]`);
+  if (!sprite) return;
+  sprite.style.left = `${placement.x}%`;
+  sprite.style.top = `${placement.y}%`;
+  sprite.style.width = `${placement.width}%`;
+};
+
+const updateLayoutDebugJson = () => {
+  const output = root.querySelector<HTMLTextAreaElement>('[data-layout-json]');
+  if (output) output.value = garageLayoutJson();
+};
+
+const renderEquipmentSprite = (equipment: Equipment): string => {
+  const src = garageEquipmentSpriteByItem[equipment.itemId ?? 'stock-pot-20l'];
+  if (!src) return '';
+
+  const placement = garageLayoutDraft[equipment.id];
+  return `
+    <img
+      class="equipment-sprite equipment-sprite-${equipment.id}"
+      src="${src}"
+      alt=""
+      aria-hidden="true"
+      data-equipment-id="${equipment.id}"
+      style="left: ${placement.x}%; top: ${placement.y}%; width: ${placement.width}%"
+    />
+  `;
+};
+
+const renderLayoutDebugPanel = () =>
+  layoutDebugEnabled
+    ? `
+      <aside class="layout-debug-panel" aria-label="Equipment sprite layout debugger">
+        <div class="layout-debug-heading">
+          <strong>Layout debug</strong>
+          <span>Percent values inside .garage-scene</span>
+        </div>
+        <div class="layout-debug-controls">
+          ${equipmentSceneOrder
+            .map((equipmentId) => {
+              const placement = garageLayoutDraft[equipmentId];
+              return `
+                <fieldset class="layout-debug-fieldset">
+                  <legend>${stationLabels[equipmentId]}</legend>
+                  ${(['x', 'y', 'width'] as const)
+                    .map(
+                      (field) => `
+                        <label>
+                          <span>${field}: <output data-layout-output="${equipmentId}-${field}">${placement[field]}</output>%</span>
+                          <input
+                            type="range"
+                            min="0"
+                            max="100"
+                            step="0.1"
+                            value="${placement[field]}"
+                            data-layout-equipment-id="${equipmentId}"
+                            data-layout-field="${field}"
+                          />
+                        </label>
+                      `
+                    )
+                    .join('')}
+                </fieldset>
+              `;
+            })
+            .join('')}
+        </div>
+        <label class="layout-debug-json-label" for="layout-debug-json">Copyable JSON</label>
+        <textarea id="layout-debug-json" data-layout-json readonly>${garageLayoutJson()}</textarea>
+      </aside>
+    `
+    : '';
 
 const displayEquipmentName = (equipment: Equipment): string => equipment.name;
 
@@ -685,6 +769,7 @@ const renderGarage = () => {
     <section class="garage-scene ${expandedClass} ${visibility.modeClass}" aria-label="Playable garage brewery floor">
       <div class="scene-vignette"></div>
       ${renderAtmosphere()}
+      ${Object.values(state.equipment).map(renderEquipmentSprite).join('')}
       <div class="stage-summary" aria-label="Workflow overview">Mash · Ferment · Package · Sell</div>
       ${renderMissionsControl()}
       ${renderGaragePressure()}
@@ -706,6 +791,7 @@ const renderGarage = () => {
       </article>` : ''}
       <div class="brewer-avatar" style="left: ${position.left}; top: ${position.top}" aria-label="Brewer position"><span></span></div>
       ${renderOpsControl()}
+      ${renderLayoutDebugPanel()}
     </section>
   `;
 };
@@ -891,13 +977,26 @@ const render = () => {
   `;
 };
 
+root.addEventListener('input', (event) => {
+  if (!layoutDebugEnabled) return;
+  const input = (event.target as HTMLElement).closest<HTMLInputElement>('[data-layout-equipment-id][data-layout-field]');
+  if (!input) return;
+  const equipmentId = input.dataset.layoutEquipmentId as EquipmentId;
+  const field = input.dataset.layoutField as keyof GarageEquipmentPlacement;
+  garageLayoutDraft[equipmentId][field] = Number(input.value);
+  const output = root.querySelector<HTMLOutputElement>(`[data-layout-output="${equipmentId}-${field}"]`);
+  if (output) output.value = input.value;
+  applySpritePlacement(equipmentId);
+  updateLayoutDebugJson();
+});
+
 root.addEventListener('click', (event) => {
   audioAllowed = true;
   const target = (event.target as HTMLElement).closest<HTMLElement>('[data-action]');
   if (!target) {
     const clickTarget = event.target as HTMLElement;
     const isInsideOpenSurface = Boolean(
-      clickTarget.closest('.equipment-hotspot, .case-hotspot, .supply-hotspot, .workshop-hotspot, .event-ticker, .missions-control, .notification-control, .ops-control, .focus-overlay, button')
+      clickTarget.closest('.equipment-hotspot, .case-hotspot, .supply-hotspot, .workshop-hotspot, .event-ticker, .missions-control, .notification-control, .ops-control, .layout-debug-panel, .focus-overlay, button')
     );
     if ((expandedTarget || missionsOpen || notificationsOpen || opsOpen || activeOverlay) && !isInsideOpenSurface) {
       expandedTarget = null;

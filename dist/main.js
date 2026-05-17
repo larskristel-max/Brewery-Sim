@@ -1,4 +1,5 @@
 import { equipmentByStation } from './data/equipment.js';
+import { garageEquipmentLayout, garageEquipmentSpriteByItem } from './data/garageLayout.js';
 import { ingredients, getIngredient } from './data/ingredients.js';
 import { createInitialState } from './game/initialState.js';
 import { loadSavedGame, resetSavedGame, saveGameState, STORAGE_KEY } from './game/persistence.js';
@@ -25,6 +26,9 @@ let notificationsOpen = false;
 let opsOpen = false;
 let activeOverlay = null;
 let audioAllowed = false;
+const equipmentSceneOrder = ['kettle', 'fermenter', 'bottler'];
+const layoutDebugEnabled = new URLSearchParams(globalThis.location.search).get('layoutDebug') === '1';
+const garageLayoutDraft = structuredClone(garageEquipmentLayout);
 const stationLabels = {
     kettle: 'Brewhouse',
     fermenter: 'Fermentation',
@@ -35,6 +39,77 @@ const stationNouns = {
     fermenter: 'fermenter',
     bottler: 'packaging station'
 };
+const garageLayoutJson = () => JSON.stringify(garageLayoutDraft, null, 2);
+const applySpritePlacement = (equipmentId) => {
+    const placement = garageLayoutDraft[equipmentId];
+    const sprite = root.querySelector(`.equipment-sprite[data-equipment-id="${equipmentId}"]`);
+    if (!sprite)
+        return;
+    sprite.style.left = `${placement.x}%`;
+    sprite.style.top = `${placement.y}%`;
+    sprite.style.width = `${placement.width}%`;
+};
+const updateLayoutDebugJson = () => {
+    const output = root.querySelector('[data-layout-json]');
+    if (output)
+        output.value = garageLayoutJson();
+};
+const renderEquipmentSprite = (equipment) => {
+    const src = garageEquipmentSpriteByItem[equipment.itemId ?? 'stock-pot-20l'];
+    if (!src)
+        return '';
+    const placement = garageLayoutDraft[equipment.id];
+    return `
+    <img
+      class="equipment-sprite equipment-sprite-${equipment.id}"
+      src="${src}"
+      alt=""
+      aria-hidden="true"
+      data-equipment-id="${equipment.id}"
+      style="left: ${placement.x}%; top: ${placement.y}%; width: ${placement.width}%"
+    />
+  `;
+};
+const renderLayoutDebugPanel = () => layoutDebugEnabled
+    ? `
+      <aside class="layout-debug-panel" aria-label="Equipment sprite layout debugger">
+        <div class="layout-debug-heading">
+          <strong>Layout debug</strong>
+          <span>Percent values inside .garage-scene</span>
+        </div>
+        <div class="layout-debug-controls">
+          ${equipmentSceneOrder
+        .map((equipmentId) => {
+        const placement = garageLayoutDraft[equipmentId];
+        return `
+                <fieldset class="layout-debug-fieldset">
+                  <legend>${stationLabels[equipmentId]}</legend>
+                  ${['x', 'y', 'width']
+            .map((field) => `
+                        <label>
+                          <span>${field}: <output data-layout-output="${equipmentId}-${field}">${placement[field]}</output>%</span>
+                          <input
+                            type="range"
+                            min="0"
+                            max="100"
+                            step="0.1"
+                            value="${placement[field]}"
+                            data-layout-equipment-id="${equipmentId}"
+                            data-layout-field="${field}"
+                          />
+                        </label>
+                      `)
+            .join('')}
+                </fieldset>
+              `;
+    })
+        .join('')}
+        </div>
+        <label class="layout-debug-json-label" for="layout-debug-json">Copyable JSON</label>
+        <textarea id="layout-debug-json" data-layout-json readonly>${garageLayoutJson()}</textarea>
+      </aside>
+    `
+    : '';
 const displayEquipmentName = (equipment) => equipment.name;
 const equipmentCapacityLabel = (equipment) => {
     const liters = equipment.capacityLiters;
@@ -614,6 +689,7 @@ const renderGarage = () => {
     <section class="garage-scene ${expandedClass} ${visibility.modeClass}" aria-label="Playable garage brewery floor">
       <div class="scene-vignette"></div>
       ${renderAtmosphere()}
+      ${Object.values(state.equipment).map(renderEquipmentSprite).join('')}
       <div class="stage-summary" aria-label="Workflow overview">Mash · Ferment · Package · Sell</div>
       ${renderMissionsControl()}
       ${renderGaragePressure()}
@@ -633,6 +709,7 @@ const renderGarage = () => {
       </article>` : ''}
       <div class="brewer-avatar" style="left: ${position.left}; top: ${position.top}" aria-label="Brewer position"><span></span></div>
       ${renderOpsControl()}
+      ${renderLayoutDebugPanel()}
     </section>
   `;
 };
@@ -808,12 +885,27 @@ const render = () => {
     </main>
   `;
 };
+root.addEventListener('input', (event) => {
+    if (!layoutDebugEnabled)
+        return;
+    const input = event.target.closest('[data-layout-equipment-id][data-layout-field]');
+    if (!input)
+        return;
+    const equipmentId = input.dataset.layoutEquipmentId;
+    const field = input.dataset.layoutField;
+    garageLayoutDraft[equipmentId][field] = Number(input.value);
+    const output = root.querySelector(`[data-layout-output="${equipmentId}-${field}"]`);
+    if (output)
+        output.value = input.value;
+    applySpritePlacement(equipmentId);
+    updateLayoutDebugJson();
+});
 root.addEventListener('click', (event) => {
     audioAllowed = true;
     const target = event.target.closest('[data-action]');
     if (!target) {
         const clickTarget = event.target;
-        const isInsideOpenSurface = Boolean(clickTarget.closest('.equipment-hotspot, .case-hotspot, .supply-hotspot, .workshop-hotspot, .event-ticker, .missions-control, .notification-control, .ops-control, .focus-overlay, button'));
+        const isInsideOpenSurface = Boolean(clickTarget.closest('.equipment-hotspot, .case-hotspot, .supply-hotspot, .workshop-hotspot, .event-ticker, .missions-control, .notification-control, .ops-control, .layout-debug-panel, .focus-overlay, button'));
         if ((expandedTarget || missionsOpen || notificationsOpen || opsOpen || activeOverlay) && !isInsideOpenSurface) {
             expandedTarget = null;
             missionsOpen = false;
