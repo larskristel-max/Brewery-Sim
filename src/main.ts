@@ -1,5 +1,5 @@
 import { equipmentByStation } from './data/equipment.js';
-import { garageEquipmentLayout, garageEquipmentSpriteByItem, type GarageEquipmentPlacement } from './data/garageLayout.js';
+import { garageEquipmentLayoutByItem, type GarageEquipmentPlacement } from './data/garageLayout.js';
 import { ingredients, getIngredient } from './data/ingredients.js';
 import type { Equipment, EquipmentCatalogItem, EquipmentId, EquipmentItemId, GameAction, IngredientId, SalesChannelId } from './game/schema.js';
 import { createInitialState } from './game/initialState.js';
@@ -36,7 +36,7 @@ if (!root) {
 type SceneTarget = EquipmentId | 'cases';
 type FocusOverlay = 'recipes' | 'production' | 'inventory' | 'upgrades' | 'log';
 type StoreStation = 'kettle' | 'fermenter' | 'bottler';
-type GarageLayoutDraft = Record<EquipmentId, GarageEquipmentPlacement>;
+type GarageLayoutDraft = Record<EquipmentItemId, GarageEquipmentPlacement>;
 
 const hasBrowserSave = (): boolean => {
   try {
@@ -58,7 +58,9 @@ let audioAllowed = false;
 
 const equipmentSceneOrder: EquipmentId[] = ['kettle', 'fermenter', 'bottler'];
 const layoutDebugEnabled = new URLSearchParams(globalThis.location.search).get('layoutDebug') === '1';
-const garageLayoutDraft: GarageLayoutDraft = structuredClone(garageEquipmentLayout);
+const garageLayoutDraft: GarageLayoutDraft = Object.fromEntries(
+  Object.entries(garageEquipmentLayoutByItem).map(([itemId, visual]) => [itemId, structuredClone(visual.placement)])
+) as GarageLayoutDraft;
 
 const stationLabels: Record<StoreStation, string> = {
   kettle: 'Brewhouse',
@@ -75,13 +77,13 @@ const stationNouns: Record<StoreStation, string> = {
 
 const garageLayoutJson = (): string => JSON.stringify(garageLayoutDraft, null, 2);
 
-const applySpritePlacement = (equipmentId: EquipmentId) => {
-  const placement = garageLayoutDraft[equipmentId];
-  const sprite = root.querySelector<HTMLElement>(`.equipment-sprite[data-equipment-id="${equipmentId}"]`);
-  if (!sprite) return;
-  sprite.style.left = `${placement.x}%`;
-  sprite.style.top = `${placement.y}%`;
-  sprite.style.width = `${placement.width}%`;
+const applySpritePlacement = (itemId: EquipmentItemId) => {
+  const placement = garageLayoutDraft[itemId];
+  const object = root.querySelector<HTMLElement>(`.equipment-object[data-equipment-item-id="${itemId}"]`);
+  if (!object) return;
+  object.style.left = `${placement.x}%`;
+  object.style.top = `${placement.y}%`;
+  object.style.width = `${placement.width}%`;
 };
 
 const updateLayoutDebugJson = () => {
@@ -89,20 +91,29 @@ const updateLayoutDebugJson = () => {
   if (output) output.value = garageLayoutJson();
 };
 
-const renderEquipmentSprite = (equipment: Equipment): string => {
-  const src = garageEquipmentSpriteByItem[equipment.itemId ?? 'stock-pot-20l'];
+const activeEquipmentItemId = (equipment: Equipment): EquipmentItemId | null => equipment.itemId ?? null;
+
+const renderEquipmentObject = (equipment: Equipment, content: string): string => {
+  const itemId = activeEquipmentItemId(equipment);
+  if (!itemId) return '';
+
+  const visual = garageEquipmentLayoutByItem[itemId];
+  const src = visual.sprite;
   if (!src) return '';
 
-  const placement = garageLayoutDraft[equipment.id];
+  const placement = garageLayoutDraft[itemId];
+  const tapPadding = visual.tapPadding ?? { x: 0, y: 0 };
+  const priority = visual.interactionPriority ?? 0;
+
   return `
-    <img
-      class="equipment-sprite equipment-sprite-${equipment.id}"
-      src="${src}"
-      alt=""
-      aria-hidden="true"
+    <article
+      class="equipment-object equipment-object-${equipment.id}"
       data-equipment-id="${equipment.id}"
-      style="left: ${placement.x}%; top: ${placement.y}%; width: ${placement.width}%"
-    />
+      data-equipment-item-id="${itemId}"
+      style="left: ${placement.x}%; top: ${placement.y}%; width: ${placement.width}%; --tap-padding-x: ${tapPadding.x}%; --tap-padding-y: ${tapPadding.y}%; --interaction-priority: ${priority}; z-index: ${20 + priority}"
+    >
+      ${content}
+    </article>
   `;
 };
 
@@ -117,28 +128,33 @@ const renderLayoutDebugPanel = () =>
         <div class="layout-debug-controls">
           ${equipmentSceneOrder
             .map((equipmentId) => {
-              const placement = garageLayoutDraft[equipmentId];
+              const item = state.equipment[equipmentId];
+              const itemId = activeEquipmentItemId(item);
+              if (!itemId) return '';
+              const placement = garageLayoutDraft[itemId];
+              const tapPadding = garageEquipmentLayoutByItem[itemId].tapPadding;
               return `
                 <fieldset class="layout-debug-fieldset">
-                  <legend>${stationLabels[equipmentId]}</legend>
+                  <legend>${stationLabels[equipmentId]} · ${itemId}</legend>
                   ${(['x', 'y', 'width'] as const)
                     .map(
                       (field) => `
                         <label>
-                          <span>${field}: <output data-layout-output="${equipmentId}-${field}">${placement[field]}</output>%</span>
+                          <span>${field}: <output data-layout-output="${itemId}-${field}">${placement[field]}</output>%</span>
                           <input
                             type="range"
                             min="0"
                             max="100"
                             step="0.1"
                             value="${placement[field]}"
-                            data-layout-equipment-id="${equipmentId}"
+                            data-layout-item-id="${itemId}"
                             data-layout-field="${field}"
                           />
                         </label>
                       `
                     )
                     .join('')}
+                  ${tapPadding ? `<small>Tap zone preview: +${tapPadding.x}% x, +${tapPadding.y}% y</small>` : ''}
                 </fieldset>
               `;
             })
@@ -392,6 +408,7 @@ const equipmentSceneStatus = (equipmentId: EquipmentId): { label: string; detail
     toneClass: `condition-${equipmentConditionTier(equipment.condition)}`
   };
 };
+
 
 const hotspotPosition = (equipmentId: EquipmentId) => {
   if (equipmentId === 'fermenter' && state.equipment.fermenter.tier === 1) return { x: 56, y: 55 };
@@ -735,7 +752,8 @@ const renderGarage = () => {
   const expandedClass = expandedTarget ? `has-expanded expanded-${expandedTarget}` : '';
   const equipment = Object.values(state.equipment)
     .map((item) => {
-      const pos = hotspotPosition(item.id);
+      const itemId = activeEquipmentItemId(item);
+      const visual = itemId ? garageEquipmentLayoutByItem[itemId] : null;
       const conditionTier = equipmentConditionTier(item.condition);
       const status = equipmentSceneStatus(item.id);
       const expanded = expandedTarget === item.id;
@@ -747,29 +765,54 @@ const renderGarage = () => {
           : expandedTarget === 'bottler'
             ? item.id === 'fermenter'
             : false;
-      return `
-        <article
-          class="equipment-hotspot hotspot-${item.id} ${expanded ? 'expanded' : ''} ${contextual ? 'contextual' : ''} ${silent ? 'scene-silent' : ''} ${obstructed ? 'obstructed-by-card' : ''} condition-${conditionTier} ${status.toneClass} ${item.id === state.selectedEquipmentId ? 'selected' : ''} ${activeForEquipment(item.id) ? 'active' : ''} ${isNextTapTarget(item.id) ? 'next-tap' : ''}"
-          style="--x: ${pos.x}%; --y: ${pos.y}%"
-          data-action="toggle-target"
-          data-target="${item.id}"
-        >
-          <button class="hotspot-toggle" data-action="toggle-target" data-target="${item.id}" type="button" aria-expanded="${expanded}" aria-label="${expanded ? 'Collapse' : 'Expand'} ${displayEquipmentName(item)}">
+
+      if (!itemId || !visual?.sprite) {
+        const pos = hotspotPosition(item.id);
+        return `
+          <article
+            class="equipment-hotspot hotspot-${item.id} ${expanded ? 'expanded' : ''} ${contextual ? 'contextual' : ''} ${silent ? 'scene-silent' : ''} ${obstructed ? 'obstructed-by-card' : ''} condition-${conditionTier} ${status.toneClass} ${item.id === state.selectedEquipmentId ? 'selected' : ''} ${activeForEquipment(item.id) ? 'active' : ''} ${isNextTapTarget(item.id) ? 'next-tap' : ''}"
+            style="--x: ${pos.x}%; --y: ${pos.y}%"
+            data-action="toggle-target"
+            data-target="${item.id}"
+          >
+            <button class="hotspot-toggle" data-action="toggle-target" data-target="${item.id}" type="button" aria-expanded="${expanded}" aria-label="${expanded ? 'Collapse' : 'Expand'} ${displayEquipmentName(item)}">
+              <span class="hotspot-name">${displayEquipmentName(item)}</span>
+              <strong>${status.label}</strong>
+              ${expanded ? `<small>${status.detail}</small>` : ''}
+            </button>
+            ${expanded ? renderEquipmentActions(item.id) : ''}
+          </article>
+        `;
+      }
+
+      return renderEquipmentObject(
+        item,
+        `
+          <button
+            class="equipment-object-toggle hotspot-${item.id} ${expanded ? 'expanded' : ''} ${contextual ? 'contextual' : ''} ${silent ? 'scene-silent' : ''} condition-${conditionTier} ${status.toneClass} ${item.id === state.selectedEquipmentId ? 'selected' : ''} ${activeForEquipment(item.id) ? 'active' : ''} ${isNextTapTarget(item.id) ? 'next-tap' : ''}"
+            data-action="${visual.interaction.action}"
+            data-target="${visual.interaction.equipmentId}"
+            type="button"
+            aria-expanded="${expanded}"
+            aria-label="${expanded ? 'Collapse' : 'Expand'} ${displayEquipmentName(item)}"
+          >
+            <img class="equipment-sprite equipment-sprite-${item.id}" src="${visual.sprite}" alt="${displayEquipmentName(item)}" draggable="false" />
+          </button>
+          <div class="equipment-object-card ${expanded ? 'expanded' : ''} ${obstructed ? 'obstructed-by-card' : ''}" ${expanded ? '' : 'hidden'}>
             <span class="hotspot-name">${displayEquipmentName(item)}</span>
             <strong>${status.label}</strong>
-            ${expanded ? `<small>${status.detail}</small>` : ''}
-          </button>
-          ${expanded ? renderEquipmentActions(item.id) : ''}
-        </article>
-      `;
+            <small>${status.detail}</small>
+            ${renderEquipmentActions(item.id)}
+          </div>
+        `
+      );
     })
     .join('');
 
   return `
-    <section class="garage-scene ${expandedClass} ${visibility.modeClass}" aria-label="Playable garage brewery floor">
+    <section class="garage-scene ${expandedClass} ${visibility.modeClass} ${layoutDebugEnabled ? 'layout-debug-enabled' : ''}" aria-label="Playable garage brewery floor">
       <div class="scene-vignette"></div>
       ${renderAtmosphere()}
-      ${Object.values(state.equipment).map(renderEquipmentSprite).join('')}
       <div class="stage-summary" aria-label="Workflow overview">Mash · Ferment · Package · Sell</div>
       ${renderMissionsControl()}
       ${renderGaragePressure()}
@@ -979,14 +1022,14 @@ const render = () => {
 
 root.addEventListener('input', (event) => {
   if (!layoutDebugEnabled) return;
-  const input = (event.target as HTMLElement).closest<HTMLInputElement>('[data-layout-equipment-id][data-layout-field]');
+  const input = (event.target as HTMLElement).closest<HTMLInputElement>('[data-layout-item-id][data-layout-field]');
   if (!input) return;
-  const equipmentId = input.dataset.layoutEquipmentId as EquipmentId;
+  const itemId = input.dataset.layoutItemId as EquipmentItemId;
   const field = input.dataset.layoutField as keyof GarageEquipmentPlacement;
-  garageLayoutDraft[equipmentId][field] = Number(input.value);
-  const output = root.querySelector<HTMLOutputElement>(`[data-layout-output="${equipmentId}-${field}"]`);
+  garageLayoutDraft[itemId][field] = Number(input.value);
+  const output = root.querySelector<HTMLOutputElement>(`[data-layout-output="${itemId}-${field}"]`);
   if (output) output.value = input.value;
-  applySpritePlacement(equipmentId);
+  applySpritePlacement(itemId);
   updateLayoutDebugJson();
 });
 
@@ -996,7 +1039,7 @@ root.addEventListener('click', (event) => {
   if (!target) {
     const clickTarget = event.target as HTMLElement;
     const isInsideOpenSurface = Boolean(
-      clickTarget.closest('.equipment-hotspot, .case-hotspot, .supply-hotspot, .workshop-hotspot, .event-ticker, .missions-control, .notification-control, .ops-control, .layout-debug-panel, .focus-overlay, button')
+      clickTarget.closest('.equipment-object, .equipment-hotspot, .case-hotspot, .supply-hotspot, .workshop-hotspot, .event-ticker, .missions-control, .notification-control, .ops-control, .layout-debug-panel, .focus-overlay, button')
     );
     if ((expandedTarget || missionsOpen || notificationsOpen || opsOpen || activeOverlay) && !isInsideOpenSurface) {
       expandedTarget = null;
