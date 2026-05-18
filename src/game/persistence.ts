@@ -12,7 +12,8 @@ type SaveEnvelope = {
   state: GameState;
 };
 
-const equipmentIds: EquipmentId[] = ['kettle', 'fermenter', 'bottler'];
+const persistedEquipmentIds: EquipmentId[] = ['kettle', 'fermenter', 'bottler'];
+const equipmentIds: EquipmentId[] = ['kettle', 'fermenter', 'bottler', 'mill'];
 const upgradeIds: UpgradeId[] = ['larger-kettle', 'temp-control', 'labeler'];
 const ingredientIds = ingredients.map((ingredient) => ingredient.id);
 const batchSteps = ['brewing', 'awaiting-transfer', 'fermenting', 'awaiting-packaging', 'packaging', 'bottle-conditioning', 'ready'];
@@ -58,7 +59,9 @@ const isEquipment = (value: unknown, id: EquipmentId): value is Equipment =>
   hasNumber(value, 'y');
 
 const isEquipmentRecord = (value: unknown): value is GameState['equipment'] =>
-  isRecord(value) && equipmentIds.every((id) => isEquipment(value[id], id));
+  isRecord(value) &&
+  persistedEquipmentIds.every((id) => isEquipment(value[id], id)) &&
+  (value.mill === undefined || isEquipment(value.mill, 'mill'));
 
 const isOwnedEquipment = (value: unknown): value is OwnedEquipment =>
   isRecord(value) &&
@@ -143,7 +146,7 @@ const isSavedGameState = (value: unknown): value is GameState => {
     Array.isArray(value.ownedEquipment) &&
     value.ownedEquipment.every(isOwnedEquipment) &&
     isRecord(value.activeEquipment) &&
-    equipmentIds.every((id) => hasString(value.activeEquipment as Record<string, unknown>, id)) &&
+    persistedEquipmentIds.every((id) => hasString(value.activeEquipment as Record<string, unknown>, id)) &&
     hasNumber(value, 'garageSpaceUsed') &&
     hasNumber(value, 'garageSpaceLimit') &&
     isUpgradeRecord(value.upgrades) &&
@@ -165,6 +168,14 @@ const parseSavedGame = (rawSave: string): GameState | null => {
   const savedState = parsed.state as GameState & Record<string, unknown>;
   return {
     ...savedState,
+    equipment: {
+      ...createInitialState().equipment,
+      ...savedState.equipment
+    },
+    activeEquipment: {
+      ...createInitialState().activeEquipment,
+      ...savedState.activeEquipment
+    },
     fermenterTemperatureC: clampFermenterTemperature(hasNumber(savedState, 'fermenterTemperatureC') ? savedState.fermenterTemperatureC : createInitialState().fermenterTemperatureC)
   };
 };

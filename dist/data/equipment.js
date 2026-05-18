@@ -137,6 +137,25 @@ export const equipmentCatalog = [
         speedModifier: 0.78
     },
     {
+        id: 'grain-mill-tier2',
+        equipmentId: 'mill',
+        station: 'milling',
+        name: 'Tier 2 malt mill',
+        description: 'A compact powered grain mill for consistent crush. Prepared for future milling actions and brewhouse prep flow.',
+        tier: 2,
+        cost: 240,
+        spaceUsed: 1,
+        capacityLiters: 0,
+        batchTimeModifier: 0.96,
+        attentionModifier: 0.82,
+        lossModifier: 0.02,
+        visualClass: 'visual-grain-mill',
+        operonTypeKey: 'equipment.mill',
+        qualityBonus: 1,
+        riskModifier: -1,
+        speedModifier: 0.96
+    },
+    {
         id: 'wand-capper',
         equipmentId: 'bottler',
         station: 'packaging',
@@ -250,6 +269,7 @@ export const topGarageTier = (equipmentId) => Math.max(...equipmentByStation(equ
 export const starterEquipment = [
     createEquipment('stock-pot-20l', 76, 17, 42),
     createEquipment('plastic-bucket', 72, 50, 35),
+    createEquipment('grain-mill-tier2', 94, 35, 56),
     createEquipment('wand-capper', 70, 76, 56)
 ];
 export const starterOwnedEquipment = [

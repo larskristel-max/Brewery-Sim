@@ -7,6 +7,7 @@ export const garageEquipmentLayoutBySlot = {
     'fermenter-slot-3': { x: 60.2, y: 45.2, width: 14.5 },
     'fermenter-slot-4': { x: 50.5, y: 65, width: 12 },
     'fermenter-slot-5': { x: 61.5, y: 65, width: 12 },
+    milling: { x: 18, y: 62, width: 10 },
     packaging: { x: 74.5, y: 62.4, width: 13.1 }
 };
 export const garageEquipmentLayoutByItem = {
@@ -65,6 +66,14 @@ export const garageEquipmentLayoutByItem = {
         interaction: { action: 'toggle-target', equipmentId: 'fermenter' },
         tapPadding: defaultTapPadding,
         interactionPriority: 1
+    },
+    'grain-mill-tier2': {
+        stationType: 'milling',
+        sprite: garageEquipmentAssetPath('tier2', 'malt-mill.png'),
+        placement: { x: 18, y: 62, width: 10 },
+        interaction: { action: 'toggle-target', equipmentId: 'mill' },
+        tapPadding: { x: 5, y: 5 },
+        interactionPriority: 3
     },
     'wand-capper': {
         stationType: 'packaging',

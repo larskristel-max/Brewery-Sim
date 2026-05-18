@@ -22,7 +22,7 @@ export interface GarageEquipmentVisual {
 }
 export type GarageEquipmentTier = 'tier1' | 'tier2';
 export type GarageEquipmentSpritePath = `/assets/garage/equipment/tier1/${string}` | `/assets/garage/equipment/tier2/${string}`;
-export type GarageEquipmentSlotId = 'brewhouse' | 'fermenter-slot-1' | 'fermenter-slot-2' | 'fermenter-slot-3' | 'fermenter-slot-4' | 'fermenter-slot-5' | 'packaging';
+export type GarageEquipmentSlotId = 'brewhouse' | 'fermenter-slot-1' | 'fermenter-slot-2' | 'fermenter-slot-3' | 'fermenter-slot-4' | 'fermenter-slot-5' | 'milling' | 'packaging';
 export declare const garageEquipmentAssetPath: (tier: GarageEquipmentTier, filename: string) => GarageEquipmentSpritePath;
 export declare const garageEquipmentLayoutBySlot: Record<GarageEquipmentSlotId, GarageEquipmentPlacement>;
 export declare const garageEquipmentLayoutByItem: Record<EquipmentItemId, GarageEquipmentVisual>;

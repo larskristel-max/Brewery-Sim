@@ -33,6 +33,7 @@ export const createInitialState = (): GameState => ({
   activeEquipment: {
     kettle: 'stock-pot-20l-1',
     fermenter: 'plastic-bucket-1',
+    mill: '',
     bottler: 'wand-capper-1'
   },
   garageSpaceUsed: starterOwnedEquipment.reduce((total, item) => total + item.spaceUsed, 0),
