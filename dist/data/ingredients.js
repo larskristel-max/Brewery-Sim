@@ -157,7 +157,7 @@ export const ingredients = [
         storageArea: 'utility-shelf',
         packSize: 12,
         packPrice: 4.8,
-        sourceNote: 'Prototype packaging supply bundle.'
+        sourceNote: 'Twelve 33 cl bottles with caps; one in-game case is one bundle.'
     },
     {
         id: 'cleaner',
@@ -188,7 +188,7 @@ export const createIngredientStock = () => Object.fromEntries(ingredients.map((i
                     : ingredient.id === 'ale-yeast'
                         ? 2
                         : ingredient.id === 'bottles'
-                            ? 24
+                            ? 72
                             : ingredient.id === 'cleaner'
                                 ? 4
                                 : 0,

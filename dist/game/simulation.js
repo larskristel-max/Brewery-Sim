@@ -1,7 +1,7 @@
 import { getIngredient } from '../data/ingredients.js';
 import { createOwnedEquipment, getEquipmentCatalogItem, topGarageTier } from '../data/equipment.js';
 import { getRecipe } from '../data/recipes.js';
-import { activeOwnedEquipment, equipmentConditionTier, garageSpaceAvailable, orderCost, recipeBatchCapacity, recipeMissingIngredients, recipeOrderItems, saleValue, salesChannels, storageOverflowByArea, totalStorageOverflow } from './selectors.js';
+import { activeOwnedEquipment, bottlesPerCase, equipmentConditionTier, garageSpaceAvailable, orderCost, recipeBatchCapacity, recipeMissingIngredients, recipeOrderItems, saleValue, salesChannels, storageOverflowByArea, totalStorageOverflow } from './selectors.js';
 const orderLeadDays = 3;
 const startOfDayMinute = 7 * 60;
 const manualSteps = ['awaiting-transfer', 'awaiting-packaging', 'ready'];
@@ -76,6 +76,8 @@ const conditionLabel = (ingredientId, condition) => {
 };
 const storageUseForItem = (ingredientId, amount) => {
     const ingredient = getIngredient(ingredientId);
+    if (ingredient.id === 'bottles')
+        return amount / bottlesPerCase;
     if (ingredient.storageArea === 'cold-box' && ingredient.unit === 'g')
         return amount / 1000;
     if (ingredient.storageArea === 'cold-box' && ingredient.unit === 'pack')

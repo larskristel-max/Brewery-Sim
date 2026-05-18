@@ -40,8 +40,8 @@ const visibleText = async (page) => page.locator('body').innerText();
 
 const finishedPalletLevelName = (cases) => {
   if (cases <= 0) return 'empty';
-  if (cases < 10) return 'level1';
-  if (cases < 25) return 'level2';
+  if (cases < 6) return 'level1';
+  if (cases < 12) return 'level2';
   return 'level3';
 };
 
@@ -114,6 +114,7 @@ try {
   assert.match(await visibleText(page), /Tap the fermenter to transfer Garage Blonde/i);
 
   await page.locator('.hotspot-fermenter').click();
+  await assert.doesNotReject(page.getByRole('button', { name: /Transfer to fermenter/ }).waitFor({ state: 'visible', timeout: 5000 }), 'assigned fermenter should show Transfer to fermenter without opening Production');
   await page.getByRole('button', { name: /Transfer to fermenter/ }).click();
   await waitForBatchStep(page, 'fermenting');
   assert.doesNotMatch(await visibleText(page), /in-game minutes remaining/i, 'fermenter card should use readable time labels');

@@ -8,12 +8,15 @@ import { loadSavedGame, resetSavedGame, saveGameState, STORAGE_KEY } from '../di
 import { reduceGame } from '../dist/game/simulation.js';
 import {
   contaminationRiskTier,
+  bottlesPerCase,
   currentWorkflowStage,
   equipmentConditionLabel,
   equipmentConditionTier,
   orderCost,
   firstLoopObjective,
   formatBatchRemainingTime,
+  litersToBottles,
+  litersToCases,
   recipeCanStart,
   recipeMissingIngredients,
   saleValueForChannel,
@@ -125,10 +128,16 @@ assert.equal(state.equipment.kettle.name, '20 L enamel stock pot', 'starter brew
 assert.equal(state.equipment.fermenter.name, 'Plastic fermentation bucket', 'starter fermentation should be one plastic bucket');
 assert.equal(state.equipment.bottler.name, 'Bottle wand and hand capper', 'starter packaging should be the wand and hand capper');
 assert.equal(firstLoopObjective(state), 'Tap the stock pot to brew Garage Blonde.', 'fresh first-loop objective should point at the stock pot');
+assert.equal(bottlesPerCase, 12, 'one in-game case should be a 12 bottle case');
+assert.equal(litersToBottles(20), 61, '20 L should be about 61 Belgian 33 cl bottles before case rounding');
+assert.equal(litersToCases(20), 5, '20 L should package as about five 12 bottle cases');
+assert.equal(blonde.batchSizeCases, 5, 'Garage Blonde displayed batch size should match 20 L / 33 cl bottle case math');
+assert.equal(blonde.ingredients.find((item) => item.ingredientId === 'bottles')?.amount, 60, 'Garage Blonde should require roughly 60 33 cl bottles');
 
 state = reduceGame(state, { type: 'start-batch', recipeId: 'garage-blonde' });
 assert.equal(state.batches.length, 1, 'starting a batch should create one active batch');
 assert.equal(state.inventory.ingredients['pilsner-malt'].amount, 5.8, 'starting a Blonde consumes named pilsner malt');
+assert.equal(state.inventory.ingredients.bottles.amount, 12, 'starting a Blonde consumes five 12 bottle cases from starter packaging stock');
 assert.equal(state.batches[0].step, 'awaiting-transfer', 'brew day should stop at manual transfer');
 assert.equal(currentWorkflowStage(state).tapTarget, 'fermenter', 'started batch should point at manual transfer');
 assert.equal(firstLoopObjective(state), 'Tap the fermenter to transfer Garage Blonde.', 'awaiting-transfer objective should point at the fermenter');
@@ -147,6 +156,7 @@ const packagingCashBefore = state.cash;
 const expectedCases = state.batches[0].casesExpected;
 state = reduceGame(state, { type: 'start-packaging', batchId: state.batches[0].id });
 assert.equal(state.batches.length, 0, 'packaging should immediately finish the first-loop batch');
+assert.equal(expectedCases, 5, 'first-loop 20 L Garage Blonde should expect five 12 bottle cases');
 assert.equal(state.inventory.cases, expectedCases, 'packaging should add the displayed expected cases to inventory');
 assert.equal(state.finishedBeerLots.length, 1, 'packaging should create a recipe-specific finished lot');
 assert.equal(state.cash, packagingCashBefore, 'packaging should not secretly change cash');
@@ -234,7 +244,7 @@ stockRecipeIngredients(capacityState, blonde);
 capacityState = reduceGame(capacityState, { type: 'start-batch', recipeId: 'garage-blonde' });
 assert.equal(
   capacityState.batches[0].casesExpected,
-  2,
+  litersToCases(20),
   'fermenter upgrades should not inflate batch output without matching brewhouse capacity'
 );
 
@@ -287,7 +297,7 @@ dirtyIpa.inventory.ingredients['pale-malt'].amount = 10;
 dirtyIpa.inventory.ingredients['crystal-malt'].amount = 1;
 dirtyIpa.inventory.ingredients['ipa-hops'].amount = 300;
 dirtyIpa.inventory.ingredients['ale-yeast'].amount = 3;
-dirtyIpa.inventory.ingredients.bottles.amount = 40;
+dirtyIpa.inventory.ingredients.bottles.amount = 80;
 dirtyIpa.inventory.ingredients['ipa-hops'].condition = 55;
 dirtyIpa.equipment.fermenter.condition = 35;
 dirtyIpa = reduceGame(dirtyIpa, { type: 'start-batch', recipeId: 'backyard-ipa' });
@@ -297,7 +307,7 @@ assert.ok(dirtyIpa.events.some((event) => /Polyphenols|hop creep|Contamination/.
 let dirtyPils = createInitialState();
 dirtyPils.inventory.ingredients['lager-yeast'].amount = 2;
 dirtyPils.inventory.ingredients['saaz-hops'].amount = 200;
-dirtyPils.inventory.ingredients.bottles.amount = 40;
+dirtyPils.inventory.ingredients.bottles.amount = 72;
 dirtyPils.inventory.ingredients['pilsner-malt'].condition = 50;
 dirtyPils.equipment.kettle.condition = 30;
 dirtyPils.equipment.fermenter.condition = 30;

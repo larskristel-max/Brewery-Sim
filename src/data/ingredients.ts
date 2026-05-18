@@ -159,7 +159,7 @@ export const ingredients: Ingredient[] = [
     storageArea: 'utility-shelf',
     packSize: 12,
     packPrice: 4.8,
-    sourceNote: 'Prototype packaging supply bundle.'
+    sourceNote: 'Twelve 33 cl bottles with caps; one in-game case is one bundle.'
   },
   {
     id: 'cleaner',
@@ -194,7 +194,7 @@ export const createIngredientStock = (): Record<IngredientId, IngredientStock> =
                 : ingredient.id === 'ale-yeast'
                   ? 2
                   : ingredient.id === 'bottles'
-                    ? 24
+                    ? 72
                     : ingredient.id === 'cleaner'
                       ? 4
                       : 0,

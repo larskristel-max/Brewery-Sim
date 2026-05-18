@@ -21,9 +21,14 @@ export declare const ownedByStation: (state: GameState, equipmentId: EquipmentId
 export declare const activeOwnedEquipment: (state: GameState, equipmentId: EquipmentId) => OwnedEquipment;
 export declare const availableFermenters: (state: GameState) => OwnedEquipment[];
 export declare const garageSpaceAvailable: (state: GameState) => number;
+export declare const bottleVolumeMl = 330;
+export declare const bottlesPerCase = 12;
+export declare const caseDefinitionLabel = "12 \u00D7 33 cl bottles";
+export declare const litersToBottles: (liters: number) => number;
 export declare const litersToCases: (liters: number) => number;
 export declare const recipeBatchCapacity: (state: GameState, recipe: Recipe) => {
     liters: number;
+    bottles: number;
     cases: number;
     reason: string;
     fermenter?: OwnedEquipment;

@@ -78,12 +78,18 @@ export const availableFermenters = (state: GameState): OwnedEquipment[] =>
 
 export const garageSpaceAvailable = (state: GameState): number => Math.max(0, state.garageSpaceLimit - state.garageSpaceUsed);
 
-export const litersToCases = (liters: number): number => Math.max(1, Math.floor((liters * 0.92) / 7.92));
+export const bottleVolumeMl = 330;
+export const bottlesPerCase = 12;
+export const caseDefinitionLabel = `${bottlesPerCase} × 33 cl bottles`;
 
-export const recipeBatchCapacity = (state: GameState, recipe: Recipe): { liters: number; cases: number; reason: string; fermenter?: OwnedEquipment } => {
+export const litersToBottles = (liters: number): number => Math.max(1, Math.round((liters * 1000) / bottleVolumeMl));
+
+export const litersToCases = (liters: number): number => Math.max(1, Math.round(litersToBottles(liters) / bottlesPerCase));
+
+export const recipeBatchCapacity = (state: GameState, recipe: Recipe): { liters: number; bottles: number; cases: number; reason: string; fermenter?: OwnedEquipment } => {
   const brewhouse = activeOwnedEquipment(state, 'kettle');
   const fermenter = availableFermenters(state).sort((a, b) => b.capacityLiters - a.capacityLiters)[0];
-  if (!fermenter) return { liters: 0, cases: 0, reason: 'Blocked: no empty fermenter.' };
+  if (!fermenter) return { liters: 0, bottles: 0, cases: 0, reason: 'Blocked: no empty fermenter.' };
   const liters = Math.min(recipe.targetBatchLiters, brewhouse.capacityLiters, fermenter.capacityLiters);
   const limit =
     liters === fermenter.capacityLiters && fermenter.capacityLiters < brewhouse.capacityLiters
@@ -91,7 +97,9 @@ export const recipeBatchCapacity = (state: GameState, recipe: Recipe): { liters:
       : liters === brewhouse.capacityLiters && brewhouse.capacityLiters < recipe.targetBatchLiters
         ? `${brewhouse.name} caps the batch`
         : 'Can brew now';
-  return { liters, cases: litersToCases(liters), reason: `${limit}: ${liters} L into ${fermenter.name}.`, fermenter };
+  const bottles = litersToBottles(liters);
+  const cases = litersToCases(liters);
+  return { liters, bottles, cases, reason: `${limit}: ${liters} L into ${fermenter.name} ≈ ${bottles} bottles / ${cases} cases.`, fermenter };
 };
 
 export const orderCost = (items: RecipeIngredient[]): number =>
@@ -112,7 +120,8 @@ export const storageUseByArea = (state: GameState): Record<StorageArea, number> 
   const use: Record<StorageArea, number> = { 'dry-shelf': 0, 'cold-box': 0, 'utility-shelf': 0 };
   Object.entries(state.inventory.ingredients).forEach(([ingredientId, stock]) => {
     const ingredient = getIngredient(ingredientId as IngredientId);
-    if (ingredient.storageArea === 'cold-box' && ingredient.unit === 'g') use['cold-box'] += stock.amount / 1000;
+    if (ingredient.id === 'bottles') use[ingredient.storageArea] += stock.amount / bottlesPerCase;
+    else if (ingredient.storageArea === 'cold-box' && ingredient.unit === 'g') use['cold-box'] += stock.amount / 1000;
     else if (ingredient.storageArea === 'cold-box' && ingredient.unit === 'pack') use['cold-box'] += stock.amount * 0.0115;
     else use[ingredient.storageArea] += stock.amount;
   });
