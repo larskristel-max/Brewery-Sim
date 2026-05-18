@@ -359,16 +359,45 @@ assert.match(mainSource, /caseCountLabel\(lot\.cases\)/, 'finished lot cards sho
 
 const index = await readFile(new URL('../index.html', import.meta.url), 'utf8');
 const garageCss = await readFile(new URL('../src/styles/garage.css', import.meta.url), 'utf8');
+const hasLowOpacityInSelectorBlocks = (cssSource, selectorPatterns, maxOpacityExclusive = 0.9) => {
+  const selectorGroup = selectorPatterns.map((pattern) => pattern.source).join('|');
+  const blockRegex = new RegExp(`(?:${selectorGroup})[\\s\\S]*?\\{([\\s\\S]*?)\\}`, 'g');
+  let blockMatch;
+  while ((blockMatch = blockRegex.exec(cssSource)) !== null) {
+    const blockBody = blockMatch[1];
+    const opacityRegex = /opacity:\s*([01](?:\.\d+)?)/g;
+    let opacityMatch;
+    while ((opacityMatch = opacityRegex.exec(blockBody)) !== null) {
+      if (Number(opacityMatch[1]) < maxOpacityExclusive) {
+        return true;
+      }
+    }
+  }
+  return false;
+};
 assert.match(index, /viewport-fit=cover/, 'index should include an iPhone safe-area viewport');
 assert.match(index, /src="\.\/dist\/main\.js"/, 'index should load compiled TypeScript output with a relative path');
 assert.match(index, /href="\.\/src\/styles\/globals\.css"/, 'index should load global CSS with a relative path');
 assert.match(index, /href="\.\/src\/styles\/garage\.css"/, 'index should load garage CSS with a relative path');
 assert.doesNotMatch(index, /(?:href|src)="\//, 'index asset references should not use root-relative paths');
-assert.doesNotMatch(garageCss, /\.equipment-object-toggle\.scene-silent|\.equipment-hotspot\.scene-silent|\.case-hotspot\.scene-silent/, 'gameplay CSS should not fade idle equipment via scene-silent rules');
-assert.doesNotMatch(garageCss, /opacity:\s*0\.(?:[0-8]\d?|9[0-0]?)\s*;[\s\S]{0,160}(?:mode-idle|mode-fermentation|mode-packaging)/, 'gameplay mode styling should not reduce idle equipment visibility below 0.9');
+assert.equal(
+  hasLowOpacityInSelectorBlocks(garageCss, [/\.mode-idle\b/, /\.mode-fermentation\b/, /\.mode-packaging\b/]),
+  false,
+  'gameplay mode styling should not reduce mode-targeted visibility below 0.9'
+);
+assert.equal(
+  hasLowOpacityInSelectorBlocks(garageCss, [/\.scene-silent\b/]),
+  false,
+  'scene-silent selectors should not dim gameplay visibility below 0.9'
+);
 assert.doesNotMatch(garageCss, /\.(?:equipment-hotspot|equipment-object-toggle)\.active::after[\s\S]{0,140}dashed/, 'active gameplay highlights should avoid debug-style dashed outlines');
 assert.match(garageCss, /\.layout-debug-enabled[\s\S]{0,180}dashed/, 'dashed outlines should be scoped to layout-debug-enabled mode only');
 assert.doesNotMatch(garageCss, /\.garage-scene\.has-expanded\s+\.obstructed-by-card/, 'expanded-card state should not hide or disable obstructed equipment');
+assert.equal(
+  hasLowOpacityInSelectorBlocks(garageCss, [/\.obstructed-by-card\b/], 0.01),
+  false,
+  'obstructed-by-card selectors should not hide equipment with zero opacity'
+);
 assert.doesNotMatch(garageCss, /\.(?:equipment-object|equipment-object-toggle|equipment-hotspot|case-hotspot)[^{]*\.expanded[\s\S]{0,220}opacity:\s*0(?:[;\s}])/, 'expanded-card styling should not set equipment or hotspots to opacity 0');
 
 console.log('All Brewery Sim prototype checks passed.');
