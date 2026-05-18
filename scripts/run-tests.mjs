@@ -8,12 +8,18 @@ import { loadSavedGame, resetSavedGame, saveGameState, STORAGE_KEY } from '../di
 import { reduceGame } from '../dist/game/simulation.js';
 import {
   contaminationRiskTier,
+  bottlesPerCase,
   currentWorkflowStage,
   equipmentConditionLabel,
   equipmentConditionTier,
   orderCost,
+  firstLoopObjective,
+  formatBatchRemainingTime,
+  litersToBottles,
+  litersToCases,
   recipeCanStart,
   recipeMissingIngredients,
+  saleValueForChannel,
   storageOverflowByArea
 } from '../dist/game/selectors.js';
 
@@ -121,33 +127,46 @@ assert.deepEqual(
 assert.equal(state.equipment.kettle.name, '20 L enamel stock pot', 'starter brewhouse should be the Tier 1 enamel stock pot');
 assert.equal(state.equipment.fermenter.name, 'Plastic fermentation bucket', 'starter fermentation should be one plastic bucket');
 assert.equal(state.equipment.bottler.name, 'Bottle wand and hand capper', 'starter packaging should be the wand and hand capper');
+assert.equal(firstLoopObjective(state), 'Tap the stock pot to brew Garage Blonde.', 'fresh first-loop objective should point at the stock pot');
+assert.equal(bottlesPerCase, 12, 'one in-game case should be a 12 bottle case');
+assert.equal(litersToBottles(20), 61, '20 L should be about 61 Belgian 33 cl bottles before case rounding');
+assert.equal(litersToCases(20), 5, '20 L should package as about five 12 bottle cases');
+assert.equal(blonde.batchSizeCases, 5, 'Garage Blonde displayed batch size should match 20 L / 33 cl bottle case math');
+assert.equal(blonde.ingredients.find((item) => item.ingredientId === 'bottles')?.amount, 60, 'Garage Blonde should require roughly 60 33 cl bottles');
 
 state = reduceGame(state, { type: 'start-batch', recipeId: 'garage-blonde' });
 assert.equal(state.batches.length, 1, 'starting a batch should create one active batch');
 assert.equal(state.inventory.ingredients['pilsner-malt'].amount, 5.8, 'starting a Blonde consumes named pilsner malt');
+assert.equal(state.inventory.ingredients.bottles.amount, 12, 'starting a Blonde consumes five 12 bottle cases from starter packaging stock');
 assert.equal(state.batches[0].step, 'awaiting-transfer', 'brew day should stop at manual transfer');
 assert.equal(currentWorkflowStage(state).tapTarget, 'fermenter', 'started batch should point at manual transfer');
+assert.equal(firstLoopObjective(state), 'Tap the fermenter to transfer Garage Blonde.', 'awaiting-transfer objective should point at the fermenter');
 
 state = tickUntilStep(state, 'fermenting');
 assert.equal(state.batches[0].step, 'fermenting', 'batch should enter fermentation only after manual transfer');
 assert.equal(currentWorkflowStage(state).tapTarget, 'fermenter', 'fermenting stage should point at the fermenter');
+assert.equal(firstLoopObjective(state), 'Wait for fermentation, then tap the fermenter.', 'fermenting objective should point at waiting/fermenter inspection');
+assert.doesNotMatch(formatBatchRemainingTime(state, state.batches[0], blonde), /in-game minutes/, 'remaining time should be player-readable');
 
 state = tickUntilStep(state, 'awaiting-packaging');
 assert.equal(state.batches[0].step, 'awaiting-packaging', 'batch should stop for manual packaging after fermentation');
+assert.equal(firstLoopObjective(state), 'Tap the bottling bench to package Garage Blonde.', 'awaiting-packaging objective should point at the bottling bench');
 
-state = tickUntilStep(state, 'bottle-conditioning');
-assert.equal(state.batches[0].step, 'bottle-conditioning', 'packaging should start bottle conditioning before beer is ready');
-assert.equal(currentWorkflowStage(state).tapTarget, 'bottler', 'conditioning batches should keep the bottler/cases area in focus');
-
-let bottlerActionState = reduceGame(state, { type: 'use-equipment', equipmentId: 'bottler' });
-assert.equal(bottlerActionState.batches[0].step, 'bottle-conditioning', 'bottler should not auto-ready conditioning beer');
-
-state = tickUntilStep(state, undefined, 8);
-assert.ok(state.inventory.cases > 0, 'packaging should add cases to inventory');
+const packagingCashBefore = state.cash;
+const expectedCases = state.batches[0].casesExpected;
+state = reduceGame(state, { type: 'start-packaging', batchId: state.batches[0].id });
+assert.equal(state.batches.length, 0, 'packaging should immediately finish the first-loop batch');
+assert.equal(expectedCases, 5, 'first-loop 20 L Garage Blonde should expect five 12 bottle cases');
+assert.equal(state.inventory.cases, expectedCases, 'packaging should add the displayed expected cases to inventory');
 assert.equal(state.finishedBeerLots.length, 1, 'packaging should create a recipe-specific finished lot');
+assert.equal(state.cash, packagingCashBefore, 'packaging should not secretly change cash');
+assert.equal(firstLoopObjective(state), 'Tap the pallet to sell Garage Blonde.', 'cases-available objective should point at the pallet');
 
 const casesBeforeSale = state.inventory.cases;
-state = reduceGame(state, { type: 'sell-cases', cases: 6 });
+const cashBeforeSale = state.cash;
+const displayedPayout = saleValueForChannel(state, 'friends-family');
+state = reduceGame(state, { type: 'sell-channel', channelId: 'friends-family', cases: 4 });
+assert.equal(state.cash - cashBeforeSale, displayedPayout, 'displayed sale payout helper should match the reducer cash delta');
 assert.ok(state.inventory.cases < casesBeforeSale, 'selling should remove cases from inventory');
 assert.ok(state.demand.casesSold > 0, 'selling should fulfill local demand progress');
 assert.ok(['Sell', 'Mash'].includes(currentWorkflowStage(state).stage), 'flow should either keep selling remaining cases or return to brewing after stock sells out');
@@ -225,7 +244,7 @@ stockRecipeIngredients(capacityState, blonde);
 capacityState = reduceGame(capacityState, { type: 'start-batch', recipeId: 'garage-blonde' });
 assert.equal(
   capacityState.batches[0].casesExpected,
-  2,
+  litersToCases(20),
   'fermenter upgrades should not inflate batch output without matching brewhouse capacity'
 );
 
@@ -278,7 +297,7 @@ dirtyIpa.inventory.ingredients['pale-malt'].amount = 10;
 dirtyIpa.inventory.ingredients['crystal-malt'].amount = 1;
 dirtyIpa.inventory.ingredients['ipa-hops'].amount = 300;
 dirtyIpa.inventory.ingredients['ale-yeast'].amount = 3;
-dirtyIpa.inventory.ingredients.bottles.amount = 40;
+dirtyIpa.inventory.ingredients.bottles.amount = 80;
 dirtyIpa.inventory.ingredients['ipa-hops'].condition = 55;
 dirtyIpa.equipment.fermenter.condition = 35;
 dirtyIpa = reduceGame(dirtyIpa, { type: 'start-batch', recipeId: 'backyard-ipa' });
@@ -288,7 +307,7 @@ assert.ok(dirtyIpa.events.some((event) => /Polyphenols|hop creep|Contamination/.
 let dirtyPils = createInitialState();
 dirtyPils.inventory.ingredients['lager-yeast'].amount = 2;
 dirtyPils.inventory.ingredients['saaz-hops'].amount = 200;
-dirtyPils.inventory.ingredients.bottles.amount = 40;
+dirtyPils.inventory.ingredients.bottles.amount = 72;
 dirtyPils.inventory.ingredients['pilsner-malt'].condition = 50;
 dirtyPils.equipment.kettle.condition = 30;
 dirtyPils.equipment.fermenter.condition = 30;
@@ -302,7 +321,7 @@ dirtyBottler.ownedEquipment.find((item) => item.instanceId === dirtyBottler.acti
 dirtyBottler = reduceGame(dirtyBottler, { type: 'start-batch', recipeId: 'garage-blonde' });
 dirtyBottler = tickUntilStep(dirtyBottler, undefined, 20);
 assert.ok(dirtyBottler.inventory.cases > 0, 'dirty bottler should still package some cases');
-assert.match(eventMessages(dirtyBottler), /Dirty bottling station lost \d+ cases?/, 'dirty packaging should produce a plain-language warning');
+assert.match(eventMessages(dirtyBottler), /Dirty bottling station lost \d+ gameplay cases? \(12 × 33 cl bottles each\)/, 'dirty packaging should produce a plain-language warning with the gameplay case definition');
 
 let nextDay = createInitialState();
 nextDay = reduceGame(nextDay, { type: 'end-day' });
@@ -318,6 +337,10 @@ assert.match(mainSource, /Mash.*Ferment.*Package.*Sell/s, 'UI should show clear 
 assert.match(mainSource, /loadSavedGame/, 'UI should load browser-local saves on startup');
 assert.match(mainSource, /saveGameState/, 'UI should save browser-local progress after actions and ticks');
 assert.match(mainSource, /New Game \/ Reset Save/, 'UI should expose a reset save button');
+assert.match(mainSource, /caseDefinitionExplanation/, 'UI should reuse the persistent gameplay case explanation');
+assert.match(mainSource, /caseCountLabel\(readyBatch\.casesExpected\)/, 'bottling bench should show case counts with the 12 bottle definition');
+assert.match(mainSource, /caseCountLabel\(state\.inventory\.cases\)/, 'pallet and inventory surfaces should show gameplay case counts with definition');
+assert.match(mainSource, /caseCountLabel\(lot\.cases\)/, 'finished lot cards should show gameplay case counts with definition');
 
 const index = await readFile(new URL('../index.html', import.meta.url), 'utf8');
 assert.match(index, /viewport-fit=cover/, 'index should include an iPhone safe-area viewport');

@@ -1,6 +1,14 @@
-import type { BatchStep, EquipmentId, GameState, IngredientId, OwnedEquipment, Recipe, RecipeIngredient, StorageArea } from './schema.js';
+import type { Batch, BatchStep, EquipmentId, GameState, IngredientId, OwnedEquipment, Recipe, RecipeIngredient, SalesChannelId, StorageArea } from './schema.js';
 export type EquipmentConditionTier = 'clean' | 'worn' | 'dirty' | 'critical';
 export type ContaminationRiskTier = 'low' | 'elevated' | 'high' | 'severe';
+export declare const salesChannels: Record<SalesChannelId, {
+    name: string;
+    cases: number;
+    rep: number;
+    invoiceAfter: number;
+    risk: number;
+    formal: boolean;
+}>;
 export declare const formatClock: (minute: number) => string;
 export declare const formatCurrency: (amount: number) => string;
 export declare const formatGameDate: (day: number) => string;
@@ -13,9 +21,16 @@ export declare const ownedByStation: (state: GameState, equipmentId: EquipmentId
 export declare const activeOwnedEquipment: (state: GameState, equipmentId: EquipmentId) => OwnedEquipment;
 export declare const availableFermenters: (state: GameState) => OwnedEquipment[];
 export declare const garageSpaceAvailable: (state: GameState) => number;
+export declare const bottleVolumeMl = 330;
+export declare const bottlesPerCase = 12;
+export declare const caseDefinitionLabel = "12 \u00D7 33 cl bottles";
+export declare const caseDefinitionExplanation = "In Brewery-Sim, one gameplay case = 12 \u00D7 33 cl bottles.";
+export declare const caseCountLabel: (cases: number) => string;
+export declare const litersToBottles: (liters: number) => number;
 export declare const litersToCases: (liters: number) => number;
 export declare const recipeBatchCapacity: (state: GameState, recipe: Recipe) => {
     liters: number;
+    bottles: number;
     cases: number;
     reason: string;
     fermenter?: OwnedEquipment;
@@ -27,10 +42,12 @@ export declare const storageCapacityByArea: (state: GameState) => Record<Storage
 export declare const storageOverflowByArea: (state: GameState) => Record<StorageArea, number>;
 export declare const totalStorageOverflow: (state: GameState) => number;
 export declare const readyToPackage: (state: GameState) => boolean;
-export declare const activeBatchForStep: (state: GameState, step: BatchStep) => import("./schema.js").Batch | undefined;
+export declare const activeBatchForStep: (state: GameState, step: BatchStep) => Batch | undefined;
 export declare const equipmentConditionTier: (condition: number) => EquipmentConditionTier;
 export declare const equipmentConditionLabel: (condition: number) => string;
 export declare const contaminationRiskTier: (risk: number) => ContaminationRiskTier;
+export declare const formatBatchRemainingTime: (state: GameState, batch: Batch, recipe: Recipe) => string;
+export declare const firstLoopObjective: (state: GameState) => string;
 export declare const objectiveProgress: (state: GameState) => {
     label: string;
     progress: number;
@@ -46,3 +63,5 @@ export declare const currentWorkflowStage: (state: GameState) => WorkflowStage;
 export declare const nextSuggestedAction: (state: GameState) => string;
 export declare const visibleRecipes: () => Recipe[];
 export declare const saleValue: (state: GameState, cases: number) => number;
+export declare const saleCasesForChannel: (state: GameState, channelId: SalesChannelId, requestedCases?: number) => number;
+export declare const saleValueForChannel: (state: GameState, channelId: SalesChannelId, requestedCases?: number) => number;

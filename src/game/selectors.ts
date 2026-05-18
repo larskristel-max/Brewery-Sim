@@ -1,11 +1,19 @@
 import { getIngredient } from '../data/ingredients.js';
 import { getRecipe, recipes } from '../data/recipes.js';
-import type { BatchStep, EquipmentId, GameState, IngredientId, OwnedEquipment, Recipe, RecipeIngredient, StorageArea } from './schema.js';
+import type { Batch, BatchStep, EquipmentId, GameState, IngredientId, OwnedEquipment, Recipe, RecipeIngredient, SalesChannelId, StorageArea } from './schema.js';
 
 const gameStartDateUtc = Date.UTC(2026, 4, 16);
 
 export type EquipmentConditionTier = 'clean' | 'worn' | 'dirty' | 'critical';
 export type ContaminationRiskTier = 'low' | 'elevated' | 'high' | 'severe';
+
+
+export const salesChannels: Record<SalesChannelId, { name: string; cases: number; rep: number; invoiceAfter: number; risk: number; formal: boolean }> = {
+  'friends-family': { name: 'Friends and family', cases: 4, rep: 1, invoiceAfter: 999, risk: 0.6, formal: false },
+  'private-event': { name: 'Private event', cases: 8, rep: 2, invoiceAfter: 26, risk: 1.1, formal: false },
+  'local-bar': { name: 'Local bar', cases: 12, rep: 3, invoiceAfter: 18, risk: 1.8, formal: true },
+  restaurant: { name: 'Restaurant', cases: 16, rep: 4, invoiceAfter: 0, risk: 2.4, formal: true }
+};
 
 export const formatClock = (minute: number): string => {
   const dayMinute = minute % (24 * 60);
@@ -70,12 +78,20 @@ export const availableFermenters = (state: GameState): OwnedEquipment[] =>
 
 export const garageSpaceAvailable = (state: GameState): number => Math.max(0, state.garageSpaceLimit - state.garageSpaceUsed);
 
-export const litersToCases = (liters: number): number => Math.max(1, Math.floor((liters * 0.92) / 7.92));
+export const bottleVolumeMl = 330;
+export const bottlesPerCase = 12;
+export const caseDefinitionLabel = `${bottlesPerCase} × 33 cl bottles`;
+export const caseDefinitionExplanation = `In Brewery-Sim, one gameplay case = ${caseDefinitionLabel}.`;
+export const caseCountLabel = (cases: number): string => `${cases} gameplay case${cases === 1 ? '' : 's'} (${caseDefinitionLabel} each)`;
 
-export const recipeBatchCapacity = (state: GameState, recipe: Recipe): { liters: number; cases: number; reason: string; fermenter?: OwnedEquipment } => {
+export const litersToBottles = (liters: number): number => Math.max(1, Math.round((liters * 1000) / bottleVolumeMl));
+
+export const litersToCases = (liters: number): number => Math.max(1, Math.round(litersToBottles(liters) / bottlesPerCase));
+
+export const recipeBatchCapacity = (state: GameState, recipe: Recipe): { liters: number; bottles: number; cases: number; reason: string; fermenter?: OwnedEquipment } => {
   const brewhouse = activeOwnedEquipment(state, 'kettle');
   const fermenter = availableFermenters(state).sort((a, b) => b.capacityLiters - a.capacityLiters)[0];
-  if (!fermenter) return { liters: 0, cases: 0, reason: 'Blocked: no empty fermenter.' };
+  if (!fermenter) return { liters: 0, bottles: 0, cases: 0, reason: 'Blocked: no empty fermenter.' };
   const liters = Math.min(recipe.targetBatchLiters, brewhouse.capacityLiters, fermenter.capacityLiters);
   const limit =
     liters === fermenter.capacityLiters && fermenter.capacityLiters < brewhouse.capacityLiters
@@ -83,7 +99,9 @@ export const recipeBatchCapacity = (state: GameState, recipe: Recipe): { liters:
       : liters === brewhouse.capacityLiters && brewhouse.capacityLiters < recipe.targetBatchLiters
         ? `${brewhouse.name} caps the batch`
         : 'Can brew now';
-  return { liters, cases: litersToCases(liters), reason: `${limit}: ${liters} L into ${fermenter.name}.`, fermenter };
+  const bottles = litersToBottles(liters);
+  const cases = litersToCases(liters);
+  return { liters, bottles, cases, reason: `${limit}: ${liters} L into ${fermenter.name} ≈ ${bottles} bottles / ${caseCountLabel(cases)}.`, fermenter };
 };
 
 export const orderCost = (items: RecipeIngredient[]): number =>
@@ -104,7 +122,8 @@ export const storageUseByArea = (state: GameState): Record<StorageArea, number> 
   const use: Record<StorageArea, number> = { 'dry-shelf': 0, 'cold-box': 0, 'utility-shelf': 0 };
   Object.entries(state.inventory.ingredients).forEach(([ingredientId, stock]) => {
     const ingredient = getIngredient(ingredientId as IngredientId);
-    if (ingredient.storageArea === 'cold-box' && ingredient.unit === 'g') use['cold-box'] += stock.amount / 1000;
+    if (ingredient.id === 'bottles') use[ingredient.storageArea] += stock.amount / bottlesPerCase;
+    else if (ingredient.storageArea === 'cold-box' && ingredient.unit === 'g') use['cold-box'] += stock.amount / 1000;
     else if (ingredient.storageArea === 'cold-box' && ingredient.unit === 'pack') use['cold-box'] += stock.amount * 0.0115;
     else use[ingredient.storageArea] += stock.amount;
   });
@@ -156,6 +175,38 @@ export const contaminationRiskTier = (risk: number): ContaminationRiskTier => {
   if (risk <= 24) return 'elevated';
   if (risk <= 34) return 'high';
   return 'severe';
+};
+
+
+export const formatBatchRemainingTime = (state: GameState, batch: Batch, recipe: Recipe): string => {
+  if (batch.step === 'awaiting-transfer' || batch.step === 'awaiting-packaging') return 'Waiting for player input';
+  if (batch.step === 'ready') return 'Ready now';
+  const duration = recipe.stepDurations[batch.step as keyof typeof recipe.stepDurations];
+  if (!duration || batch.stepProgress >= 100) return 'Ready now';
+
+  const remaining = Math.max(0, Math.round(duration * (1 - batch.stepProgress / 100)));
+  if (remaining <= 0) return 'Ready now';
+  if (remaining < 120) return `About ${Math.max(1, Math.ceil(remaining / 60))} hour${Math.ceil(remaining / 60) === 1 ? '' : 's'} remaining`;
+
+  const startOfDayMinute = 7 * 60;
+  if (remaining <= 24 * 60 && state.minute + remaining >= 24 * 60 + startOfDayMinute - 90) return 'Ready tomorrow morning';
+  if (remaining <= 36 * 60 && state.minute + remaining >= 24 * 60) return 'Ready tomorrow morning';
+
+  const days = Math.max(1, Math.ceil(remaining / (24 * 60)));
+  if (days <= 1) return `About ${Math.ceil(remaining / 60)} hours remaining`;
+  return `${days} days remaining`;
+};
+
+export const firstLoopObjective = (state: GameState): string => {
+  const blondeBatch = state.batches.find((batch) => batch.recipeId === 'garage-blonde');
+  const blondeCases = state.finishedBeerLots.some((lot) => lot.recipeId === 'garage-blonde' && lot.cases > 0) || state.inventory.cases > 0;
+  if (blondeCases) return 'Tap the pallet to sell Garage Blonde.';
+  if (!blondeBatch) return 'Tap the stock pot to brew Garage Blonde.';
+  if (blondeBatch.step === 'awaiting-transfer') return 'Tap the fermenter to transfer Garage Blonde.';
+  if (blondeBatch.step === 'fermenting') return 'Wait for fermentation, then tap the fermenter.';
+  if (blondeBatch.step === 'awaiting-packaging') return 'Tap the bottling bench to package Garage Blonde.';
+  if (blondeBatch.step === 'packaging' || blondeBatch.step === 'bottle-conditioning') return 'Tap the bottling bench to package Garage Blonde.';
+  return 'Tap the stock pot to brew Garage Blonde.';
 };
 
 export const objectiveProgress = (state: GameState): { label: string; progress: number; complete: boolean } => {
@@ -210,7 +261,7 @@ export const currentWorkflowStage = (state: GameState): WorkflowStage => {
     return {
       stage: 'Sell',
       tapTarget: 'cases',
-      instruction: `Tap cases to sell into ${state.demand.accountName}'s order.`
+      instruction: `Tap the pallet to sell into ${state.demand.accountName}'s order.`
     };
   }
 
@@ -219,7 +270,7 @@ export const currentWorkflowStage = (state: GameState): WorkflowStage => {
     return {
       stage: 'Mash',
       tapTarget: 'kettle',
-      instruction: 'Tap the 20 L BIAB stock pot and choose a recipe.'
+      instruction: 'Tap the stock pot to brew Garage Blonde.'
     };
   }
 
@@ -243,7 +294,7 @@ export const currentWorkflowStage = (state: GameState): WorkflowStage => {
     return {
       stage: 'Package',
       tapTarget: 'bottler',
-      instruction: 'Bottles are conditioning. Advance time to make cases ready.'
+      instruction: 'Packaging is finishing. Tap the bottling bench to check cases.'
     };
   }
 
@@ -270,3 +321,12 @@ export const saleValue = (state: GameState, cases: number): number => {
   const reputationBonus = 1 + Math.min(state.reputation, 30) / 100;
   return Math.round(cases * recipe.salePricePerCase * recipe.marketAppeal * qualityMultiplier * reputationBonus);
 };
+
+export const saleCasesForChannel = (state: GameState, channelId: SalesChannelId, requestedCases = salesChannels[channelId].cases): number => {
+  const lot = state.finishedBeerLots[0];
+  const channel = salesChannels[channelId];
+  return Math.min(requestedCases, state.inventory.cases, lot?.cases ?? 0, channel.cases);
+};
+
+export const saleValueForChannel = (state: GameState, channelId: SalesChannelId, requestedCases = salesChannels[channelId].cases): number =>
+  saleValue(state, saleCasesForChannel(state, channelId, requestedCases));

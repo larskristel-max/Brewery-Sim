@@ -1,7 +1,7 @@
 import { getIngredient } from '../data/ingredients.js';
 import { createOwnedEquipment, getEquipmentCatalogItem, topGarageTier } from '../data/equipment.js';
 import { getRecipe } from '../data/recipes.js';
-import { activeOwnedEquipment, equipmentConditionTier, garageSpaceAvailable, orderCost, recipeBatchCapacity, recipeMissingIngredients, recipeOrderItems, saleValue, storageOverflowByArea, totalStorageOverflow } from './selectors.js';
+import { activeOwnedEquipment, bottlesPerCase, caseCountLabel, equipmentConditionTier, garageSpaceAvailable, orderCost, recipeBatchCapacity, recipeMissingIngredients, recipeOrderItems, saleValue, salesChannels, storageOverflowByArea, totalStorageOverflow } from './selectors.js';
 const orderLeadDays = 3;
 const startOfDayMinute = 7 * 60;
 const manualSteps = ['awaiting-transfer', 'awaiting-packaging', 'ready'];
@@ -13,12 +13,6 @@ const stepEquipment = {
     fermenting: 'fermenter',
     packaging: 'bottler',
     'bottle-conditioning': 'bottler'
-};
-const salesChannels = {
-    'friends-family': { name: 'Friends and family', cases: 4, rep: 1, invoiceAfter: 999, risk: 0.6, formal: false },
-    'private-event': { name: 'Private event', cases: 8, rep: 2, invoiceAfter: 26, risk: 1.1, formal: false },
-    'local-bar': { name: 'Local bar', cases: 12, rep: 3, invoiceAfter: 18, risk: 1.8, formal: true },
-    restaurant: { name: 'Restaurant', cases: 16, rep: 4, invoiceAfter: 0, risk: 2.4, formal: true }
 };
 const cloneState = (state) => ({
     ...state,
@@ -82,6 +76,8 @@ const conditionLabel = (ingredientId, condition) => {
 };
 const storageUseForItem = (ingredientId, amount) => {
     const ingredient = getIngredient(ingredientId);
+    if (ingredient.id === 'bottles')
+        return amount / bottlesPerCase;
     if (ingredient.storageArea === 'cold-box' && ingredient.unit === 'g')
         return amount / 1000;
     if (ingredient.storageArea === 'cold-box' && ingredient.unit === 'pack')
@@ -262,7 +258,7 @@ const finishConditionedBatch = (state, batch) => {
         marketAppeal: recipe.marketAppeal
     });
     state.batches = state.batches.filter((item) => item.id !== batch.id);
-    addEvent(state, `${batch.casesExpected} cases of ${batch.recipeName} finished bottle conditioning and are ready to sell.`);
+    addEvent(state, `${caseCountLabel(batch.casesExpected)} of ${batch.recipeName} are packaged and ready on the pallet.`);
 };
 const completeTimedStep = (state, batch, completedStep) => {
     applyStepQuality(state, batch, completedStep);
@@ -276,8 +272,8 @@ const completeTimedStep = (state, batch, completedStep) => {
         addEvent(state, `${batch.recipeName} finished fermenting. Tap Package to bottle it.`);
     }
     else if (completedStep === 'packaging') {
-        batch.step = 'bottle-conditioning';
-        addEvent(state, `${batch.recipeName} is bottled and conditioning. It is not sellable yet.`);
+        batch.step = 'ready';
+        finishConditionedBatch(state, batch);
     }
     else {
         batch.step = 'ready';
@@ -435,10 +431,10 @@ const packageAwaitingBatch = (next, batchId) => {
     advanceGameTime(next, getRecipe(batch.recipeId).stepDurations.packaging, 24);
     completeTimedStep(next, batch, 'packaging');
     if (lostCases > 0) {
-        addEvent(next, `Dirty bottling station lost ${lostCases} case${lostCases === 1 ? '' : 's'}. ${batch.casesExpected} cases are conditioning.`);
+        addEvent(next, `Dirty bottling station lost ${caseCountLabel(lostCases)}. ${caseCountLabel(batch.casesExpected)} are ready on the pallet.`);
     }
     else {
-        addEvent(next, `${batch.casesExpected} cases of ${batch.recipeName} bottled by hand and set aside for conditioning.`);
+        addEvent(next, `${caseCountLabel(batch.casesExpected)} of ${batch.recipeName} bottled by hand and moved to the pallet.`);
     }
     return next;
 };
@@ -507,7 +503,7 @@ const sellCases = (next, requestedCases, channelOverride) => {
     next.householdPressure += cases >= 10 ? 2 : 1;
     const repGain = (activeOwnedEquipment(next, 'bottler').tier >= 2 ? 2 : 1) + (next.demand.casesSold >= next.demand.casesRequested ? next.demand.reputationReward : 0);
     next.reputation += repGain;
-    addEvent(next, `Sold ${cases} cases of ${lot.recipeName} through ${channel.name} for EUR ${revenue}. Reputation +${repGain}.`);
+    addEvent(next, `Sold ${caseCountLabel(cases)} of ${lot.recipeName} through ${channel.name} for EUR ${revenue}. Reputation +${repGain}.`);
     if (next.visibilityRisk >= 20)
         addEvent(next, 'Garage visibility is high. Bars and restaurants may now ask for invoices, traceability, and legal release status.');
     if (next.complianceRisk >= 30)
@@ -539,9 +535,9 @@ export const reduceGame = (state, action) => {
             const waiting = next.batches.find((item) => item.step === 'awaiting-transfer');
             if (waiting)
                 return transferAwaitingBatch(next, waiting.id);
-            const batch = next.batches.find((item) => item.step === 'fermenting');
+            const batch = next.batches.find((item) => item.step === 'fermenting' || item.step === 'awaiting-packaging');
             const effectiveRisk = batch ? Math.max(3, batch.contaminationRisk + fermentationTemperatureEffect(getRecipe(batch.recipeId), next.fermenterTemperatureC).risk) : 0;
-            addEvent(next, batch ? `${batch.recipeName} fermenting at ${next.fermenterTemperatureC} C. Effective contamination risk ${effectiveRisk}%.` : `Fermenter set to ${next.fermenterTemperatureC} C. Mash something in the kettle first.`);
+            addEvent(next, batch ? `${batch.recipeName} ${batch.step === 'awaiting-packaging' ? 'is ready to package' : `fermenting at ${next.fermenterTemperatureC} C. Effective contamination risk ${effectiveRisk}%.`}` : `Fermenter set to ${next.fermenterTemperatureC} C. Mash something in the kettle first.`);
             return next;
         }
         if (action.equipmentId === 'bottler')

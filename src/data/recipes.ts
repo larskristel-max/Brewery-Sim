@@ -10,12 +10,12 @@ export const recipes: Recipe[] = [
       { ingredientId: 'pilsner-malt', amount: 4.2 },
       { ingredientId: 'saaz-hops', amount: 45 },
       { ingredientId: 'ale-yeast', amount: 1 },
-      { ingredientId: 'bottles', amount: 8 }
+      { ingredientId: 'bottles', amount: 60 }
     ],
     waterCost: 25,
     salePricePerCase: 18,
     marketAppeal: 1,
-    batchSizeCases: 8,
+    batchSizeCases: 5,
     targetBatchLiters: 20,
     qualityBase: 68,
     difficulty: 8,
@@ -51,12 +51,12 @@ export const recipes: Recipe[] = [
       { ingredientId: 'crystal-malt', amount: 0.35 },
       { ingredientId: 'ipa-hops', amount: 180 },
       { ingredientId: 'ale-yeast', amount: 1 },
-      { ingredientId: 'bottles', amount: 9 }
+      { ingredientId: 'bottles', amount: 72 }
     ],
     waterCost: 25,
     salePricePerCase: 26,
     marketAppeal: 1.08,
-    batchSizeCases: 9,
+    batchSizeCases: 6,
     targetBatchLiters: 22,
     qualityBase: 74,
     difficulty: 18,
@@ -91,12 +91,12 @@ export const recipes: Recipe[] = [
       { ingredientId: 'pilsner-malt', amount: 4.8 },
       { ingredientId: 'saaz-hops', amount: 80 },
       { ingredientId: 'lager-yeast', amount: 1 },
-      { ingredientId: 'bottles', amount: 8 }
+      { ingredientId: 'bottles', amount: 60 }
     ],
     waterCost: 26,
     salePricePerCase: 21,
     marketAppeal: 1.1,
-    batchSizeCases: 8,
+    batchSizeCases: 5,
     targetBatchLiters: 20,
     qualityBase: 72,
     difficulty: 22,
@@ -132,12 +132,12 @@ export const recipes: Recipe[] = [
       { ingredientId: 'pilsner-malt', amount: 2.1 },
       { ingredientId: 'styrian-hops', amount: 45 },
       { ingredientId: 'wheat-yeast', amount: 1 },
-      { ingredientId: 'bottles', amount: 8 }
+      { ingredientId: 'bottles', amount: 60 }
     ],
     waterCost: 25,
     salePricePerCase: 19,
     marketAppeal: 0.95,
-    batchSizeCases: 8,
+    batchSizeCases: 5,
     targetBatchLiters: 20,
     qualityBase: 70,
     difficulty: 13,
@@ -173,12 +173,12 @@ export const recipes: Recipe[] = [
       { ingredientId: 'wheat-malt', amount: 0.8 },
       { ingredientId: 'styrian-hops', amount: 60 },
       { ingredientId: 'saison-yeast', amount: 1 },
-      { ingredientId: 'bottles', amount: 8 }
+      { ingredientId: 'bottles', amount: 60 }
     ],
     waterCost: 25,
     salePricePerCase: 20,
     marketAppeal: 0.86,
-    batchSizeCases: 8,
+    batchSizeCases: 5,
     targetBatchLiters: 20,
     qualityBase: 73,
     difficulty: 12,
@@ -207,12 +207,12 @@ export const recipes: Recipe[] = [
       { ingredientId: 'black-malt', amount: 0.45 },
       { ingredientId: 'fuggles-hops', amount: 60 },
       { ingredientId: 'stout-yeast', amount: 1 },
-      { ingredientId: 'bottles', amount: 7 }
+      { ingredientId: 'bottles', amount: 60 }
     ],
     waterCost: 25,
     salePricePerCase: 23,
     marketAppeal: 0.82,
-    batchSizeCases: 7,
+    batchSizeCases: 5,
     targetBatchLiters: 18,
     qualityBase: 75,
     difficulty: 15,
@@ -241,12 +241,12 @@ export const recipes: Recipe[] = [
       { ingredientId: 'wheat-malt', amount: 0.5 },
       { ingredientId: 'styrian-hops', amount: 65 },
       { ingredientId: 'kveik-yeast', amount: 1 },
-      { ingredientId: 'bottles', amount: 8 }
+      { ingredientId: 'bottles', amount: 60 }
     ],
     waterCost: 25,
     salePricePerCase: 22,
     marketAppeal: 0.9,
-    batchSizeCases: 8,
+    batchSizeCases: 5,
     targetBatchLiters: 20,
     qualityBase: 72,
     difficulty: 10,
