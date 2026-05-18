@@ -919,6 +919,11 @@ const render = () => {
     </main>
   `;
 };
+root.addEventListener('error', (event) => {
+    if (event.target instanceof HTMLImageElement && event.target.classList.contains('equipment-sprite')) {
+        event.target.hidden = true;
+    }
+}, true);
 root.addEventListener('input', (event) => {
     if (!layoutDebugEnabled)
         return;
