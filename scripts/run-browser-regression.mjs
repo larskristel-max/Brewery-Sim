@@ -73,6 +73,7 @@ try {
     'fermenter-slot-1',
     'starter fermenter should use the first fermenter slot'
   );
+  assert.equal(await page.locator('.equipment-object[data-equipment-id="mill"]').count(), 0, 'fresh game should not render an unowned grain mill');
 
   await page.locator('.hotspot-kettle').click();
   await assert.doesNotReject(page.getByRole('dialog', { name: 'Recipe / Brew' }).waitFor({ state: 'visible', timeout: 5000 }));
@@ -151,6 +152,31 @@ try {
   await slotTwoXSlider.fill('49.4');
   await slotTwoXSlider.dispatchEvent('input');
   assert.equal(await slotTwoXNumber.inputValue(), '49.4', 'slider should update its paired number input');
+
+  await page.goto(`${baseUrl}?layoutDebug=1&tierPreview=2`);
+  await assert.doesNotReject(page.locator('.layout-debug-panel').waitFor({ state: 'visible', timeout: 5000 }));
+  assert.equal(await page.locator('.equipment-object[data-equipment-id="kettle"][data-equipment-item-id="all-in-one-40l"]').count(), 1);
+  assert.equal(await page.locator('.equipment-object[data-equipment-id="mill"][data-equipment-item-id="grain-mill-tier2"]').count(), 1);
+  assert.equal(await page.locator('.equipment-object[data-equipment-id="fermenter"]').count(), 3);
+  assert.equal(await page.locator('.equipment-object[data-equipment-id="fermenter"][data-equipment-item-id="stainless-conical-50l"]').count(), 3);
+  assert.equal(await page.locator('.equipment-object[data-equipment-id="bottler"][data-equipment-item-id="semi-auto-filler"]').count(), 1);
+  assert.equal(
+    await page.locator('.layout-debug-fieldset').filter({ hasText: 'Milling / grain-mill-tier2' }).count(),
+    1,
+    'tier 2 preview should expose the grain mill in layout debug'
+  );
+  assert.equal(
+    await page.locator('input[type="number"][data-layout-slot-id="milling"][data-layout-field="y"]').inputValue(),
+    '76.5',
+    'tier 2 preview should use the locked milling placement'
+  );
+  assert.match(await page.locator('[data-layout-json]').inputValue(), /"milling": \{\n    "x": 18,\n    "y": 76\.5,\n    "width": 10/);
+  await page.locator('.equipment-object[data-equipment-id="mill"] .equipment-object-toggle').click();
+  assert.equal(
+    await page.locator('.equipment-object[data-equipment-id="mill"] .equipment-object-card:not([hidden])').count(),
+    1,
+    'tier 2 grain mill should be clickable'
+  );
 
   await browser.close();
   console.log('Browser regression passed: direct hotspot garage loop works.');

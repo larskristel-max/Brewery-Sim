@@ -7,7 +7,7 @@ export type BatchStep =
   | 'bottle-conditioning'
   | 'ready';
 export type TimedBatchStep = 'brewing' | 'fermenting' | 'packaging' | 'bottle-conditioning';
-export type EquipmentId = 'kettle' | 'fermenter' | 'bottler';
+export type EquipmentId = 'kettle' | 'fermenter' | 'bottler' | 'mill';
 export type EquipmentItemId =
   | 'stock-pot-20l'
   | 'all-in-one-40l'
@@ -16,12 +16,13 @@ export type EquipmentItemId =
   | 'plastic-bucket'
   | 'stainless-conical-50l'
   | 'unitank-150l'
+  | 'grain-mill-tier2'
   | 'wand-capper'
   | 'semi-auto-filler'
   | 'small-can-seamer';
 export type EquipmentTier = 1 | 2 | 3;
 export type UpgradeId = 'larger-kettle' | 'temp-control' | 'labeler';
-export type EquipmentStation = 'brewhouse' | 'fermentation' | 'packaging';
+export type EquipmentStation = 'brewhouse' | 'fermentation' | 'milling' | 'packaging';
 export type SalesChannelId = 'friends-family' | 'private-event' | 'local-bar' | 'restaurant';
 export type IngredientCategory = 'malt' | 'hops' | 'yeast' | 'sugar' | 'packaging' | 'cleaning';
 export type StorageArea = 'dry-shelf' | 'cold-box' | 'utility-shelf';

@@ -31,11 +31,7 @@ const cloneState = (state: GameState): GameState => ({
     ...state.inventory,
     ingredients: Object.fromEntries(Object.entries(state.inventory.ingredients).map(([id, stock]) => [id, { ...stock }])) as GameState['inventory']['ingredients']
   },
-  equipment: {
-    kettle: { ...state.equipment.kettle },
-    fermenter: { ...state.equipment.fermenter },
-    bottler: { ...state.equipment.bottler }
-  },
+  equipment: Object.fromEntries(Object.entries(state.equipment).map(([id, equipment]) => [id, { ...equipment }])) as GameState['equipment'],
   ownedEquipment: state.ownedEquipment.map((item) => ({ ...item })),
   activeEquipment: { ...state.activeEquipment },
   demand: { ...state.demand },
@@ -563,6 +559,10 @@ export const reduceGame = (state: GameState, action: GameAction): GameState => {
   if (action.type === 'use-equipment') {
     next.selectedEquipmentId = action.equipmentId;
     if (action.equipmentId === 'kettle') return startBatch(next, 'garage-blonde');
+    if (action.equipmentId === 'mill') {
+      addEvent(next, `${stateEquipmentName(next, 'mill')} inspected. Milling actions are coming in a future production pass.`);
+      return next;
+    }
     if (action.equipmentId === 'fermenter') {
       const waiting = next.batches.find((item) => item.step === 'awaiting-transfer');
       if (waiting) return transferAwaitingBatch(next, waiting.id);
@@ -645,7 +645,9 @@ export const reduceGame = (state: GameState, action: GameAction): GameState => {
       next.visibilityRisk += 4;
     }
     addEvent(next, `${item.name} installed. ${item.description}`);
-    const garageMaxed = Object.values(next.equipment).every((equipment) => equipment.tier >= topGarageTier(equipment.id)) || next.ownedEquipment.some((ownedItem) => ownedItem.tier >= 3);
+    const garageMaxed =
+      Object.values(next.equipment).every((equipment) => next.ownedEquipment.some((owned) => owned.equipmentId === equipment.id) && equipment.tier >= topGarageTier(equipment.id)) ||
+      next.ownedEquipment.some((ownedItem) => ownedItem.tier >= 3);
     if (garageMaxed) addEvent(next, 'Garage ceiling reached: this setup is too professional for the garage. The next milestone is moving into a real brewery space.');
     return next;
   }

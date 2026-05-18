@@ -1,5 +1,5 @@
 import { equipmentByStation } from './data/equipment.js';
-import { garageEquipmentLayoutByItem, garageEquipmentLayoutBySlot } from './data/garageLayout.js';
+import { garageEquipmentLayoutByItem, garageEquipmentLayoutBySlot, garageEquipmentLayoutByTier } from './data/garageLayout.js';
 import { ingredients, getIngredient } from './data/ingredients.js';
 import { createInitialState } from './game/initialState.js';
 import { loadSavedGame, resetSavedGame, saveGameState, STORAGE_KEY } from './game/persistence.js';
@@ -18,8 +18,34 @@ const hasBrowserSave = () => {
     }
 };
 const hadBrowserSave = hasBrowserSave();
-let state = loadSavedGame();
-let saveStatus = hadBrowserSave ? 'Browser save loaded' : 'Autosave ready';
+const urlParams = new URLSearchParams(globalThis.location.search);
+const layoutDebugEnabled = urlParams.get('layoutDebug') === '1';
+const tierPreview = layoutDebugEnabled ? urlParams.get('tierPreview') : null;
+const tier2PreviewEnabled = tierPreview === '2';
+const activeGarageLayoutTier = tier2PreviewEnabled ? 'tier2' : 'tier1';
+const createTier2PreviewState = () => {
+    let preview = createInitialState();
+    preview.cash = 5000;
+    preview.garageSpaceLimit = 48;
+    ['all-in-one-40l', 'grain-mill-tier2', 'stainless-conical-50l', 'stainless-conical-50l', 'stainless-conical-50l', 'semi-auto-filler'].forEach((equipmentItemId) => {
+        preview = reduceGame(preview, { type: 'buy-equipment', equipmentItemId });
+    });
+    preview.ownedEquipment = preview.ownedEquipment.filter((item) => item.itemId !== 'plastic-bucket');
+    preview.garageSpaceUsed = preview.ownedEquipment.reduce((total, item) => total + item.spaceUsed, 0);
+    preview.cash = 180;
+    preview.events = [
+        {
+            id: 'tier-2-preview',
+            minute: preview.minute,
+            message: 'Tier 2 layout preview loaded for visual placement. This debug state is not saved.'
+        },
+        ...preview.events
+    ];
+    preview.selectedEquipmentId = 'kettle';
+    return preview;
+};
+let state = tier2PreviewEnabled ? createTier2PreviewState() : loadSavedGame();
+let saveStatus = tier2PreviewEnabled ? 'Tier 2 layout preview - not saved' : hadBrowserSave ? 'Browser save loaded' : 'Autosave ready';
 let expandedTarget = null;
 let expandedEquipmentInstanceId = null;
 let missionsOpen = false;
@@ -27,16 +53,20 @@ let notificationsOpen = false;
 let opsOpen = false;
 let activeOverlay = null;
 let audioAllowed = false;
-const layoutDebugEnabled = new URLSearchParams(globalThis.location.search).get('layoutDebug') === '1';
-const garageLayoutDraft = Object.fromEntries(Object.entries(garageEquipmentLayoutBySlot).map(([slotId, placement]) => [slotId, structuredClone(placement)]));
+const garageLayoutDraft = Object.fromEntries(Object.entries(garageEquipmentLayoutByTier[activeGarageLayoutTier] ?? garageEquipmentLayoutBySlot).map(([slotId, placement]) => [
+    slotId,
+    structuredClone(placement)
+]));
 const stationLabels = {
     kettle: 'Brewhouse',
     fermenter: 'Fermentation',
+    mill: 'Milling',
     bottler: 'Packaging'
 };
 const stationNouns = {
     kettle: 'brewhouse',
     fermenter: 'fermenter',
+    mill: 'grain mill',
     bottler: 'packaging station'
 };
 const garageLayoutJson = () => JSON.stringify(garageLayoutDraft, null, 2);
@@ -59,19 +89,25 @@ const updateLayoutDebugJson = () => {
         output.value = garageLayoutJson();
 };
 const activeEquipmentItemId = (equipment) => equipment.itemId ?? null;
-const stationSlotId = (equipmentId) => (equipmentId === 'bottler' ? 'packaging' : 'brewhouse');
+const stationSlotId = (equipmentId) => {
+    if (equipmentId === 'bottler')
+        return 'packaging';
+    if (equipmentId === 'mill')
+        return 'milling';
+    return 'brewhouse';
+};
 const fermenterSlotId = (index) => `fermenter-slot-${Math.min(index + 1, 5)}`;
 const activeOwnedInstance = (equipmentId) => {
     const activeId = state.activeEquipment[equipmentId];
     return state.ownedEquipment.find((item) => item.instanceId === activeId) ?? null;
 };
 const garageSceneEquipmentInstances = () => {
-    const stationInstances = ['kettle', 'bottler']
+    const stationInstances = ['kettle', 'mill', 'bottler']
         .map((equipmentId) => {
         const equipment = state.equipment[equipmentId];
         const owned = activeOwnedInstance(equipmentId);
         const itemId = activeEquipmentItemId(equipment);
-        if (!itemId)
+        if (!itemId || (equipmentId === 'mill' && !owned?.installed))
             return null;
         return {
             equipmentId,
@@ -101,7 +137,7 @@ const garageSceneEquipmentInstances = () => {
         spaceUsed: item.spaceUsed,
         occupiedBatchId: item.occupiedBatchId
     }));
-    return [stationInstances[0], ...fermenters, stationInstances[1]].filter((item) => Boolean(item));
+    return [stationInstances[0], stationInstances[1], ...fermenters, stationInstances[2]].filter((item) => Boolean(item));
 };
 const renderEquipmentObject = (equipment, content) => {
     const visual = garageEquipmentLayoutByItem[equipment.itemId];
@@ -181,6 +217,8 @@ const renderLayoutDebugPanel = () => layoutDebugEnabled
 const displayEquipmentName = (equipment) => equipment.name;
 const equipmentCapacityLabel = (equipment) => {
     const liters = equipment.capacityLiters;
+    if (equipment.id === 'mill')
+        return 'Milling prep station';
     if (equipment.id === 'bottler')
         return liters > 0 ? `${liters} L packaging run` : 'Packaging capacity pending';
     return liters > 0 ? `${liters} L capacity` : 'Capacity pending';
@@ -294,8 +332,13 @@ const dispatch = (action) => {
     const previousEventId = state.events[0]?.id;
     const overlayScrollTop = document.querySelector('.focus-overlay')?.scrollTop ?? 0;
     state = reduceGame(state, action);
-    saveGameState(state);
-    saveStatus = `Saved locally ${formatClock(state.minute)}`;
+    if (tier2PreviewEnabled) {
+        saveStatus = 'Tier 2 layout preview - not saved';
+    }
+    else {
+        saveGameState(state);
+        saveStatus = `Saved locally ${formatClock(state.minute)}`;
+    }
     if (state.events[0]?.id && state.events[0]?.id !== previousEventId)
         playBell();
     render();
@@ -306,6 +349,18 @@ const dispatch = (action) => {
     }
 };
 const resetGame = () => {
+    if (tier2PreviewEnabled) {
+        state = createTier2PreviewState();
+        expandedTarget = null;
+        expandedEquipmentInstanceId = null;
+        missionsOpen = false;
+        notificationsOpen = false;
+        opsOpen = false;
+        activeOverlay = null;
+        saveStatus = 'Tier 2 layout preview reset - not saved';
+        render();
+        return;
+    }
     resetSavedGame();
     state = createInitialState();
     expandedTarget = null;
@@ -328,11 +383,17 @@ const stepLabel = (step) => ({
 })[step] ?? step;
 const activeForEquipment = (equipmentId) => {
     const stepByEquipment = { kettle: 'brewing', fermenter: 'fermenting', bottler: 'packaging' };
-    return state.batches.some((batch) => batch.step === stepByEquipment[equipmentId]);
+    const step = stepByEquipment[equipmentId];
+    if (!step)
+        return false;
+    return state.batches.some((batch) => batch.step === step);
 };
 const batchForEquipment = (equipmentId) => {
     const stepByEquipment = { kettle: 'brewing', fermenter: 'fermenting', bottler: 'packaging' };
-    return state.batches.find((batch) => batch.step === stepByEquipment[equipmentId]);
+    const step = stepByEquipment[equipmentId];
+    if (!step)
+        return undefined;
+    return state.batches.find((batch) => batch.step === step);
 };
 const isNextTapTarget = (target) => currentWorkflowStage(state).tapTarget === target;
 const riskLabel = (risk) => {
@@ -483,6 +544,7 @@ const hotspotPosition = (equipmentId) => {
     return {
         kettle: { x: 24, y: 49 },
         fermenter: { x: 51, y: 29 },
+        mill: { x: 35, y: 56 },
         bottler: { x: 75, y: 48 }
     }[equipmentId];
 };
@@ -638,6 +700,16 @@ const renderEquipmentActions = (equipmentId) => {
       </div>
     `;
     }
+    if (equipmentId === 'mill') {
+        return `
+      <div class="hotspot-actions">
+        <button data-action="use-equipment" data-equipment-id="mill" type="button">Inspect<small>Prep flow</small></button>
+        <button data-action="clean-equipment" data-equipment-id="mill" type="button" ${canClean ? '' : `disabled title="Need ${formatCurrency(cleanCost)}"`}>Clean${canClean ? '' : '<small>Need cash</small>'}</button>
+        <button type="button" disabled title="Milling actions are planned for a future pass">Mill<small>Coming later</small></button>
+        <button data-action="open-overlay" data-overlay="upgrades" type="button">Store<small>Equipment</small></button>
+      </div>
+    `;
+    }
     const readyBatch = state.batches.find((batch) => batch.step === 'awaiting-packaging');
     return `
     <div class="hotspot-actions">
@@ -697,8 +769,8 @@ const renderSceneSupplyHotspots = () => {
         .join('');
 };
 const renderWorkshopHotspot = () => {
-    const installed = Object.values(state.equipment).reduce((total, equipment) => total + equipment.tier, 0);
-    const total = Object.values(state.equipment).reduce((sum, equipment) => sum + equipmentByStation(equipment.id).length, 0);
+    const installed = state.ownedEquipment.filter((item) => item.installed).reduce((total, equipment) => total + equipment.tier, 0);
+    const total = Object.keys(stationLabels).reduce((sum, equipmentId) => sum + equipmentByStation(equipmentId).length, 0);
     return `
     <button class="workshop-hotspot" data-action="open-overlay" data-overlay="upgrades" type="button" aria-label="Equipment store">
       <span>Equipment</span><strong>${installed}/${total} tiers - ${garageSpaceUsed()}/${garageSpaceLimit()} space</strong>
@@ -948,7 +1020,7 @@ const equipmentStoreButtonState = (item) => {
     const ownedCount = state.ownedEquipment.filter((owned) => owned.itemId === item.id).length;
     const canOwnMore = Boolean(item.maxOwned && ownedCount < item.maxOwned);
     const projectedSpace = garageSpaceUsed() + item.spaceUsed;
-    if (item.id === current.itemId && !canOwnMore)
+    if (ownedCount > 0 && item.id === current.itemId && !canOwnMore)
         return { disabled: true, label: 'Installed', reason: 'On the garage floor now', className: 'upgrade-installed' };
     if (!item.maxOwned && ownedCount > 0)
         return { disabled: true, label: 'Owned', reason: 'Already installed', className: 'upgrade-installed' };
@@ -963,7 +1035,8 @@ const equipmentStoreButtonState = (item) => {
 const renderEquipmentStoreCard = (item) => {
     const buttonState = equipmentStoreButtonState(item);
     const current = state.equipment[item.equipmentId];
-    const isCurrent = item.id === current.itemId;
+    const ownedCount = state.ownedEquipment.filter((owned) => owned.itemId === item.id).length;
+    const isCurrent = ownedCount > 0 && item.id === current.itemId;
     return `
     <button class="upgrade-pallet equipment-store-card tier-${item.tier} ${buttonState.className}" type="button" data-action="buy-equipment" data-equipment-item-id="${item.id}" ${buttonState.disabled ? `disabled title="${buttonState.reason}"` : ''}>
       <span>${isCurrent ? 'Installed: ' : ''}${item.name}</span>
