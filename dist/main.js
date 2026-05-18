@@ -52,6 +52,7 @@ let missionsOpen = false;
 let notificationsOpen = false;
 let opsOpen = false;
 let activeOverlay = null;
+let recipePanelOpen = false;
 let recipeStyleFilter = null;
 let recipePage = 0;
 let audioAllowed = false;
@@ -1041,7 +1042,7 @@ const renderSalesOffers = () => `
   </div>
 `;
 const renderStationPanel = () => {
-    if (activeOverlay === 'recipes') {
+    if (recipePanelOpen) {
         return `
       <div class="station-panel-layer">
         <button class="station-panel-scrim" data-action="close-overlay" type="button" aria-label="Close station panel"></button>
@@ -1397,7 +1398,7 @@ const overlayContent = () => {
         return renderEventLog();
     return '';
 };
-const overlayTitle = () => ({ recipes: 'Recipe / Brew', production: 'Production', inventory: 'Inventory detail', upgrades: 'Equipment store', log: 'Clipboard log' })[activeOverlay ?? 'production'];
+const overlayTitle = () => ({ production: 'Production', inventory: 'Inventory detail', upgrades: 'Equipment store', log: 'Clipboard log' })[activeOverlay ?? 'production'];
 const renderFocusOverlay = () => activeOverlay
     ? `
       <div class="focus-layer" role="dialog" aria-modal="false" aria-label="${overlayTitle()}">
@@ -1473,13 +1474,16 @@ root.addEventListener('click', (event) => {
     if (!target) {
         const clickTarget = event.target;
         const isInsideOpenSurface = Boolean(clickTarget.closest('.equipment-object, .equipment-hotspot, .sell-point-object, .case-hotspot, .supply-hotspot, .workshop-hotspot, .event-ticker, .missions-control, .notification-control, .ops-control, .layout-debug-panel, .focus-overlay, button'));
-        if ((expandedTarget || missionsOpen || notificationsOpen || opsOpen || activeOverlay) && !isInsideOpenSurface) {
+        if ((expandedTarget || missionsOpen || notificationsOpen || opsOpen || activeOverlay || recipePanelOpen) && !isInsideOpenSurface) {
             expandedTarget = null;
             expandedEquipmentInstanceId = null;
             missionsOpen = false;
             notificationsOpen = false;
             opsOpen = false;
             activeOverlay = null;
+            recipePanelOpen = false;
+            recipeStyleFilter = null;
+            recipePage = 0;
             render();
         }
         return;
@@ -1487,13 +1491,24 @@ root.addEventListener('click', (event) => {
     const action = target.dataset.action;
     if (action === 'close-overlay') {
         activeOverlay = null;
+        recipePanelOpen = false;
+        recipeStyleFilter = null;
+        recipePage = 0;
         opsOpen = false;
         render();
         return;
     }
     if (action === 'open-overlay') {
-        activeOverlay = target.dataset.overlay;
-        if (activeOverlay === 'recipes') {
+        const requestedOverlay = target.dataset.overlay;
+        if (requestedOverlay === 'recipes') {
+            recipePanelOpen = true;
+            recipeStyleFilter = null;
+            recipePage = 0;
+            activeOverlay = null;
+        }
+        else {
+            activeOverlay = requestedOverlay;
+            recipePanelOpen = false;
             recipeStyleFilter = null;
             recipePage = 0;
         }
@@ -1527,16 +1542,21 @@ root.addEventListener('click', (event) => {
     if (action === 'close-station-panel') {
         expandedTarget = null;
         expandedEquipmentInstanceId = null;
+        recipePanelOpen = false;
+        recipeStyleFilter = null;
+        recipePage = 0;
         render();
         return;
     }
     if (action === 'select-recipe-style') {
+        recipePanelOpen = true;
         recipeStyleFilter = target.dataset.style ?? null;
         recipePage = 0;
         render();
         return;
     }
     if (action === 'back-to-styles') {
+        recipePanelOpen = true;
         recipeStyleFilter = null;
         recipePage = 0;
         render();
@@ -1559,6 +1579,9 @@ root.addEventListener('click', (event) => {
         expandedTarget = null;
         expandedEquipmentInstanceId = null;
         activeOverlay = null;
+        recipePanelOpen = false;
+        recipeStyleFilter = null;
+        recipePage = 0;
         render();
         return;
     }
