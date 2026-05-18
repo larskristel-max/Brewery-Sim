@@ -13,7 +13,7 @@ export const recipes = [
         waterCost: 25,
         salePricePerCase: 18,
         marketAppeal: 1,
-        batchSizeCases: 8,
+        batchSizeCases: 2,
         targetBatchLiters: 20,
         qualityBase: 68,
         difficulty: 8,

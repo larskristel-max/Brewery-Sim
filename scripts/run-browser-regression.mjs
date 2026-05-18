@@ -91,6 +91,7 @@ try {
   await assert.doesNotReject(page.locator('.garage-scene').waitFor({ state: 'visible', timeout: 5000 }));
   assert.match(await visibleText(page), /May 16/i);
   assert.equal(await page.locator('.case-hotspot').count(), 0, 'legacy case hotspot should not render');
+  assert.match(await visibleText(page), /Tap the stock pot to brew Garage Blonde/i, 'fresh game should show the garage-floor first-loop objective');
   await assertFinishedPallet(page, 'empty', 'fresh game');
   assert.equal(
     await page.locator('.equipment-object[data-equipment-id="fermenter"]').count(),
@@ -105,13 +106,17 @@ try {
   assert.equal(await page.locator('.equipment-object[data-equipment-id="mill"]').count(), 0, 'fresh game should not render an unowned grain mill');
 
   await page.locator('.hotspot-kettle').click();
-  await assert.doesNotReject(page.getByRole('dialog', { name: 'Recipe / Brew' }).waitFor({ state: 'visible', timeout: 5000 }));
-  await page.locator('.recipe-card').filter({ hasText: 'Garage Blonde' }).getByRole('button', { name: 'Brew' }).click();
+  assert.equal(await page.getByRole('dialog', { name: 'Recipe / Brew' }).count(), 0, 'kettle tap should not open the full recipe overlay');
+  await assert.doesNotReject(page.getByRole('button', { name: /Brew Garage Blonde/ }).waitFor({ state: 'visible', timeout: 5000 }));
+  await page.getByRole('button', { name: /Brew Garage Blonde/ }).click();
   await waitForBatchStep(page, 'awaiting-transfer');
   await assertFinishedPallet(page, 'empty', 'brewing beer not yet sellable');
+  assert.match(await visibleText(page), /Tap the fermenter to transfer Garage Blonde/i);
 
   await page.locator('.hotspot-fermenter').click();
+  await page.getByRole('button', { name: /Transfer to fermenter/ }).click();
   await waitForBatchStep(page, 'fermenting');
+  assert.doesNotMatch(await visibleText(page), /in-game minutes remaining/i, 'fermenter card should use readable time labels');
 
   for (let day = 0; day < 8; day += 1) {
     const packagingWaiting = await page.evaluate(() => {
@@ -125,17 +130,13 @@ try {
   await assertFinishedPallet(page, 'empty', 'packaging waiting');
 
   await page.locator('.hotspot-bottler').click();
-  await waitForBatchStep(page, 'bottle-conditioning');
-  await assertFinishedPallet(page, 'empty', 'bottle conditioning');
-
-  for (let day = 0; day < 3 && (await finishedCases(page)) === 0; day += 1) {
-    await endDay(page);
-  }
+  await page.getByRole('button', { name: /Package Garage Blonde/ }).click();
   await page.waitForFunction(
     (storageKey) => {
       const raw = localStorage.getItem(storageKey);
       if (!raw) return false;
-      return (JSON.parse(raw).state.inventory?.cases ?? 0) > 0;
+      const state = JSON.parse(raw).state;
+      return (state.inventory?.cases ?? 0) > 0 && (state.batches?.length ?? 0) === 0;
     },
     'brewery-sim-save-v4',
     { timeout: 5000 }

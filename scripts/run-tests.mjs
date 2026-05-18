@@ -12,8 +12,11 @@ import {
   equipmentConditionLabel,
   equipmentConditionTier,
   orderCost,
+  firstLoopObjective,
+  formatBatchRemainingTime,
   recipeCanStart,
   recipeMissingIngredients,
+  saleValueForChannel,
   storageOverflowByArea
 } from '../dist/game/selectors.js';
 
@@ -121,33 +124,39 @@ assert.deepEqual(
 assert.equal(state.equipment.kettle.name, '20 L enamel stock pot', 'starter brewhouse should be the Tier 1 enamel stock pot');
 assert.equal(state.equipment.fermenter.name, 'Plastic fermentation bucket', 'starter fermentation should be one plastic bucket');
 assert.equal(state.equipment.bottler.name, 'Bottle wand and hand capper', 'starter packaging should be the wand and hand capper');
+assert.equal(firstLoopObjective(state), 'Tap the stock pot to brew Garage Blonde.', 'fresh first-loop objective should point at the stock pot');
 
 state = reduceGame(state, { type: 'start-batch', recipeId: 'garage-blonde' });
 assert.equal(state.batches.length, 1, 'starting a batch should create one active batch');
 assert.equal(state.inventory.ingredients['pilsner-malt'].amount, 5.8, 'starting a Blonde consumes named pilsner malt');
 assert.equal(state.batches[0].step, 'awaiting-transfer', 'brew day should stop at manual transfer');
 assert.equal(currentWorkflowStage(state).tapTarget, 'fermenter', 'started batch should point at manual transfer');
+assert.equal(firstLoopObjective(state), 'Tap the fermenter to transfer Garage Blonde.', 'awaiting-transfer objective should point at the fermenter');
 
 state = tickUntilStep(state, 'fermenting');
 assert.equal(state.batches[0].step, 'fermenting', 'batch should enter fermentation only after manual transfer');
 assert.equal(currentWorkflowStage(state).tapTarget, 'fermenter', 'fermenting stage should point at the fermenter');
+assert.equal(firstLoopObjective(state), 'Wait for fermentation, then tap the fermenter.', 'fermenting objective should point at waiting/fermenter inspection');
+assert.doesNotMatch(formatBatchRemainingTime(state, state.batches[0], blonde), /in-game minutes/, 'remaining time should be player-readable');
 
 state = tickUntilStep(state, 'awaiting-packaging');
 assert.equal(state.batches[0].step, 'awaiting-packaging', 'batch should stop for manual packaging after fermentation');
+assert.equal(firstLoopObjective(state), 'Tap the bottling bench to package Garage Blonde.', 'awaiting-packaging objective should point at the bottling bench');
 
-state = tickUntilStep(state, 'bottle-conditioning');
-assert.equal(state.batches[0].step, 'bottle-conditioning', 'packaging should start bottle conditioning before beer is ready');
-assert.equal(currentWorkflowStage(state).tapTarget, 'bottler', 'conditioning batches should keep the bottler/cases area in focus');
-
-let bottlerActionState = reduceGame(state, { type: 'use-equipment', equipmentId: 'bottler' });
-assert.equal(bottlerActionState.batches[0].step, 'bottle-conditioning', 'bottler should not auto-ready conditioning beer');
-
-state = tickUntilStep(state, undefined, 8);
-assert.ok(state.inventory.cases > 0, 'packaging should add cases to inventory');
+const packagingCashBefore = state.cash;
+const expectedCases = state.batches[0].casesExpected;
+state = reduceGame(state, { type: 'start-packaging', batchId: state.batches[0].id });
+assert.equal(state.batches.length, 0, 'packaging should immediately finish the first-loop batch');
+assert.equal(state.inventory.cases, expectedCases, 'packaging should add the displayed expected cases to inventory');
 assert.equal(state.finishedBeerLots.length, 1, 'packaging should create a recipe-specific finished lot');
+assert.equal(state.cash, packagingCashBefore, 'packaging should not secretly change cash');
+assert.equal(firstLoopObjective(state), 'Tap the pallet to sell Garage Blonde.', 'cases-available objective should point at the pallet');
 
 const casesBeforeSale = state.inventory.cases;
-state = reduceGame(state, { type: 'sell-cases', cases: 6 });
+const cashBeforeSale = state.cash;
+const displayedPayout = saleValueForChannel(state, 'friends-family');
+state = reduceGame(state, { type: 'sell-channel', channelId: 'friends-family', cases: 4 });
+assert.equal(state.cash - cashBeforeSale, displayedPayout, 'displayed sale payout helper should match the reducer cash delta');
 assert.ok(state.inventory.cases < casesBeforeSale, 'selling should remove cases from inventory');
 assert.ok(state.demand.casesSold > 0, 'selling should fulfill local demand progress');
 assert.ok(['Sell', 'Mash'].includes(currentWorkflowStage(state).stage), 'flow should either keep selling remaining cases or return to brewing after stock sells out');

@@ -1,11 +1,19 @@
 import { getIngredient } from '../data/ingredients.js';
 import { getRecipe, recipes } from '../data/recipes.js';
-import type { BatchStep, EquipmentId, GameState, IngredientId, OwnedEquipment, Recipe, RecipeIngredient, StorageArea } from './schema.js';
+import type { Batch, BatchStep, EquipmentId, GameState, IngredientId, OwnedEquipment, Recipe, RecipeIngredient, SalesChannelId, StorageArea } from './schema.js';
 
 const gameStartDateUtc = Date.UTC(2026, 4, 16);
 
 export type EquipmentConditionTier = 'clean' | 'worn' | 'dirty' | 'critical';
 export type ContaminationRiskTier = 'low' | 'elevated' | 'high' | 'severe';
+
+
+export const salesChannels: Record<SalesChannelId, { name: string; cases: number; rep: number; invoiceAfter: number; risk: number; formal: boolean }> = {
+  'friends-family': { name: 'Friends and family', cases: 4, rep: 1, invoiceAfter: 999, risk: 0.6, formal: false },
+  'private-event': { name: 'Private event', cases: 8, rep: 2, invoiceAfter: 26, risk: 1.1, formal: false },
+  'local-bar': { name: 'Local bar', cases: 12, rep: 3, invoiceAfter: 18, risk: 1.8, formal: true },
+  restaurant: { name: 'Restaurant', cases: 16, rep: 4, invoiceAfter: 0, risk: 2.4, formal: true }
+};
 
 export const formatClock = (minute: number): string => {
   const dayMinute = minute % (24 * 60);
@@ -158,6 +166,38 @@ export const contaminationRiskTier = (risk: number): ContaminationRiskTier => {
   return 'severe';
 };
 
+
+export const formatBatchRemainingTime = (state: GameState, batch: Batch, recipe: Recipe): string => {
+  if (batch.step === 'awaiting-transfer' || batch.step === 'awaiting-packaging') return 'Waiting for player input';
+  if (batch.step === 'ready') return 'Ready now';
+  const duration = recipe.stepDurations[batch.step as keyof typeof recipe.stepDurations];
+  if (!duration || batch.stepProgress >= 100) return 'Ready now';
+
+  const remaining = Math.max(0, Math.round(duration * (1 - batch.stepProgress / 100)));
+  if (remaining <= 0) return 'Ready now';
+  if (remaining < 120) return `About ${Math.max(1, Math.ceil(remaining / 60))} hour${Math.ceil(remaining / 60) === 1 ? '' : 's'} remaining`;
+
+  const startOfDayMinute = 7 * 60;
+  if (remaining <= 24 * 60 && state.minute + remaining >= 24 * 60 + startOfDayMinute - 90) return 'Ready tomorrow morning';
+  if (remaining <= 36 * 60 && state.minute + remaining >= 24 * 60) return 'Ready tomorrow morning';
+
+  const days = Math.max(1, Math.ceil(remaining / (24 * 60)));
+  if (days <= 1) return `About ${Math.ceil(remaining / 60)} hours remaining`;
+  return `${days} days remaining`;
+};
+
+export const firstLoopObjective = (state: GameState): string => {
+  const blondeBatch = state.batches.find((batch) => batch.recipeId === 'garage-blonde');
+  const blondeCases = state.finishedBeerLots.some((lot) => lot.recipeId === 'garage-blonde' && lot.cases > 0) || state.inventory.cases > 0;
+  if (blondeCases) return 'Tap the pallet to sell Garage Blonde.';
+  if (!blondeBatch) return 'Tap the stock pot to brew Garage Blonde.';
+  if (blondeBatch.step === 'awaiting-transfer') return 'Tap the fermenter to transfer Garage Blonde.';
+  if (blondeBatch.step === 'fermenting') return 'Wait for fermentation, then tap the fermenter.';
+  if (blondeBatch.step === 'awaiting-packaging') return 'Tap the bottling bench to package Garage Blonde.';
+  if (blondeBatch.step === 'packaging' || blondeBatch.step === 'bottle-conditioning') return 'Tap the bottling bench to package Garage Blonde.';
+  return 'Tap the stock pot to brew Garage Blonde.';
+};
+
 export const objectiveProgress = (state: GameState): { label: string; progress: number; complete: boolean } => {
   const soldFirstCases = state.demand.casesSold > 0 || state.salesToday > 0;
   const extraFermenter = ownedByStation(state, 'fermenter').length > 1;
@@ -210,7 +250,7 @@ export const currentWorkflowStage = (state: GameState): WorkflowStage => {
     return {
       stage: 'Sell',
       tapTarget: 'cases',
-      instruction: `Tap cases to sell into ${state.demand.accountName}'s order.`
+      instruction: `Tap the pallet to sell into ${state.demand.accountName}'s order.`
     };
   }
 
@@ -219,7 +259,7 @@ export const currentWorkflowStage = (state: GameState): WorkflowStage => {
     return {
       stage: 'Mash',
       tapTarget: 'kettle',
-      instruction: 'Tap the 20 L BIAB stock pot and choose a recipe.'
+      instruction: 'Tap the stock pot to brew Garage Blonde.'
     };
   }
 
@@ -243,7 +283,7 @@ export const currentWorkflowStage = (state: GameState): WorkflowStage => {
     return {
       stage: 'Package',
       tapTarget: 'bottler',
-      instruction: 'Bottles are conditioning. Advance time to make cases ready.'
+      instruction: 'Packaging is finishing. Tap the bottling bench to check cases.'
     };
   }
 
@@ -270,3 +310,12 @@ export const saleValue = (state: GameState, cases: number): number => {
   const reputationBonus = 1 + Math.min(state.reputation, 30) / 100;
   return Math.round(cases * recipe.salePricePerCase * recipe.marketAppeal * qualityMultiplier * reputationBonus);
 };
+
+export const saleCasesForChannel = (state: GameState, channelId: SalesChannelId, requestedCases = salesChannels[channelId].cases): number => {
+  const lot = state.finishedBeerLots[0];
+  const channel = salesChannels[channelId];
+  return Math.min(requestedCases, state.inventory.cases, lot?.cases ?? 0, channel.cases);
+};
+
+export const saleValueForChannel = (state: GameState, channelId: SalesChannelId, requestedCases = salesChannels[channelId].cases): number =>
+  saleValue(state, saleCasesForChannel(state, channelId, requestedCases));
