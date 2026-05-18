@@ -741,15 +741,10 @@
   content: '';
   position: absolute;
   inset: -8px;
-  border: 2px dashed rgba(76, 139, 245, 0.8);
+  border: 1px solid rgba(242, 196, 110, 0.42);
   border-radius: 20px;
   animation: pulse 1.4s infinite;
-  pointer-events: none;
-}
-.equipment-hotspot.scene-silent,
-.case-hotspot.scene-silent {
-  opacity: 0.28;
-  filter: saturate(0.72) brightness(0.8);
+  box-shadow: 0 0 0 2px rgba(226, 179, 84, 0.16);
   pointer-events: none;
 }
 
@@ -766,7 +761,7 @@
 .mode-fermentation .hotspot-kettle,
 .mode-packaging .hotspot-kettle,
 .mode-packaging .hotspot-fermenter {
-  opacity: 0.24;
+  opacity: 0.94;
   pointer-events: none;
 }
 
@@ -1196,34 +1191,6 @@
     width: 11.5rem;
     max-height: 12.4rem;
     overflow: visible;
-  }
-
-  .hotspot-bottler {
-    --x: 61% !important;
-    --y: 54% !important;
-  }
-
-  .hotspot-kettle {
-    --x: 31% !important;
-    --y: 51% !important;
-  }
-
-  .hotspot-fermenter.expanded {
-    --x: 48% !important;
-    --y: 34% !important;
-    translate: -50% -16%;
-  }
-
-  .hotspot-bottler.expanded {
-    --x: 66% !important;
-    --y: 58% !important;
-    translate: -50% -44%;
-  }
-
-  .case-hotspot.expanded {
-    --x: 79% !important;
-    --y: 70% !important;
-    translate: -50% -42%;
   }
 
   .garage-scene.has-expanded .obstructed-by-card {
@@ -2676,13 +2643,8 @@ body {
 }
 
 .equipment-object-toggle.active::after {
-  border: 2px dashed rgba(76, 139, 245, 0.8);
-}
-
-.equipment-object-toggle.scene-silent {
-  opacity: 0.32;
-  filter: saturate(0.72) brightness(0.8);
-  pointer-events: none;
+  border: 1px solid rgba(242, 196, 110, 0.42);
+  box-shadow: 0 0 0 2px rgba(226, 179, 84, 0.16);
 }
 
 .equipment-object-toggle.contextual,

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { equipmentCatalog } from '../dist/data/equipment.js';
 import { ingredients } from '../dist/data/ingredients.js';
+import { garageEquipmentLayoutByTier } from '../dist/data/garageLayout.js';
 import { recipes } from '../dist/data/recipes.js';
 import { createInitialState } from '../dist/game/initialState.js';
 import { loadSavedGame, resetSavedGame, saveGameState, STORAGE_KEY } from '../dist/game/persistence.js';
@@ -44,6 +45,20 @@ assert.ok(blonde && ipa && pils && wheat && saison && stout && kveik, 'starter r
 assert.ok(recipes.some((recipe) => recipe.id === 'custom-recipe' && recipe.enabled === false), 'custom recipe should exist as disabled placeholder');
 assert.ok(ingredients.some((ingredient) => ingredient.id === 'pilsner-malt'), 'ingredient catalog should include named malt');
 assert.equal(state.fermenterTemperatureC, 18, 'new games should track fermenter temperature');
+assert.deepEqual(
+  garageEquipmentLayoutByTier.tier1,
+  {
+    brewhouse: { x: 24.6, y: 53.1, width: 17 },
+    'fermenter-slot-1': { x: 38.6, y: 45.2, width: 14.5 },
+    'fermenter-slot-2': { x: 49.4, y: 45.2, width: 14.5 },
+    'fermenter-slot-3': { x: 60.2, y: 45.2, width: 14.5 },
+    'fermenter-slot-4': { x: 50.5, y: 65, width: 12 },
+    'fermenter-slot-5': { x: 61.5, y: 65, width: 12 },
+    milling: { x: 18, y: 76.5, width: 10 },
+    packaging: { x: 74.5, y: 62.4, width: 13.1 }
+  },
+  'tier1 garage layout should keep the locked cozy composition values'
+);
 
 let temperatureState = reduceGame(state, { type: 'set-fermenter-temperature', temperatureC: 23 });
 assert.equal(temperatureState.fermenterTemperatureC, 23, 'fermenter temperature action should accept in-range values');
@@ -343,10 +358,15 @@ assert.match(mainSource, /caseCountLabel\(state\.inventory\.cases\)/, 'pallet an
 assert.match(mainSource, /caseCountLabel\(lot\.cases\)/, 'finished lot cards should show gameplay case counts with definition');
 
 const index = await readFile(new URL('../index.html', import.meta.url), 'utf8');
+const garageCss = await readFile(new URL('../src/styles/garage.css', import.meta.url), 'utf8');
 assert.match(index, /viewport-fit=cover/, 'index should include an iPhone safe-area viewport');
 assert.match(index, /src="\.\/dist\/main\.js"/, 'index should load compiled TypeScript output with a relative path');
 assert.match(index, /href="\.\/src\/styles\/globals\.css"/, 'index should load global CSS with a relative path');
 assert.match(index, /href="\.\/src\/styles\/garage\.css"/, 'index should load garage CSS with a relative path');
 assert.doesNotMatch(index, /(?:href|src)="\//, 'index asset references should not use root-relative paths');
+assert.doesNotMatch(garageCss, /\.equipment-object-toggle\.scene-silent|\.equipment-hotspot\.scene-silent|\.case-hotspot\.scene-silent/, 'gameplay CSS should not fade idle equipment via scene-silent rules');
+assert.doesNotMatch(garageCss, /opacity:\s*0\.(?:[0-8]\d?|9[0-0]?)\s*;[\s\S]{0,160}(?:mode-idle|mode-fermentation|mode-packaging)/, 'gameplay mode styling should not reduce idle equipment visibility below 0.9');
+assert.doesNotMatch(garageCss, /\.(?:equipment-hotspot|equipment-object-toggle)\.active::after[\s\S]{0,140}dashed/, 'active gameplay highlights should avoid debug-style dashed outlines');
+assert.match(garageCss, /\.layout-debug-enabled[\s\S]{0,180}dashed/, 'dashed outlines should be scoped to layout-debug-enabled mode only');
 
 console.log('All Brewery Sim prototype checks passed.');
