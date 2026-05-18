@@ -140,9 +140,21 @@ const renderLayoutDebugPanel = () => layoutDebugEnabled
                   <legend>${equipment.label} / ${equipment.itemId}</legend>
                   ${['x', 'y', 'width']
             .map((field) => `
-                        <label>
-                          <span>${field}: <output data-layout-output="${equipment.slotId}-${field}">${placement[field]}</output>%</span>
+                        <label class="layout-debug-field-row">
+                          <span>${field}</span>
                           <input
+                            class="layout-debug-number"
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="0.1"
+                            value="${placement[field]}"
+                            data-layout-slot-id="${equipment.slotId}"
+                            data-layout-field="${field}"
+                            aria-label="${equipment.label} ${field} value"
+                          />
+                          <input
+                            class="layout-debug-slider"
                             type="range"
                             min="0"
                             max="100"
@@ -150,6 +162,7 @@ const renderLayoutDebugPanel = () => layoutDebugEnabled
                             value="${placement[field]}"
                             data-layout-slot-id="${equipment.slotId}"
                             data-layout-field="${field}"
+                            aria-label="${equipment.label} ${field} slider"
                           />
                         </label>
                       `)
@@ -1043,10 +1056,16 @@ root.addEventListener('input', (event) => {
         return;
     const slotId = input.dataset.layoutSlotId;
     const field = input.dataset.layoutField;
-    garageLayoutDraft[slotId][field] = Number(input.value);
-    const output = root.querySelector(`[data-layout-output="${slotId}-${field}"]`);
-    if (output)
-        output.value = input.value;
+    const nextValue = input.valueAsNumber;
+    if (!Number.isFinite(nextValue))
+        return;
+    const placementValue = Math.min(100, Math.max(0, nextValue));
+    const displayValue = String(placementValue);
+    garageLayoutDraft[slotId][field] = placementValue;
+    root.querySelectorAll(`[data-layout-slot-id="${slotId}"][data-layout-field="${field}"]`).forEach((control) => {
+        if (control.value !== displayValue)
+            control.value = displayValue;
+    });
     applySpritePlacement(slotId);
     updateLayoutDebugJson();
 });

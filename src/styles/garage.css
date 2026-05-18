@@ -264,22 +264,33 @@
   font-weight: 900;
 }
 
-.layout-debug-fieldset label {
+.layout-debug-field-row {
   display: grid;
-  gap: 0.18rem;
+  grid-template-columns: 2.8rem 4.8rem minmax(0, 1fr);
+  gap: 0.38rem;
+  align-items: center;
 }
 
-.layout-debug-fieldset label span {
-  display: flex;
-  justify-content: space-between;
+.layout-debug-field-row span {
   color: var(--text-secondary);
   font-size: 0.66rem;
   font-weight: 800;
+  text-transform: uppercase;
 }
 
 .layout-debug-fieldset input {
   width: 100%;
   accent-color: var(--gold);
+}
+
+.layout-debug-number {
+  min-width: 0;
+  padding: 0.28rem 0.34rem;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
+  color: #fff7e8;
+  background: rgba(0, 0, 0, 0.28);
+  font: 0.68rem/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
 .layout-debug-panel textarea {

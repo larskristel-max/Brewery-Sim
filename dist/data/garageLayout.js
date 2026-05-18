@@ -1,10 +1,10 @@
 export const garageEquipmentAssetPath = (tier, filename) => `/assets/garage/equipment/${tier}/${filename}`;
 const defaultTapPadding = { x: 4, y: 8 };
 export const garageEquipmentLayoutBySlot = {
-    brewhouse: { x: 26.9, y: 47, width: 17 },
-    'fermenter-slot-1': { x: 38.6, y: 45.1, width: 14.5 },
-    'fermenter-slot-2': { x: 49.4, y: 46.3, width: 14.5 },
-    'fermenter-slot-3': { x: 60.2, y: 47.5, width: 14.5 },
+    brewhouse: { x: 23.6, y: 54.3, width: 17 },
+    'fermenter-slot-1': { x: 38.6, y: 45.2, width: 14.5 },
+    'fermenter-slot-2': { x: 49.4, y: 45.2, width: 14.5 },
+    'fermenter-slot-3': { x: 60.2, y: 45.2, width: 14.5 },
     'fermenter-slot-4': { x: 50.5, y: 65, width: 12 },
     'fermenter-slot-5': { x: 61.5, y: 65, width: 12 },
     packaging: { x: 74.5, y: 62.4, width: 13.1 }
@@ -13,7 +13,7 @@ export const garageEquipmentLayoutByItem = {
     'stock-pot-20l': {
         stationType: 'brewhouse',
         sprite: garageEquipmentAssetPath('tier1', 'brewhouse-20l-biab.png'),
-        placement: { x: 26.9, y: 47, width: 17 },
+        placement: { x: 23.6, y: 54.3, width: 17 },
         interaction: { action: 'toggle-target', equipmentId: 'kettle' },
         tapPadding: { x: 5, y: 5 },
         interactionPriority: 2
@@ -45,7 +45,7 @@ export const garageEquipmentLayoutByItem = {
     'plastic-bucket': {
         stationType: 'fermentation',
         sprite: garageEquipmentAssetPath('tier1', 'fermenter-plastic-bucket.png'),
-        placement: { x: 38.6, y: 45.1, width: 14.5 },
+        placement: { x: 38.6, y: 45.2, width: 14.5 },
         interaction: { action: 'toggle-target', equipmentId: 'fermenter' },
         tapPadding: defaultTapPadding,
         interactionPriority: 3

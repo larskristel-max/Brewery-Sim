@@ -63,6 +63,16 @@ try {
   await assert.doesNotReject(page.locator('.garage-scene').waitFor({ state: 'visible', timeout: 5000 }));
   assert.match(await visibleText(page), /May 16/i);
   assert.equal(await page.locator('.case-hotspot').count(), 0, 'fresh game should not show sellable cases');
+  assert.equal(
+    await page.locator('.equipment-object[data-equipment-id="fermenter"]').count(),
+    1,
+    'fresh game should render one owned fermenter'
+  );
+  assert.equal(
+    await page.locator('.equipment-object[data-equipment-id="fermenter"]').getAttribute('data-layout-slot-id'),
+    'fermenter-slot-1',
+    'starter fermenter should use the first fermenter slot'
+  );
 
   await page.locator('.hotspot-kettle').click();
   await assert.doesNotReject(page.getByRole('dialog', { name: 'Recipe / Brew' }).waitFor({ state: 'visible', timeout: 5000 }));
@@ -107,6 +117,13 @@ try {
     3,
     'owned plastic fermenters should render as separate clickable scene objects outside debug mode'
   );
+  assert.deepEqual(
+    await page.locator('.equipment-object[data-equipment-id="fermenter"]').evaluateAll((nodes) =>
+      nodes.map((node) => node.getAttribute('data-layout-slot-id'))
+    ),
+    ['fermenter-slot-1', 'fermenter-slot-2', 'fermenter-slot-3'],
+    'owned plastic fermenters should occupy the first three fermenter slots'
+  );
 
   await page.goto(`${baseUrl}?layoutDebug=1`);
   await assert.doesNotReject(page.locator('.layout-debug-panel').waitFor({ state: 'visible', timeout: 5000 }));
@@ -125,6 +142,15 @@ try {
     1,
     'layout debug should expose fermenter slot 3'
   );
+  const slotTwoXNumber = page.locator('input[type="number"][data-layout-slot-id="fermenter-slot-2"][data-layout-field="x"]');
+  const slotTwoXSlider = page.locator('input[type="range"][data-layout-slot-id="fermenter-slot-2"][data-layout-field="x"]');
+  await slotTwoXNumber.fill('48.8');
+  await slotTwoXNumber.dispatchEvent('input');
+  assert.equal(await slotTwoXSlider.inputValue(), '48.8', 'number input should update its paired slider');
+  assert.match(await page.locator('[data-layout-json]').inputValue(), /"fermenter-slot-2": \{\n    "x": 48\.8,/);
+  await slotTwoXSlider.fill('49.4');
+  await slotTwoXSlider.dispatchEvent('input');
+  assert.equal(await slotTwoXNumber.inputValue(), '49.4', 'slider should update its paired number input');
 
   await browser.close();
   console.log('Browser regression passed: direct hotspot garage loop works.');
