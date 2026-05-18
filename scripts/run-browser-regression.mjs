@@ -38,6 +38,34 @@ const endDay = async (page) => {
 
 const visibleText = async (page) => page.locator('body').innerText();
 
+const finishedPalletLevelName = (cases) => {
+  if (cases <= 0) return 'empty';
+  if (cases < 10) return 'level1';
+  if (cases < 25) return 'level2';
+  return 'level3';
+};
+
+const finishedCases = async (page) =>
+  page.evaluate((storageKey) => {
+    const raw = localStorage.getItem(storageKey);
+    if (!raw) return 0;
+    return JSON.parse(raw).state.inventory?.cases ?? 0;
+  }, 'brewery-sim-save-v4');
+
+const assertFinishedPallet = async (page, expectedLevel, message) => {
+  assert.equal(
+    await page.locator('.sell-point-object[data-sell-point-id="finished-beer-pallet"]').count(),
+    1,
+    `${message}: finished beer pallet should render once`
+  );
+  const expectedFilename = `pallet-finished-beer-${expectedLevel}.png`;
+  assert.match(
+    (await page.locator('.sell-point-sprite').getAttribute('src')) ?? '',
+    new RegExp(expectedFilename.replace('.', '\\.')),
+    `${message}: finished beer pallet should show ${expectedFilename}`
+  );
+};
+
 const waitForBatchStep = async (page, step) => {
   await page.waitForFunction(
     ([storageKey, expectedStep]) => {
@@ -62,7 +90,8 @@ try {
 
   await assert.doesNotReject(page.locator('.garage-scene').waitFor({ state: 'visible', timeout: 5000 }));
   assert.match(await visibleText(page), /May 16/i);
-  assert.equal(await page.locator('.case-hotspot').count(), 0, 'fresh game should not show sellable cases');
+  assert.equal(await page.locator('.case-hotspot').count(), 0, 'legacy case hotspot should not render');
+  await assertFinishedPallet(page, 'empty', 'fresh game');
   assert.equal(
     await page.locator('.equipment-object[data-equipment-id="fermenter"]').count(),
     1,
@@ -79,7 +108,7 @@ try {
   await assert.doesNotReject(page.getByRole('dialog', { name: 'Recipe / Brew' }).waitFor({ state: 'visible', timeout: 5000 }));
   await page.locator('.recipe-card').filter({ hasText: 'Garage Blonde' }).getByRole('button', { name: 'Brew' }).click();
   await waitForBatchStep(page, 'awaiting-transfer');
-  assert.equal(await page.locator('.case-hotspot').count(), 0, 'cases should stay hidden while beer is not sellable');
+  await assertFinishedPallet(page, 'empty', 'brewing beer not yet sellable');
 
   await page.locator('.hotspot-fermenter').click();
   await waitForBatchStep(page, 'fermenting');
@@ -93,22 +122,32 @@ try {
     await endDay(page);
   }
   await waitForBatchStep(page, 'awaiting-packaging');
-  assert.equal(await page.locator('.case-hotspot').count(), 0, 'cases should stay hidden while packaging is waiting');
+  await assertFinishedPallet(page, 'empty', 'packaging waiting');
 
   await page.locator('.hotspot-bottler').click();
   await waitForBatchStep(page, 'bottle-conditioning');
-  assert.equal(await page.locator('.case-hotspot').count(), 0, 'cases should stay hidden during bottle conditioning');
+  await assertFinishedPallet(page, 'empty', 'bottle conditioning');
 
-  for (let day = 0; day < 3 && (await page.locator('.case-hotspot').count()) === 0; day += 1) {
+  for (let day = 0; day < 3 && (await finishedCases(page)) === 0; day += 1) {
     await endDay(page);
   }
-  await assert.doesNotReject(page.locator('.case-hotspot').waitFor({ state: 'visible', timeout: 5000 }));
-  await page.locator('.case-hotspot').click();
+  await page.waitForFunction(
+    (storageKey) => {
+      const raw = localStorage.getItem(storageKey);
+      if (!raw) return false;
+      return (JSON.parse(raw).state.inventory?.cases ?? 0) > 0;
+    },
+    'brewery-sim-save-v4',
+    { timeout: 5000 }
+  );
+  const sellableCases = await finishedCases(page);
+  await assertFinishedPallet(page, finishedPalletLevelName(sellableCases), 'finished packaged beer');
+  await page.locator('.sell-point-object[data-sell-point-id="finished-beer-pallet"]').click();
   await assert.doesNotReject(page.getByRole('button', { name: /Friends and family/ }).waitFor({ state: 'visible', timeout: 5000 }));
   await page.getByRole('button', { name: /Friends and family/ }).click();
 
   assert.match(await visibleText(page), /REP\s+1/);
-  assert.equal(await page.locator('.case-hotspot').count(), 0, 'sold-out cases should leave the scene');
+  await assertFinishedPallet(page, 'empty', 'sold-out inventory');
 
   await page.locator('.workshop-hotspot').click();
   await page.locator('[data-action="buy-equipment"][data-equipment-item-id="plastic-bucket"]').click();
@@ -153,6 +192,21 @@ try {
   await slotTwoXSlider.dispatchEvent('input');
   assert.equal(await slotTwoXNumber.inputValue(), '49.4', 'slider should update its paired number input');
 
+  assert.equal(
+    await page.locator('.layout-debug-fieldset').filter({ hasText: 'Finished beer pallet / sell point' }).count(),
+    1,
+    'layout debug should expose the finished beer pallet sell point'
+  );
+  const palletXNumber = page.locator('input[type="number"][data-sell-point-layout-id="finished-beer-pallet"][data-sell-point-layout-field="x"]');
+  const palletXSlider = page.locator('input[type="range"][data-sell-point-layout-id="finished-beer-pallet"][data-sell-point-layout-field="x"]');
+  await palletXNumber.fill('16.2');
+  await palletXNumber.dispatchEvent('input');
+  assert.equal(await palletXSlider.inputValue(), '16.2', 'sell point number input should update its paired slider');
+  assert.match(await page.locator('[data-layout-json]').inputValue(), /"finished-beer-pallet": \{\n    "x": 16\.2,/);
+  await palletXSlider.fill('47.7');
+  await palletXSlider.dispatchEvent('input');
+  assert.equal(await palletXNumber.inputValue(), '47.7', 'sell point slider should update its paired number input');
+
   await page.goto(`${baseUrl}?layoutDebug=1&tierPreview=2`);
   await assert.doesNotReject(page.locator('.layout-debug-panel').waitFor({ state: 'visible', timeout: 5000 }));
   assert.equal(await page.locator('.equipment-object[data-equipment-id="kettle"][data-equipment-item-id="all-in-one-40l"]').count(), 1);
@@ -160,6 +214,7 @@ try {
   assert.equal(await page.locator('.equipment-object[data-equipment-id="fermenter"]').count(), 3);
   assert.equal(await page.locator('.equipment-object[data-equipment-id="fermenter"][data-equipment-item-id="stainless-conical-50l"]').count(), 3);
   assert.equal(await page.locator('.equipment-object[data-equipment-id="bottler"][data-equipment-item-id="semi-auto-filler"]').count(), 1);
+  await assertFinishedPallet(page, 'empty', 'tier 2 preview');
   assert.equal(
     await page.locator('.layout-debug-fieldset').filter({ hasText: 'Milling / grain-mill-tier2' }).count(),
     1,

@@ -1,4 +1,5 @@
-export const garageEquipmentAssetPath = (tier, filename) => `/assets/garage/equipment/${tier}/${filename}`;
+export const garageEquipmentAssetPath = (tier, filename) => `assets/garage/equipment/${tier}/${filename}`;
+export const garageSellPointAssetPath = (filename) => `assets/garage/sell-point/${filename}`;
 const defaultTapPadding = { x: 4, y: 8 };
 const tier1GarageEquipmentLayout = {
     brewhouse: { x: 23.6, y: 54.3, width: 17 },
@@ -25,6 +26,19 @@ export const garageEquipmentLayoutByTier = {
     tier2: tier2GarageEquipmentLayout
 };
 export const garageEquipmentLayoutBySlot = garageEquipmentLayoutByTier.tier1;
+export const garageSellPointLayout = {
+    'finished-beer-pallet': {
+        spriteByLevel: {
+            0: garageSellPointAssetPath('pallet-finished-beer-empty.png'),
+            1: garageSellPointAssetPath('pallet-finished-beer-level1.png'),
+            2: garageSellPointAssetPath('pallet-finished-beer-level2.png'),
+            3: garageSellPointAssetPath('pallet-finished-beer-level3.png')
+        },
+        placement: { x: 47.7, y: 96.5, width: 9.7 },
+        tapPadding: { x: 4, y: 4 },
+        interactionPriority: 2
+    }
+};
 export const garageEquipmentLayoutByItem = {
     'stock-pot-20l': {
         stationType: 'brewhouse',
