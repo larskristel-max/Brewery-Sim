@@ -1193,11 +1193,6 @@
     overflow: visible;
   }
 
-  .garage-scene.has-expanded .obstructed-by-card {
-    opacity: 0;
-    pointer-events: none;
-  }
-
   .equipment-hotspot.expanded.next-tap::before,
   .case-hotspot.expanded.next-tap::before {
     display: none;

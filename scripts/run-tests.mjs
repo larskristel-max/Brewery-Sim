@@ -368,5 +368,7 @@ assert.doesNotMatch(garageCss, /\.equipment-object-toggle\.scene-silent|\.equipm
 assert.doesNotMatch(garageCss, /opacity:\s*0\.(?:[0-8]\d?|9[0-0]?)\s*;[\s\S]{0,160}(?:mode-idle|mode-fermentation|mode-packaging)/, 'gameplay mode styling should not reduce idle equipment visibility below 0.9');
 assert.doesNotMatch(garageCss, /\.(?:equipment-hotspot|equipment-object-toggle)\.active::after[\s\S]{0,140}dashed/, 'active gameplay highlights should avoid debug-style dashed outlines');
 assert.match(garageCss, /\.layout-debug-enabled[\s\S]{0,180}dashed/, 'dashed outlines should be scoped to layout-debug-enabled mode only');
+assert.doesNotMatch(garageCss, /\.garage-scene\.has-expanded\s+\.obstructed-by-card/, 'expanded-card state should not hide or disable obstructed equipment');
+assert.doesNotMatch(garageCss, /\.(?:equipment-object|equipment-object-toggle|equipment-hotspot|case-hotspot)[^{]*\.expanded[\s\S]{0,220}opacity:\s*0(?:[;\s}])/, 'expanded-card styling should not set equipment or hotspots to opacity 0');
 
 console.log('All Brewery Sim prototype checks passed.');
