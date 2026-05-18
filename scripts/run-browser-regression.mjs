@@ -38,6 +38,19 @@ const endDay = async (page) => {
 
 const visibleText = async (page) => page.locator('body').innerText();
 
+const waitForBatchStep = async (page, step) => {
+  await page.waitForFunction(
+    ([storageKey, expectedStep]) => {
+      const raw = localStorage.getItem(storageKey);
+      if (!raw) return false;
+      const state = JSON.parse(raw).state;
+      return state.batches.some((batch) => batch.step === expectedStep);
+    },
+    ['brewery-sim-save-v4', step],
+    { timeout: 5000 }
+  );
+};
+
 try {
   await waitForServer();
 
@@ -50,24 +63,39 @@ try {
   await assert.doesNotReject(page.locator('.garage-scene').waitFor({ state: 'visible', timeout: 5000 }));
   assert.match(await visibleText(page), /May 16/i);
   assert.equal(await page.locator('.case-hotspot').count(), 0, 'fresh game should not show sellable cases');
+  assert.equal(
+    await page.locator('.equipment-object[data-equipment-id="fermenter"]').count(),
+    1,
+    'fresh game should render one owned fermenter'
+  );
+  assert.equal(
+    await page.locator('.equipment-object[data-equipment-id="fermenter"]').getAttribute('data-layout-slot-id'),
+    'fermenter-slot-1',
+    'starter fermenter should use the first fermenter slot'
+  );
 
   await page.locator('.hotspot-kettle').click();
   await assert.doesNotReject(page.getByRole('dialog', { name: 'Recipe / Brew' }).waitFor({ state: 'visible', timeout: 5000 }));
   await page.locator('.recipe-card').filter({ hasText: 'Garage Blonde' }).getByRole('button', { name: 'Brew' }).click();
-  await assert.doesNotReject(page.getByText('Transfer waiting').waitFor({ state: 'visible', timeout: 5000 }));
+  await waitForBatchStep(page, 'awaiting-transfer');
   assert.equal(await page.locator('.case-hotspot').count(), 0, 'cases should stay hidden while beer is not sellable');
 
   await page.locator('.hotspot-fermenter').click();
-  await assert.doesNotReject(page.getByText('18 C fermentation').waitFor({ state: 'visible', timeout: 5000 }));
+  await waitForBatchStep(page, 'fermenting');
 
-  for (let day = 0; day < 8 && !(await page.getByText('2 cases waiting').isVisible()); day += 1) {
+  for (let day = 0; day < 8; day += 1) {
+    const packagingWaiting = await page.evaluate(() => {
+      const state = JSON.parse(localStorage.getItem('brewery-sim-save-v4') ?? '{}').state;
+      return state.batches?.some?.((batch) => batch.step === 'awaiting-packaging') ?? false;
+    });
+    if (packagingWaiting) break;
     await endDay(page);
   }
-  await assert.doesNotReject(page.getByText('2 cases waiting').waitFor({ state: 'visible', timeout: 5000 }));
+  await waitForBatchStep(page, 'awaiting-packaging');
   assert.equal(await page.locator('.case-hotspot').count(), 0, 'cases should stay hidden while packaging is waiting');
 
   await page.locator('.hotspot-bottler').click();
-  await assert.doesNotReject(page.getByText('Conditioning').waitFor({ state: 'visible', timeout: 5000 }));
+  await waitForBatchStep(page, 'bottle-conditioning');
   assert.equal(await page.locator('.case-hotspot').count(), 0, 'cases should stay hidden during bottle conditioning');
 
   for (let day = 0; day < 3 && (await page.locator('.case-hotspot').count()) === 0; day += 1) {
@@ -80,6 +108,49 @@ try {
 
   assert.match(await visibleText(page), /REP\s+1/);
   assert.equal(await page.locator('.case-hotspot').count(), 0, 'sold-out cases should leave the scene');
+
+  await page.locator('.workshop-hotspot').click();
+  await page.locator('[data-action="buy-equipment"][data-equipment-item-id="plastic-bucket"]').click();
+  await page.locator('[data-action="buy-equipment"][data-equipment-item-id="plastic-bucket"]').click();
+  assert.equal(
+    await page.locator('.equipment-object[data-equipment-id="fermenter"]').count(),
+    3,
+    'owned plastic fermenters should render as separate clickable scene objects outside debug mode'
+  );
+  assert.deepEqual(
+    await page.locator('.equipment-object[data-equipment-id="fermenter"]').evaluateAll((nodes) =>
+      nodes.map((node) => node.getAttribute('data-layout-slot-id'))
+    ),
+    ['fermenter-slot-1', 'fermenter-slot-2', 'fermenter-slot-3'],
+    'owned plastic fermenters should occupy the first three fermenter slots'
+  );
+
+  await page.goto(`${baseUrl}?layoutDebug=1`);
+  await assert.doesNotReject(page.locator('.layout-debug-panel').waitFor({ state: 'visible', timeout: 5000 }));
+  assert.equal(
+    await page.locator('.layout-debug-fieldset').filter({ hasText: 'Fermenter 1 / plastic-bucket' }).count(),
+    1,
+    'layout debug should expose fermenter slot 1'
+  );
+  assert.equal(
+    await page.locator('.layout-debug-fieldset').filter({ hasText: 'Fermenter 2 / plastic-bucket' }).count(),
+    1,
+    'layout debug should expose fermenter slot 2'
+  );
+  assert.equal(
+    await page.locator('.layout-debug-fieldset').filter({ hasText: 'Fermenter 3 / plastic-bucket' }).count(),
+    1,
+    'layout debug should expose fermenter slot 3'
+  );
+  const slotTwoXNumber = page.locator('input[type="number"][data-layout-slot-id="fermenter-slot-2"][data-layout-field="x"]');
+  const slotTwoXSlider = page.locator('input[type="range"][data-layout-slot-id="fermenter-slot-2"][data-layout-field="x"]');
+  await slotTwoXNumber.fill('48.8');
+  await slotTwoXNumber.dispatchEvent('input');
+  assert.equal(await slotTwoXSlider.inputValue(), '48.8', 'number input should update its paired slider');
+  assert.match(await page.locator('[data-layout-json]').inputValue(), /"fermenter-slot-2": \{\n    "x": 48\.8,/);
+  await slotTwoXSlider.fill('49.4');
+  await slotTwoXSlider.dispatchEvent('input');
+  assert.equal(await slotTwoXNumber.inputValue(), '49.4', 'slider should update its paired number input');
 
   await browser.close();
   console.log('Browser regression passed: direct hotspot garage loop works.');
