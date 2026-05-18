@@ -3,8 +3,10 @@ import {
   garageEquipmentLayoutByItem,
   garageEquipmentLayoutBySlot,
   garageEquipmentLayoutByTier,
+  garageSellPointLayout,
   type GarageEquipmentLayoutTier,
   type GarageEquipmentPlacement,
+  type GarageSellPointId,
   type GarageEquipmentSlotId
 } from './data/garageLayout.js';
 import { ingredients, getIngredient } from './data/ingredients.js';
@@ -44,6 +46,7 @@ type SceneTarget = EquipmentId | 'cases';
 type FocusOverlay = 'recipes' | 'production' | 'inventory' | 'upgrades' | 'log';
 type StoreStation = EquipmentId;
 type GarageLayoutDraft = Record<GarageEquipmentSlotId, GarageEquipmentPlacement>;
+type GarageSellPointLayoutDraft = Record<GarageSellPointId, GarageEquipmentPlacement>;
 
 type GarageSceneEquipmentInstance = {
   equipmentId: EquipmentId;
@@ -113,6 +116,9 @@ const garageLayoutDraft: GarageLayoutDraft = Object.fromEntries(
     structuredClone(placement)
   ])
 ) as GarageLayoutDraft;
+const garageSellPointLayoutDraft: GarageSellPointLayoutDraft = Object.fromEntries(
+  Object.entries(garageSellPointLayout).map(([sellPointId, visual]) => [sellPointId, structuredClone(visual.placement)])
+) as GarageSellPointLayoutDraft;
 
 const stationLabels: Record<StoreStation, string> = {
   kettle: 'Brewhouse',
@@ -129,7 +135,7 @@ const stationNouns: Record<StoreStation, string> = {
 };
 
 
-const garageLayoutJson = (): string => JSON.stringify(garageLayoutDraft, null, 2);
+const garageLayoutJson = (): string => JSON.stringify({ ...garageLayoutDraft, ...garageSellPointLayoutDraft }, null, 2);
 
 const applySpritePlacement = (slotId: GarageEquipmentSlotId) => {
   const placement = garageLayoutDraft[slotId];
@@ -143,6 +149,15 @@ const applySpritePlacement = (slotId: GarageEquipmentSlotId) => {
     object.style.setProperty('--x', `${placement.x}%`);
     object.style.setProperty('--y', `${placement.y}%`);
   });
+};
+
+const applySellPointPlacement = (sellPointId: GarageSellPointId) => {
+  const placement = garageSellPointLayoutDraft[sellPointId];
+  const object = root.querySelector<HTMLElement>(`[data-sell-point-id="${sellPointId}"]`);
+  if (!object) return;
+  object.style.left = `${placement.x}%`;
+  object.style.top = `${placement.y}%`;
+  object.style.width = `${placement.width}%`;
 };
 
 const updateLayoutDebugJson = () => {
@@ -280,6 +295,48 @@ const renderLayoutDebugPanel = () =>
                     )
                     .join('')}
                   ${tapPadding ? `<small>Tap zone preview: +${tapPadding.x}% x, +${tapPadding.y}% y</small>` : ''}
+                </fieldset>
+              `;
+            })
+            .join('')}
+          ${Object.entries(garageSellPointLayoutDraft)
+            .map(([sellPointId, placement]) => {
+              const sellPointLabel = sellPointId === 'finished-beer-pallet' ? 'Finished beer pallet' : sellPointId;
+              return `
+                <fieldset class="layout-debug-fieldset">
+                  <legend>${sellPointLabel} / sell point</legend>
+                  ${(['x', 'y', 'width'] as const)
+                    .map(
+                      (field) => `
+                        <label class="layout-debug-field-row">
+                          <span>${field}</span>
+                          <input
+                            class="layout-debug-number"
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="0.1"
+                            value="${placement[field]}"
+                            data-sell-point-layout-id="${sellPointId}"
+                            data-sell-point-layout-field="${field}"
+                            aria-label="${sellPointLabel} ${field} value"
+                          />
+                          <input
+                            class="layout-debug-slider"
+                            type="range"
+                            min="0"
+                            max="100"
+                            step="0.1"
+                            value="${placement[field]}"
+                            data-sell-point-layout-id="${sellPointId}"
+                            data-sell-point-layout-field="${field}"
+                            aria-label="${sellPointLabel} ${field} slider"
+                          />
+                        </label>
+                      `
+                    )
+                    .join('')}
+                  <small>Permanent sell target placement</small>
                 </fieldset>
               `;
             })
@@ -905,6 +962,13 @@ const salesOffers = () => [
   { id: 'local-bar', name: 'Local bar', cases: 12, price: 22, risk: 'High formal risk', invoice: state.canInvoice ? 'Invoice ready' : 'May ask for invoice' }
 ] as const;
 
+const getFinishedPalletLevel = (cases: number): 0 | 1 | 2 | 3 => {
+  if (cases <= 0) return 0;
+  if (cases < 10) return 1;
+  if (cases < 25) return 2;
+  return 3;
+};
+
 const renderSalesOffers = () => `
   <div class="hotspot-actions sales-offers">
     ${salesOffers()
@@ -917,6 +981,46 @@ const renderSalesOffers = () => `
       .join('')}
   </div>
 `;
+
+const renderFinishedBeerPallet = () => {
+  const sellPointId: GarageSellPointId = 'finished-beer-pallet';
+  const visual = garageSellPointLayout[sellPointId];
+  const placement = garageSellPointLayoutDraft[sellPointId];
+  const palletLevel = getFinishedPalletLevel(state.inventory.cases);
+  const src = visual.spriteByLevel[palletLevel];
+  const tapPadding = visual.tapPadding ?? { x: 0, y: 0 };
+  const priority = visual.interactionPriority ?? 0;
+  const expanded = expandedTarget === 'cases';
+  const active = state.inventory.cases > 0;
+  const nextTap = isNextTapTarget('cases');
+
+  return `
+    <article
+      class="sell-point-object sell-point-${sellPointId} ${expanded ? 'expanded' : ''} ${active ? 'active' : ''} ${nextTap ? 'next-tap' : ''}"
+      data-sell-point-id="${sellPointId}"
+      data-action="toggle-target"
+      data-target="cases"
+      style="left: ${placement.x}%; top: ${placement.y}%; width: ${placement.width}%; --tap-padding-x: ${tapPadding.x}%; --tap-padding-y: ${tapPadding.y}%; z-index: ${18 + priority}"
+    >
+      <button
+        class="sell-point-toggle"
+        data-action="toggle-target"
+        data-target="cases"
+        type="button"
+        aria-expanded="${expanded}"
+        aria-label="${expanded ? 'Collapse' : 'Expand'} finished beer pallet"
+      >
+        <img class="sell-point-sprite" src="${src}" alt="Finished beer pallet" draggable="false" />
+      </button>
+      <div class="equipment-object-card sell-point-card ${expanded ? 'expanded' : ''}" ${expanded ? '' : 'hidden'}>
+        <span class="hotspot-name">Finished beer</span>
+        <strong>${state.inventory.cases} cases</strong>
+        <small>${active ? 'Ready to sell' : 'Package beer to fill the pallet'}</small>
+        ${renderSalesOffers()}
+      </div>
+    </article>
+  `;
+};
 
 const renderEventTicker = () => {
   const latest = state.events[0];
@@ -966,7 +1070,6 @@ const renderAtmosphere = () => {
     ${activeForEquipment('fermenter') ? '<div class="equipment-glow fermenter-glow"></div>' : ''}
     ${activeForEquipment('bottler') ? '<div class="equipment-glow bottler-glow"></div>' : ''}
     ${anyActive ? '<div class="hose-line"></div>' : ''}
-    ${state.inventory.cases > 0 ? `<div class="crate-stack" aria-label="${state.inventory.cases} finished cases"><span>${state.inventory.cases}</span></div>` : ''}
     ${pending ? `<div class="delivery-pallet" aria-label="${state.pendingOrders.length} incoming deliveries"><span>${state.pendingOrders.length}</span></div>` : ''}
     ${worstCondition < 62 ? '<div class="dirty-floor"></div>' : ''}
   `;
@@ -1051,18 +1154,7 @@ const renderGarage = () => {
       ${visibility.showWorkshopHotspot ? renderWorkshopHotspot() : ''}
       ${visibility.showFloorNoteTicker ? renderEventTicker() : ''}
       ${equipment}
-      ${visibility.showCases ? `<article class="case-hotspot ${expandedTarget === 'cases' ? 'expanded' : ''} ${expandedTarget === 'bottler' ? 'obstructed-by-card' : ''} ${state.inventory.cases > 0 ? 'active' : ''} ${isNextTapTarget('cases') ? 'next-tap' : ''}" data-action="toggle-target" data-target="cases">
-        <button class="hotspot-toggle" data-action="toggle-target" data-target="cases" type="button" aria-expanded="${expandedTarget === 'cases'}" aria-label="Expand cases">
-          <span class="hotspot-name">Cases</span>
-          <strong>${state.inventory.cases}</strong>
-          ${expandedTarget === 'cases' ? `<small>${state.inventory.cases > 0 ? 'Ready to sell' : 'Packaged'}</small>` : ''}
-        </button>
-        ${
-          expandedTarget === 'cases'
-            ? renderSalesOffers()
-            : ''
-        }
-      </article>` : ''}
+      ${renderFinishedBeerPallet()}
       <div class="brewer-avatar" style="left: ${position.left}; top: ${position.top}" aria-label="Brewer position"><span></span></div>
       ${renderOpsControl()}
       ${renderLayoutDebugPanel()}
@@ -1255,7 +1347,10 @@ const render = () => {
 root.addEventListener(
   'error',
   (event) => {
-    if (event.target instanceof HTMLImageElement && event.target.classList.contains('equipment-sprite')) {
+    if (
+      event.target instanceof HTMLImageElement &&
+      (event.target.classList.contains('equipment-sprite') || event.target.classList.contains('sell-point-sprite'))
+    ) {
       event.target.hidden = true;
     }
   },
@@ -1264,6 +1359,23 @@ root.addEventListener(
 
 root.addEventListener('input', (event) => {
   if (!layoutDebugEnabled) return;
+  const sellPointInput = (event.target as HTMLElement).closest<HTMLInputElement>('[data-sell-point-layout-id][data-sell-point-layout-field]');
+  if (sellPointInput) {
+    const sellPointId = sellPointInput.dataset.sellPointLayoutId as GarageSellPointId;
+    const field = sellPointInput.dataset.sellPointLayoutField as keyof GarageEquipmentPlacement;
+    const nextValue = sellPointInput.valueAsNumber;
+    if (!Number.isFinite(nextValue)) return;
+    const placementValue = Math.min(100, Math.max(0, nextValue));
+    const displayValue = String(placementValue);
+    garageSellPointLayoutDraft[sellPointId][field] = placementValue;
+    root.querySelectorAll<HTMLInputElement>(`[data-sell-point-layout-id="${sellPointId}"][data-sell-point-layout-field="${field}"]`).forEach((control) => {
+      if (control.value !== displayValue) control.value = displayValue;
+    });
+    applySellPointPlacement(sellPointId);
+    updateLayoutDebugJson();
+    return;
+  }
+
   const input = (event.target as HTMLElement).closest<HTMLInputElement>('[data-layout-slot-id][data-layout-field]');
   if (!input) return;
   const slotId = input.dataset.layoutSlotId as GarageEquipmentSlotId;
@@ -1286,7 +1398,7 @@ root.addEventListener('click', (event) => {
   if (!target) {
     const clickTarget = event.target as HTMLElement;
     const isInsideOpenSurface = Boolean(
-      clickTarget.closest('.equipment-object, .equipment-hotspot, .case-hotspot, .supply-hotspot, .workshop-hotspot, .event-ticker, .missions-control, .notification-control, .ops-control, .layout-debug-panel, .focus-overlay, button')
+      clickTarget.closest('.equipment-object, .equipment-hotspot, .sell-point-object, .case-hotspot, .supply-hotspot, .workshop-hotspot, .event-ticker, .missions-control, .notification-control, .ops-control, .layout-debug-panel, .focus-overlay, button')
     );
     if ((expandedTarget || missionsOpen || notificationsOpen || opsOpen || activeOverlay) && !isInsideOpenSurface) {
       expandedTarget = null;

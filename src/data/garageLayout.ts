@@ -11,6 +11,17 @@ export interface GarageEquipmentTapPadding {
   y: number;
 }
 
+export type GarageSellPointId = 'finished-beer-pallet';
+
+export type GarageSellPointSpritePath = `assets/garage/sell-point/${string}`;
+
+export interface GarageSellPointVisual {
+  spriteByLevel: Record<0 | 1 | 2 | 3, GarageSellPointSpritePath>;
+  placement: GarageEquipmentPlacement;
+  tapPadding?: GarageEquipmentTapPadding;
+  interactionPriority?: number;
+}
+
 export interface GarageEquipmentInteraction {
   action: 'toggle-target';
   equipmentId: EquipmentId;
@@ -27,7 +38,7 @@ export interface GarageEquipmentVisual {
 
 export type GarageEquipmentTier = 'tier1' | 'tier2';
 export type GarageEquipmentLayoutTier = GarageEquipmentTier;
-export type GarageEquipmentSpritePath = `/assets/garage/equipment/tier1/${string}` | `/assets/garage/equipment/tier2/${string}`;
+export type GarageEquipmentSpritePath = `assets/garage/equipment/tier1/${string}` | `assets/garage/equipment/tier2/${string}`;
 export type GarageEquipmentSlotId =
   | 'brewhouse'
   | 'fermenter-slot-1'
@@ -39,7 +50,10 @@ export type GarageEquipmentSlotId =
   | 'packaging';
 
 export const garageEquipmentAssetPath = (tier: GarageEquipmentTier, filename: string): GarageEquipmentSpritePath =>
-  `/assets/garage/equipment/${tier}/${filename}` as GarageEquipmentSpritePath;
+  `assets/garage/equipment/${tier}/${filename}` as GarageEquipmentSpritePath;
+
+export const garageSellPointAssetPath = (filename: string): GarageSellPointSpritePath =>
+  `assets/garage/sell-point/${filename}` as GarageSellPointSpritePath;
 
 export type GarageEquipmentSlotLayout = Record<GarageEquipmentSlotId, GarageEquipmentPlacement>;
 
@@ -73,6 +87,20 @@ export const garageEquipmentLayoutByTier: Record<GarageEquipmentLayoutTier, Gara
 };
 
 export const garageEquipmentLayoutBySlot = garageEquipmentLayoutByTier.tier1;
+
+export const garageSellPointLayout: Record<GarageSellPointId, GarageSellPointVisual> = {
+  'finished-beer-pallet': {
+    spriteByLevel: {
+      0: garageSellPointAssetPath('pallet-finished-beer-empty.png'),
+      1: garageSellPointAssetPath('pallet-finished-beer-level1.png'),
+      2: garageSellPointAssetPath('pallet-finished-beer-level2.png'),
+      3: garageSellPointAssetPath('pallet-finished-beer-level3.png')
+    },
+    placement: { x: 47.7, y: 96.5, width: 9.7 },
+    tapPadding: { x: 4, y: 4 },
+    interactionPriority: 2
+  }
+};
 
 export const garageEquipmentLayoutByItem: Record<EquipmentItemId, GarageEquipmentVisual> = {
   'stock-pot-20l': {
