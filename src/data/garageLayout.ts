@@ -27,17 +27,35 @@ export interface GarageEquipmentVisual {
 
 export type GarageEquipmentTier = 'tier1' | 'tier2';
 export type GarageEquipmentSpritePath = `/assets/garage/equipment/tier1/${string}` | `/assets/garage/equipment/tier2/${string}`;
+export type GarageEquipmentSlotId =
+  | 'brewhouse'
+  | 'fermenter-slot-1'
+  | 'fermenter-slot-2'
+  | 'fermenter-slot-3'
+  | 'fermenter-slot-4'
+  | 'fermenter-slot-5'
+  | 'packaging';
 
 export const garageEquipmentAssetPath = (tier: GarageEquipmentTier, filename: string): GarageEquipmentSpritePath =>
   `/assets/garage/equipment/${tier}/${filename}` as GarageEquipmentSpritePath;
 
 const defaultTapPadding: GarageEquipmentTapPadding = { x: 4, y: 8 };
 
+export const garageEquipmentLayoutBySlot: Record<GarageEquipmentSlotId, GarageEquipmentPlacement> = {
+  brewhouse: { x: 26.9, y: 47, width: 17 },
+  'fermenter-slot-1': { x: 38.6, y: 45.1, width: 14.5 },
+  'fermenter-slot-2': { x: 49.4, y: 46.3, width: 14.5 },
+  'fermenter-slot-3': { x: 60.2, y: 47.5, width: 14.5 },
+  'fermenter-slot-4': { x: 50.5, y: 65, width: 12 },
+  'fermenter-slot-5': { x: 61.5, y: 65, width: 12 },
+  packaging: { x: 74.5, y: 62.4, width: 13.1 }
+};
+
 export const garageEquipmentLayoutByItem: Record<EquipmentItemId, GarageEquipmentVisual> = {
   'stock-pot-20l': {
     stationType: 'brewhouse',
     sprite: garageEquipmentAssetPath('tier1', 'brewhouse-20l-biab.png'),
-    placement: { x: 23.2, y: 80, width: 17 },
+    placement: { x: 26.9, y: 47, width: 17 },
     interaction: { action: 'toggle-target', equipmentId: 'kettle' },
     tapPadding: { x: 5, y: 5 },
     interactionPriority: 2
@@ -69,7 +87,7 @@ export const garageEquipmentLayoutByItem: Record<EquipmentItemId, GarageEquipmen
   'plastic-bucket': {
     stationType: 'fermentation',
     sprite: garageEquipmentAssetPath('tier1', 'fermenter-plastic-bucket.png'),
-    placement: { x: 52.1, y: 72.8, width: 13.5 },
+    placement: { x: 38.6, y: 45.1, width: 14.5 },
     interaction: { action: 'toggle-target', equipmentId: 'fermenter' },
     tapPadding: defaultTapPadding,
     interactionPriority: 3
@@ -93,7 +111,7 @@ export const garageEquipmentLayoutByItem: Record<EquipmentItemId, GarageEquipmen
   'wand-capper': {
     stationType: 'packaging',
     sprite: garageEquipmentAssetPath('tier1', 'packaging-bottle-wand-capper.png'),
-    placement: { x: 35, y: 66.5, width: 9 },
+    placement: { x: 74.5, y: 62.4, width: 13.1 },
     interaction: { action: 'toggle-target', equipmentId: 'bottler' },
     tapPadding: { x: 6, y: 5 },
     interactionPriority: 4

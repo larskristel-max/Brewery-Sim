@@ -1,5 +1,5 @@
 import { equipmentByStation } from './data/equipment.js';
-import { garageEquipmentLayoutByItem } from './data/garageLayout.js';
+import { garageEquipmentLayoutByItem, garageEquipmentLayoutBySlot } from './data/garageLayout.js';
 import { ingredients, getIngredient } from './data/ingredients.js';
 import { createInitialState } from './game/initialState.js';
 import { loadSavedGame, resetSavedGame, saveGameState, STORAGE_KEY } from './game/persistence.js';
@@ -21,14 +21,14 @@ const hadBrowserSave = hasBrowserSave();
 let state = loadSavedGame();
 let saveStatus = hadBrowserSave ? 'Browser save loaded' : 'Autosave ready';
 let expandedTarget = null;
+let expandedEquipmentInstanceId = null;
 let missionsOpen = false;
 let notificationsOpen = false;
 let opsOpen = false;
 let activeOverlay = null;
 let audioAllowed = false;
-const equipmentSceneOrder = ['kettle', 'fermenter', 'bottler'];
 const layoutDebugEnabled = new URLSearchParams(globalThis.location.search).get('layoutDebug') === '1';
-const garageLayoutDraft = Object.fromEntries(Object.entries(garageEquipmentLayoutByItem).map(([itemId, visual]) => [itemId, structuredClone(visual.placement)]));
+const garageLayoutDraft = Object.fromEntries(Object.entries(garageEquipmentLayoutBySlot).map(([slotId, placement]) => [slotId, structuredClone(placement)]));
 const stationLabels = {
     kettle: 'Brewhouse',
     fermenter: 'Fermentation',
@@ -40,14 +40,18 @@ const stationNouns = {
     bottler: 'packaging station'
 };
 const garageLayoutJson = () => JSON.stringify(garageLayoutDraft, null, 2);
-const applySpritePlacement = (itemId) => {
-    const placement = garageLayoutDraft[itemId];
-    const object = root.querySelector(`.equipment-object[data-equipment-item-id="${itemId}"]`);
-    if (!object)
-        return;
-    object.style.left = `${placement.x}%`;
-    object.style.top = `${placement.y}%`;
-    object.style.width = `${placement.width}%`;
+const applySpritePlacement = (slotId) => {
+    const placement = garageLayoutDraft[slotId];
+    root.querySelectorAll(`[data-layout-slot-id="${slotId}"]`).forEach((object) => {
+        if (object.classList.contains('equipment-object')) {
+            object.style.left = `${placement.x}%`;
+            object.style.top = `${placement.y}%`;
+            object.style.width = `${placement.width}%`;
+            return;
+        }
+        object.style.setProperty('--x', `${placement.x}%`);
+        object.style.setProperty('--y', `${placement.y}%`);
+    });
 };
 const updateLayoutDebugJson = () => {
     const output = root.querySelector('[data-layout-json]');
@@ -55,22 +59,64 @@ const updateLayoutDebugJson = () => {
         output.value = garageLayoutJson();
 };
 const activeEquipmentItemId = (equipment) => equipment.itemId ?? null;
+const stationSlotId = (equipmentId) => (equipmentId === 'bottler' ? 'packaging' : 'brewhouse');
+const fermenterSlotId = (index) => `fermenter-slot-${Math.min(index + 1, 5)}`;
+const activeOwnedInstance = (equipmentId) => {
+    const activeId = state.activeEquipment[equipmentId];
+    return state.ownedEquipment.find((item) => item.instanceId === activeId) ?? null;
+};
+const garageSceneEquipmentInstances = () => {
+    const stationInstances = ['kettle', 'bottler']
+        .map((equipmentId) => {
+        const equipment = state.equipment[equipmentId];
+        const owned = activeOwnedInstance(equipmentId);
+        const itemId = activeEquipmentItemId(equipment);
+        if (!itemId)
+            return null;
+        return {
+            equipmentId,
+            itemId,
+            instanceId: owned?.instanceId ?? `${equipmentId}-active`,
+            slotId: stationSlotId(equipmentId),
+            label: stationLabels[equipmentId],
+            name: displayEquipmentName(equipment),
+            condition: equipment.condition,
+            capacityLiters: equipment.capacityLiters,
+            spaceUsed: equipment.spaceUsed,
+            occupiedBatchId: owned?.occupiedBatchId
+        };
+    })
+        .filter(Boolean);
+    const fermenters = state.ownedEquipment
+        .filter((item) => item.equipmentId === 'fermenter' && item.installed)
+        .map((item, index) => ({
+        equipmentId: 'fermenter',
+        itemId: item.itemId,
+        instanceId: item.instanceId,
+        slotId: fermenterSlotId(index),
+        label: `Fermenter ${index + 1}`,
+        name: item.name,
+        condition: item.condition,
+        capacityLiters: item.capacityLiters,
+        spaceUsed: item.spaceUsed,
+        occupiedBatchId: item.occupiedBatchId
+    }));
+    return [stationInstances[0], ...fermenters, stationInstances[1]].filter((item) => Boolean(item));
+};
 const renderEquipmentObject = (equipment, content) => {
-    const itemId = activeEquipmentItemId(equipment);
-    if (!itemId)
+    const visual = garageEquipmentLayoutByItem[equipment.itemId];
+    if (!visual.sprite)
         return '';
-    const visual = garageEquipmentLayoutByItem[itemId];
-    const src = visual.sprite;
-    if (!src)
-        return '';
-    const placement = garageLayoutDraft[itemId];
+    const placement = garageLayoutDraft[equipment.slotId];
     const tapPadding = visual.tapPadding ?? { x: 0, y: 0 };
     const priority = visual.interactionPriority ?? 0;
     return `
     <article
-      class="equipment-object equipment-object-${equipment.id}"
-      data-equipment-id="${equipment.id}"
-      data-equipment-item-id="${itemId}"
+      class="equipment-object equipment-object-${equipment.equipmentId}"
+      data-equipment-id="${equipment.equipmentId}"
+      data-equipment-item-id="${equipment.itemId}"
+      data-equipment-instance-id="${equipment.instanceId}"
+      data-layout-slot-id="${equipment.slotId}"
       style="left: ${placement.x}%; top: ${placement.y}%; width: ${placement.width}%; --tap-padding-x: ${tapPadding.x}%; --tap-padding-y: ${tapPadding.y}%; --interaction-priority: ${priority}; z-index: ${20 + priority}"
     >
       ${content}
@@ -85,28 +131,24 @@ const renderLayoutDebugPanel = () => layoutDebugEnabled
           <span>Percent values inside .garage-scene</span>
         </div>
         <div class="layout-debug-controls">
-          ${equipmentSceneOrder
-        .map((equipmentId) => {
-        const item = state.equipment[equipmentId];
-        const itemId = activeEquipmentItemId(item);
-        if (!itemId)
-            return '';
-        const placement = garageLayoutDraft[itemId];
-        const tapPadding = garageEquipmentLayoutByItem[itemId].tapPadding;
+          ${garageSceneEquipmentInstances()
+        .map((equipment) => {
+        const placement = garageLayoutDraft[equipment.slotId];
+        const tapPadding = garageEquipmentLayoutByItem[equipment.itemId].tapPadding;
         return `
                 <fieldset class="layout-debug-fieldset">
-                  <legend>${stationLabels[equipmentId]} · ${itemId}</legend>
+                  <legend>${equipment.label} / ${equipment.itemId}</legend>
                   ${['x', 'y', 'width']
             .map((field) => `
                         <label>
-                          <span>${field}: <output data-layout-output="${itemId}-${field}">${placement[field]}</output>%</span>
+                          <span>${field}: <output data-layout-output="${equipment.slotId}-${field}">${placement[field]}</output>%</span>
                           <input
                             type="range"
                             min="0"
                             max="100"
                             step="0.1"
                             value="${placement[field]}"
-                            data-layout-item-id="${itemId}"
+                            data-layout-slot-id="${equipment.slotId}"
                             data-layout-field="${field}"
                           />
                         </label>
@@ -254,6 +296,7 @@ const resetGame = () => {
     resetSavedGame();
     state = createInitialState();
     expandedTarget = null;
+    expandedEquipmentInstanceId = null;
     missionsOpen = false;
     notificationsOpen = false;
     opsOpen = false;
@@ -356,6 +399,69 @@ const equipmentSceneStatus = (equipmentId) => {
         label: conditionLabel,
         detail: `${conditionDetail} - ${equipmentMetaLine(equipment)}`,
         toneClass: `condition-${equipmentConditionTier(equipment.condition)}`
+    };
+};
+const batchForEquipmentInstance = (equipment) => {
+    if (equipment.equipmentId !== 'fermenter')
+        return batchForEquipment(equipment.equipmentId);
+    return state.batches.find((batch) => batch.fermenterInstanceId === equipment.instanceId);
+};
+const activeForEquipmentInstance = (equipment) => {
+    const batch = batchForEquipmentInstance(equipment);
+    if (equipment.equipmentId === 'fermenter')
+        return batch?.step === 'fermenting';
+    return activeForEquipment(equipment.equipmentId);
+};
+const isNextTapTargetForInstance = (equipment) => {
+    if (equipment.equipmentId !== 'fermenter')
+        return isNextTapTarget(equipment.equipmentId);
+    if (!isNextTapTarget('fermenter'))
+        return false;
+    const waitingTransfer = state.batches.find((batch) => batch.step === 'awaiting-transfer');
+    if (waitingTransfer)
+        return waitingTransfer.fermenterInstanceId === equipment.instanceId;
+    const activeBatch = state.batches.find((batch) => batch.step === 'fermenting');
+    return activeBatch ? activeBatch.fermenterInstanceId === equipment.instanceId : true;
+};
+const equipmentInstanceStatus = (equipment) => {
+    if (equipment.equipmentId !== 'fermenter')
+        return equipmentSceneStatus(equipment.equipmentId);
+    const conditionTier = equipmentConditionTier(equipment.condition);
+    const batch = batchForEquipmentInstance(equipment);
+    const detailBase = `${equipment.capacityLiters} L capacity - ${equipment.spaceUsed || '?'} space`;
+    if (batch?.step === 'awaiting-transfer') {
+        return {
+            label: 'Transfer waiting',
+            detail: `${batch.recipeName} is reserved for this fermenter`,
+            toneClass: 'risk-high'
+        };
+    }
+    if (batch?.step === 'fermenting') {
+        const tier = contaminationRiskTier(batch.contaminationRisk);
+        return {
+            label: `${state.fermenterTemperatureC} C fermentation`,
+            detail: `${batch.recipeName} - ${riskLabel(batch.contaminationRisk)}`,
+            toneClass: `risk-${tier}`
+        };
+    }
+    if (batch?.step === 'awaiting-packaging') {
+        return {
+            label: 'Ready to package',
+            detail: `${batch.recipeName} finished fermenting`,
+            toneClass: 'risk-low'
+        };
+    }
+    if (batch) {
+        return {
+            label: 'Reserved',
+            detail: `${batch.recipeName} - ${stepLabel(batch.step)}`,
+            toneClass: 'risk-low'
+        };
+    }
+    return {
+        label: 'Open fermenter',
+        detail: `${Math.round(equipment.condition)}% clean - ${detailBase}`,
+        toneClass: `condition-${conditionTier}`
     };
 };
 const hotspotPosition = (equipmentId) => {
@@ -668,54 +774,59 @@ const renderGarage = () => {
     const position = brewerPosition();
     const visibility = sceneVisibility();
     const expandedClass = expandedTarget ? `has-expanded expanded-${expandedTarget}` : '';
-    const equipment = Object.values(state.equipment)
+    const equipment = garageSceneEquipmentInstances()
         .map((item) => {
-        const itemId = activeEquipmentItemId(item);
-        const visual = itemId ? garageEquipmentLayoutByItem[itemId] : null;
+        const visual = garageEquipmentLayoutByItem[item.itemId];
         const conditionTier = equipmentConditionTier(item.condition);
-        const status = equipmentSceneStatus(item.id);
-        const expanded = expandedTarget === item.id;
-        const contextual = item.id === visibility.spotlightTarget || activeForEquipment(item.id) || expanded;
+        const status = equipmentInstanceStatus(item);
+        const active = activeForEquipmentInstance(item);
+        const nextTap = isNextTapTargetForInstance(item);
+        const expanded = expandedTarget === item.equipmentId && expandedEquipmentInstanceId === item.instanceId;
+        const contextual = item.equipmentId === visibility.spotlightTarget || active || expanded || nextTap;
         const silent = !contextual && visibility.modeClass !== 'mode-idle';
         const obstructed = expandedTarget === 'fermenter'
-            ? item.id === 'kettle' || item.id === 'bottler'
+            ? item.equipmentId === 'kettle' || item.equipmentId === 'bottler'
             : expandedTarget === 'bottler'
-                ? item.id === 'fermenter'
+                ? item.equipmentId === 'fermenter'
                 : false;
-        if (!itemId || !visual?.sprite) {
-            const pos = hotspotPosition(item.id);
+        if (!visual?.sprite) {
+            const pos = garageLayoutDraft[item.slotId] ?? hotspotPosition(item.equipmentId);
             return `
           <article
-            class="equipment-hotspot hotspot-${item.id} ${expanded ? 'expanded' : ''} ${contextual ? 'contextual' : ''} ${silent ? 'scene-silent' : ''} ${obstructed ? 'obstructed-by-card' : ''} condition-${conditionTier} ${status.toneClass} ${item.id === state.selectedEquipmentId ? 'selected' : ''} ${activeForEquipment(item.id) ? 'active' : ''} ${isNextTapTarget(item.id) ? 'next-tap' : ''}"
+            class="equipment-hotspot hotspot-${item.equipmentId} ${expanded ? 'expanded' : ''} ${contextual ? 'contextual' : ''} ${silent ? 'scene-silent' : ''} ${obstructed ? 'obstructed-by-card' : ''} condition-${conditionTier} ${status.toneClass} ${item.equipmentId === state.selectedEquipmentId ? 'selected' : ''} ${active ? 'active' : ''} ${nextTap ? 'next-tap' : ''}"
             style="--x: ${pos.x}%; --y: ${pos.y}%"
             data-action="toggle-target"
-            data-target="${item.id}"
+            data-target="${item.equipmentId}"
+            data-equipment-item-id="${item.itemId}"
+            data-equipment-instance-id="${item.instanceId}"
+            data-layout-slot-id="${item.slotId}"
           >
-            <button class="hotspot-toggle" data-action="toggle-target" data-target="${item.id}" type="button" aria-expanded="${expanded}" aria-label="${expanded ? 'Collapse' : 'Expand'} ${displayEquipmentName(item)}">
-              <span class="hotspot-name">${displayEquipmentName(item)}</span>
+            <button class="hotspot-toggle" data-action="toggle-target" data-target="${item.equipmentId}" data-equipment-instance-id="${item.instanceId}" type="button" aria-expanded="${expanded}" aria-label="${expanded ? 'Collapse' : 'Expand'} ${item.name}">
+              <span class="hotspot-name">${item.label}</span>
               <strong>${status.label}</strong>
               ${expanded ? `<small>${status.detail}</small>` : ''}
             </button>
-            ${expanded ? renderEquipmentActions(item.id) : ''}
+            ${expanded ? renderEquipmentActions(item.equipmentId) : ''}
           </article>
         `;
         }
         return renderEquipmentObject(item, `
           <button
-            class="equipment-object-toggle hotspot-${item.id} ${expanded ? 'expanded' : ''} ${contextual ? 'contextual' : ''} ${silent ? 'scene-silent' : ''} condition-${conditionTier} ${status.toneClass} ${item.id === state.selectedEquipmentId ? 'selected' : ''} ${activeForEquipment(item.id) ? 'active' : ''} ${isNextTapTarget(item.id) ? 'next-tap' : ''}"
+            class="equipment-object-toggle hotspot-${item.equipmentId} ${expanded ? 'expanded' : ''} ${contextual ? 'contextual' : ''} ${silent ? 'scene-silent' : ''} condition-${conditionTier} ${status.toneClass} ${item.equipmentId === state.selectedEquipmentId ? 'selected' : ''} ${active ? 'active' : ''} ${nextTap ? 'next-tap' : ''}"
             data-action="${visual.interaction.action}"
             data-target="${visual.interaction.equipmentId}"
+            data-equipment-instance-id="${item.instanceId}"
             type="button"
             aria-expanded="${expanded}"
-            aria-label="${expanded ? 'Collapse' : 'Expand'} ${displayEquipmentName(item)}"
+            aria-label="${expanded ? 'Collapse' : 'Expand'} ${item.name}"
           >
-            <img class="equipment-sprite equipment-sprite-${item.id}" src="${visual.sprite}" alt="${displayEquipmentName(item)}" draggable="false" />
+            <img class="equipment-sprite equipment-sprite-${item.equipmentId}" src="${visual.sprite}" alt="${item.name}" draggable="false" />
           </button>
           <div class="equipment-object-card ${expanded ? 'expanded' : ''} ${obstructed ? 'obstructed-by-card' : ''}" ${expanded ? '' : 'hidden'}>
-            <span class="hotspot-name">${displayEquipmentName(item)}</span>
+            <span class="hotspot-name">${item.label}</span>
             <strong>${status.label}</strong>
             <small>${status.detail}</small>
-            ${renderEquipmentActions(item.id)}
+            ${renderEquipmentActions(item.equipmentId)}
           </div>
         `);
     })
@@ -927,16 +1038,16 @@ root.addEventListener('error', (event) => {
 root.addEventListener('input', (event) => {
     if (!layoutDebugEnabled)
         return;
-    const input = event.target.closest('[data-layout-item-id][data-layout-field]');
+    const input = event.target.closest('[data-layout-slot-id][data-layout-field]');
     if (!input)
         return;
-    const itemId = input.dataset.layoutItemId;
+    const slotId = input.dataset.layoutSlotId;
     const field = input.dataset.layoutField;
-    garageLayoutDraft[itemId][field] = Number(input.value);
-    const output = root.querySelector(`[data-layout-output="${itemId}-${field}"]`);
+    garageLayoutDraft[slotId][field] = Number(input.value);
+    const output = root.querySelector(`[data-layout-output="${slotId}-${field}"]`);
     if (output)
         output.value = input.value;
-    applySpritePlacement(itemId);
+    applySpritePlacement(slotId);
     updateLayoutDebugJson();
 });
 root.addEventListener('click', (event) => {
@@ -947,6 +1058,7 @@ root.addEventListener('click', (event) => {
         const isInsideOpenSurface = Boolean(clickTarget.closest('.equipment-object, .equipment-hotspot, .case-hotspot, .supply-hotspot, .workshop-hotspot, .event-ticker, .missions-control, .notification-control, .ops-control, .layout-debug-panel, .focus-overlay, button'));
         if ((expandedTarget || missionsOpen || notificationsOpen || opsOpen || activeOverlay) && !isInsideOpenSurface) {
             expandedTarget = null;
+            expandedEquipmentInstanceId = null;
             missionsOpen = false;
             notificationsOpen = false;
             opsOpen = false;
@@ -965,6 +1077,7 @@ root.addEventListener('click', (event) => {
     if (action === 'open-overlay') {
         activeOverlay = target.dataset.overlay;
         expandedTarget = null;
+        expandedEquipmentInstanceId = null;
         missionsOpen = false;
         notificationsOpen = false;
         opsOpen = false;
@@ -976,6 +1089,7 @@ root.addEventListener('click', (event) => {
         missionsOpen = false;
         notificationsOpen = false;
         expandedTarget = null;
+        expandedEquipmentInstanceId = null;
         activeOverlay = null;
         render();
         return;
@@ -993,6 +1107,7 @@ root.addEventListener('click', (event) => {
         missionsOpen = !missionsOpen;
         notificationsOpen = false;
         expandedTarget = null;
+        expandedEquipmentInstanceId = null;
         activeOverlay = null;
         opsOpen = false;
         render();
@@ -1002,6 +1117,7 @@ root.addEventListener('click', (event) => {
         notificationsOpen = !notificationsOpen;
         missionsOpen = false;
         expandedTarget = null;
+        expandedEquipmentInstanceId = null;
         activeOverlay = null;
         opsOpen = false;
         render();
@@ -1009,9 +1125,11 @@ root.addEventListener('click', (event) => {
     }
     if (action === 'toggle-target') {
         const nextTarget = target.dataset.target;
+        const nextInstanceId = target.dataset.equipmentInstanceId ?? null;
         if (nextTarget === 'kettle') {
             activeOverlay = 'recipes';
             expandedTarget = null;
+            expandedEquipmentInstanceId = null;
             missionsOpen = false;
             notificationsOpen = false;
             opsOpen = false;
@@ -1019,7 +1137,7 @@ root.addEventListener('click', (event) => {
             return;
         }
         const waitingTransfer = state.batches.find((batch) => batch.step === 'awaiting-transfer');
-        if (nextTarget === 'fermenter' && waitingTransfer) {
+        if (nextTarget === 'fermenter' && waitingTransfer && (!nextInstanceId || nextInstanceId === waitingTransfer.fermenterInstanceId)) {
             dispatch({ type: 'transfer-batch', batchId: waitingTransfer.id });
             return;
         }
@@ -1027,7 +1145,9 @@ root.addEventListener('click', (event) => {
             dispatch({ type: 'use-equipment', equipmentId: 'bottler' });
             return;
         }
-        expandedTarget = expandedTarget === nextTarget ? null : nextTarget;
+        const collapseSameTarget = expandedTarget === nextTarget && expandedEquipmentInstanceId === nextInstanceId;
+        expandedTarget = collapseSameTarget ? null : nextTarget;
+        expandedEquipmentInstanceId = collapseSameTarget ? null : nextInstanceId;
         missionsOpen = false;
         notificationsOpen = false;
         activeOverlay = null;

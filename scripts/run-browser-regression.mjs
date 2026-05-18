@@ -99,6 +99,33 @@ try {
   assert.match(await visibleText(page), /REP\s+1/);
   assert.equal(await page.locator('.case-hotspot').count(), 0, 'sold-out cases should leave the scene');
 
+  await page.locator('.workshop-hotspot').click();
+  await page.locator('[data-action="buy-equipment"][data-equipment-item-id="plastic-bucket"]').click();
+  await page.locator('[data-action="buy-equipment"][data-equipment-item-id="plastic-bucket"]').click();
+  assert.equal(
+    await page.locator('.equipment-object[data-equipment-id="fermenter"]').count(),
+    3,
+    'owned plastic fermenters should render as separate clickable scene objects outside debug mode'
+  );
+
+  await page.goto(`${baseUrl}?layoutDebug=1`);
+  await assert.doesNotReject(page.locator('.layout-debug-panel').waitFor({ state: 'visible', timeout: 5000 }));
+  assert.equal(
+    await page.locator('.layout-debug-fieldset').filter({ hasText: 'Fermenter 1 / plastic-bucket' }).count(),
+    1,
+    'layout debug should expose fermenter slot 1'
+  );
+  assert.equal(
+    await page.locator('.layout-debug-fieldset').filter({ hasText: 'Fermenter 2 / plastic-bucket' }).count(),
+    1,
+    'layout debug should expose fermenter slot 2'
+  );
+  assert.equal(
+    await page.locator('.layout-debug-fieldset').filter({ hasText: 'Fermenter 3 / plastic-bucket' }).count(),
+    1,
+    'layout debug should expose fermenter slot 3'
+  );
+
   await browser.close();
   console.log('Browser regression passed: direct hotspot garage loop works.');
 } finally {
