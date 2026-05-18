@@ -53,6 +53,14 @@ let notificationsOpen = false;
 let opsOpen = false;
 let activeOverlay = null;
 let audioAllowed = false;
+const GUIDANCE_DISMISSED_KEY = 'brewery-sim-guidance-dismissed';
+let guidanceDismissed = false;
+try {
+    guidanceDismissed = globalThis.localStorage?.getItem(GUIDANCE_DISMISSED_KEY) === '1';
+}
+catch {
+    guidanceDismissed = false;
+}
 const garageLayoutDraft = Object.fromEntries(Object.entries(garageEquipmentLayoutByTier[activeGarageLayoutTier] ?? garageEquipmentLayoutBySlot).map(([slotId, placement]) => [
     slotId,
     structuredClone(placement)
@@ -672,10 +680,13 @@ const renderTopHud = () => `
     ${renderNotificationControl()}
   </header>
 `;
-const renderFirstLoopObjective = () => `
+const renderFirstLoopObjective = () => guidanceDismissed
+    ? ''
+    : `
   <div class="first-loop-objective scene-pill" aria-label="Current garage-floor objective">
     <span>Next step</span>
     <strong>${firstLoopObjective(state)}</strong>
+    <button class="guidance-close" data-action="dismiss-guidance" type="button" aria-label="Dismiss guidance"></button>
   </div>
 `;
 const renderMissionsControl = () => {
@@ -987,6 +998,40 @@ const renderSalesOffers = () => `
     <div class="temperature-note"><strong>Gameplay case definition</strong><span>${caseDefinitionExplanation}</span></div>
   </div>
 `;
+const renderStationPanel = () => {
+    if (!expandedTarget)
+        return '';
+    if (expandedTarget === 'cases') {
+        return `
+      <div class="station-panel-layer">
+        <button class="station-panel-scrim" data-action="close-station-panel" type="button" aria-label="Close station panel"></button>
+        <aside class="glass-panel station-panel" aria-label="Station panel">
+          <button class="station-panel-close" data-action="close-station-panel" type="button" aria-label="Close station panel"></button>
+          <header class="station-panel-header"><span class="eyebrow gold">Pallet</span><h2>Finished beer pallet</h2><p>${caseCountLabel(state.inventory.cases)} ready</p></header>
+          <section class="station-panel-body"><p>${caseDefinitionExplanation}</p><p>${state.inventory.cases > 0 ? 'Select an offer to sell cases.' : 'Package beer to fill the pallet.'}</p></section>
+          ${renderSalesOffers()}
+        </aside>
+      </div>
+    `;
+    }
+    const equipment = garageSceneEquipmentInstances();
+    const selected = equipment.find((item) => item.instanceId === expandedEquipmentInstanceId && item.equipmentId === expandedTarget) ?? equipment.find((item) => item.equipmentId === expandedTarget);
+    if (!selected)
+        return '';
+    const status = equipmentInstanceStatus(selected);
+    const batch = batchForEquipmentInstance(selected);
+    return `
+    <div class="station-panel-layer">
+      <button class="station-panel-scrim" data-action="close-station-panel" type="button" aria-label="Close station panel"></button>
+      <aside class="glass-panel station-panel" aria-label="Station panel">
+        <button class="station-panel-close" data-action="close-station-panel" type="button" aria-label="Close station panel"></button>
+        <header class="station-panel-header"><span class="eyebrow gold">${selected.label}</span><h2>${selected.name}</h2><p>${status.label}</p></header>
+        <section class="station-panel-body"><p>${status.detail}</p>${batch ? `<p>Batch: ${batch.recipeName} · ${stepLabel(batch.step)} · ${batchRemainingLabel(batch)}</p>` : '<p>No active batch.</p>'}<p>Time: ${formatGameDate(state.day)} · ${formatClock(state.minute)}</p></section>
+        ${renderEquipmentActions(selected.equipmentId, selected)}
+      </aside>
+    </div>
+  `;
+};
 const getFinishedPalletLevel = (cases) => {
     if (cases <= 0)
         return 0;
@@ -1025,13 +1070,7 @@ const renderFinishedBeerPallet = () => {
       >
         <img class="sell-point-sprite" src="${src}" alt="Finished beer pallet" draggable="false" />
       </button>
-      <div class="equipment-object-card sell-point-card ${expanded ? 'expanded' : ''}" ${expanded ? '' : 'hidden'}>
-        <span class="hotspot-name">Finished beer</span>
-        <strong>${caseCountLabel(state.inventory.cases)}</strong>
-        <small>${caseDefinitionExplanation}</small>
-        <small>${active ? 'Ready to sell' : 'Package beer to fill the pallet'}</small>
-        ${renderSalesOffers()}
-      </div>
+
     </article>
   `;
 };
@@ -1063,6 +1102,7 @@ const renderOpsControl = () => `
               <button data-action="open-overlay" data-overlay="upgrades" type="button"><span>Bench</span><strong>Workshop</strong></button>
               <button data-action="open-overlay" data-overlay="log" type="button"><span>Clipboard</span><strong>Floor notes</strong></button>
               <button data-action="end-day" type="button"><span>Time</span><strong>End day</strong></button>
+              <button data-action="restore-guidance" type="button"><span>Help</span><strong>Restore next step</strong></button>
               <button data-action="reset-save" type="button"><span>Settings</span><strong>New Game / Reset Save</strong></button>
             </div>
           </aside>
@@ -1135,12 +1175,7 @@ const renderGarage = () => {
           >
             <img class="equipment-sprite equipment-sprite-${item.equipmentId}" src="${visual.sprite}" alt="${item.name}" draggable="false" />
           </button>
-          <div class="equipment-object-card ${expanded ? 'expanded' : ''} ${obstructed ? 'obstructed-by-card' : ''}" ${expanded ? '' : 'hidden'}>
-            <span class="hotspot-name">${item.label}</span>
-            <strong>${status.label}</strong>
-            <small>${status.detail}</small>
-            ${renderEquipmentActions(item.equipmentId, item)}
-          </div>
+
         `);
     })
         .join('');
@@ -1157,6 +1192,7 @@ const renderGarage = () => {
       ${visibility.showFloorNoteTicker ? renderEventTicker() : ''}
       ${equipment}
       ${renderFinishedBeerPallet()}
+      ${renderStationPanel()}
       <div class="brewer-avatar" style="left: ${position.left}; top: ${position.top}" aria-label="Brewer position"><span></span></div>
       ${renderOpsControl()}
       ${renderLayoutDebugPanel()}
@@ -1410,6 +1446,31 @@ root.addEventListener('click', (event) => {
         missionsOpen = false;
         notificationsOpen = false;
         opsOpen = false;
+        render();
+        return;
+    }
+    if (action === 'dismiss-guidance') {
+        guidanceDismissed = true;
+        try {
+            globalThis.localStorage?.setItem(GUIDANCE_DISMISSED_KEY, '1');
+        }
+        catch { }
+        render();
+        return;
+    }
+    if (action === 'restore-guidance') {
+        guidanceDismissed = false;
+        try {
+            globalThis.localStorage?.removeItem(GUIDANCE_DISMISSED_KEY);
+        }
+        catch { }
+        opsOpen = false;
+        render();
+        return;
+    }
+    if (action === 'close-station-panel') {
+        expandedTarget = null;
+        expandedEquipmentInstanceId = null;
         render();
         return;
     }
