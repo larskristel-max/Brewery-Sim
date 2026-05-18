@@ -321,7 +321,7 @@ dirtyBottler.ownedEquipment.find((item) => item.instanceId === dirtyBottler.acti
 dirtyBottler = reduceGame(dirtyBottler, { type: 'start-batch', recipeId: 'garage-blonde' });
 dirtyBottler = tickUntilStep(dirtyBottler, undefined, 20);
 assert.ok(dirtyBottler.inventory.cases > 0, 'dirty bottler should still package some cases');
-assert.match(eventMessages(dirtyBottler), /Dirty bottling station lost \d+ cases?/, 'dirty packaging should produce a plain-language warning');
+assert.match(eventMessages(dirtyBottler), /Dirty bottling station lost \d+ gameplay cases? \(12 × 33 cl bottles each\)/, 'dirty packaging should produce a plain-language warning with the gameplay case definition');
 
 let nextDay = createInitialState();
 nextDay = reduceGame(nextDay, { type: 'end-day' });
@@ -337,6 +337,10 @@ assert.match(mainSource, /Mash.*Ferment.*Package.*Sell/s, 'UI should show clear 
 assert.match(mainSource, /loadSavedGame/, 'UI should load browser-local saves on startup');
 assert.match(mainSource, /saveGameState/, 'UI should save browser-local progress after actions and ticks');
 assert.match(mainSource, /New Game \/ Reset Save/, 'UI should expose a reset save button');
+assert.match(mainSource, /caseDefinitionExplanation/, 'UI should reuse the persistent gameplay case explanation');
+assert.match(mainSource, /caseCountLabel\(readyBatch\.casesExpected\)/, 'bottling bench should show case counts with the 12 bottle definition');
+assert.match(mainSource, /caseCountLabel\(state\.inventory\.cases\)/, 'pallet and inventory surfaces should show gameplay case counts with definition');
+assert.match(mainSource, /caseCountLabel\(lot\.cases\)/, 'finished lot cards should show gameplay case counts with definition');
 
 const index = await readFile(new URL('../index.html', import.meta.url), 'utf8');
 assert.match(index, /viewport-fit=cover/, 'index should include an iPhone safe-area viewport');

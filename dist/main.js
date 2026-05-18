@@ -3,7 +3,7 @@ import { garageEquipmentLayoutByItem, garageEquipmentLayoutBySlot, garageEquipme
 import { ingredients, getIngredient } from './data/ingredients.js';
 import { createInitialState } from './game/initialState.js';
 import { loadSavedGame, resetSavedGame, saveGameState, STORAGE_KEY } from './game/persistence.js';
-import { caseDefinitionLabel, contaminationRiskTier, currentWorkflowStage, demandProgress, equipmentConditionLabel, equipmentConditionTier, firstLoopObjective, formatBatchRemainingTime, formatGameDate, formatClock, formatCurrency, ingredientAmountLabel, objectiveProgress, orderCost, recipeCanStart, recipeIngredientCost, recipeMissingIngredients, recipeOrderItems, saleCasesForChannel, salesChannels, saleValueForChannel, storageCapacityByArea, storageOverflowByArea, storageUseByArea, visibleRecipes } from './game/selectors.js';
+import { caseCountLabel, caseDefinitionExplanation, contaminationRiskTier, currentWorkflowStage, demandProgress, equipmentConditionLabel, equipmentConditionTier, firstLoopObjective, formatBatchRemainingTime, formatGameDate, formatClock, formatCurrency, ingredientAmountLabel, litersToBottles, litersToCases, objectiveProgress, orderCost, recipeCanStart, recipeIngredientCost, recipeMissingIngredients, recipeOrderItems, saleCasesForChannel, salesChannels, saleValueForChannel, storageCapacityByArea, storageOverflowByArea, storageUseByArea, visibleRecipes } from './game/selectors.js';
 import { reduceGame } from './game/simulation.js';
 const root = document.querySelector('#root');
 if (!root) {
@@ -525,7 +525,7 @@ const equipmentSceneStatus = (equipmentId) => {
         if (readyBatch) {
             return {
                 label: 'Package available',
-                detail: tier === 'dirty' || tier === 'critical' ? `${readyBatch.casesExpected} cases (${caseDefinitionLabel}) - packaging loss risk` : `${readyBatch.casesExpected} cases (${caseDefinitionLabel}) ready`,
+                detail: tier === 'dirty' || tier === 'critical' ? `${caseCountLabel(readyBatch.casesExpected)} - packaging loss risk` : `${caseCountLabel(readyBatch.casesExpected)} ready`,
                 toneClass: tier === 'dirty' || tier === 'critical' ? 'risk-high' : 'risk-low'
             };
         }
@@ -539,7 +539,7 @@ const equipmentSceneStatus = (equipmentId) => {
         if (state.inventory.cases > 0) {
             return {
                 label: 'Packaging / conditioning complete',
-                detail: `${state.inventory.cases} cases (${caseDefinitionLabel}) on pallet`,
+                detail: `${caseCountLabel(state.inventory.cases)} on pallet`,
                 toneClass: 'risk-low'
             };
         }
@@ -722,7 +722,7 @@ const renderNotificationControl = () => {
               <div class="status-lines">
                 <div><span>Fermenter</span><strong>${fermenterStatus}</strong></div>
                 <div><span>Packaging</span><strong>${packagingStatus}</strong></div>
-                <div><span>Cases</span><strong>${state.inventory.cases} ready</strong></div>
+                <div><span>Cases</span><strong>${caseCountLabel(state.inventory.cases)} ready</strong></div>
                 <div><span>Channel</span><strong>${state.demand.accountName}</strong></div>
                 <div><span>Compliance</span><strong>${state.visibilityRisk >= 30 ? 'Invoice pressure' : `${state.visibilityRisk}/30 visible`}</strong></div>
                 <div><span>Garage space</span><strong>${garageSpaceUsed()}/${garageSpaceLimit()}${storageOverflow > 0 ? ' plus clutter' : ''}</strong></div>
@@ -745,11 +745,13 @@ const renderRecipeCards = () => visibleRecipes()
     const startBlocker = recipeStartBlocker(recipe);
     const canStart = recipeCanStart(state, recipe) && startBlocker === '';
     const reservation = fermenterReservation();
-    const batchLiters = Math.min(state.equipment.kettle.capacityLiters, state.equipment.fermenter.capacityLiters);
+    const batchLiters = Math.min(recipe.targetBatchLiters, state.equipment.kettle.capacityLiters, state.equipment.fermenter.capacityLiters);
+    const expectedBottles = litersToBottles(batchLiters);
+    const expectedCases = litersToCases(batchLiters);
     const capStation = state.equipment.kettle.capacityLiters <= state.equipment.fermenter.capacityLiters ? stationNouns.kettle : stationNouns.fermenter;
     const capacityText = state.equipment.kettle.capacityLiters === state.equipment.fermenter.capacityLiters
-        ? `${batchLiters} L garage batch with the current setup.`
-        : `${batchLiters} L batch capped by the ${capStation}.`;
+        ? `${batchLiters} L garage batch ≈ ${expectedBottles} bottles / ${caseCountLabel(expectedCases)} with the current setup.`
+        : `${batchLiters} L batch capped by the ${capStation} ≈ ${expectedBottles} bottles / ${caseCountLabel(expectedCases)}.`;
     const missingLabel = missing.map((item) => `${getIngredient(item.ingredientId).name} ${ingredientAmountLabel(item.ingredientId, item.amount)}`).join(', ');
     const missingOrderBlocker = missing.length === 0 ? 'Nothing missing' : incomingMissing.fullyIncoming ? incomingMissing.label : `Need ${formatCurrency(missingCost)}`;
     const extraOrderBlocker = `Need ${formatCurrency(extraCost)}`;
@@ -757,8 +759,9 @@ const renderRecipeCards = () => visibleRecipes()
     const estimatedDelivery = `Estimated delivery: ${formatGameDate(estimatedArrivalDay)}. Arrives in 3 days.`;
     return `
         <article class="batch-card recipe-card">
-          <div><strong>${recipe.name}</strong><span>${recipe.style} · ${formatCurrency(recipe.salePricePerCase)}/${caseDefinitionLabel} case</span></div>
+          <div><strong>${recipe.name}</strong><span>${recipe.style} · ${formatCurrency(recipe.salePricePerCase)} per gameplay case</span></div>
           <small>${recipe.challenge}</small>
+          <small>${caseDefinitionExplanation}</small>
           <div class="capacity-note ${reservation.blocked ? 'blocked' : ''}">
             <strong>${reservation.label}</strong>
             <span>${capacityText} ${reservation.detail}</span>
@@ -870,7 +873,8 @@ const renderEquipmentActions = (equipmentId, instance) => {
     if (readyBatch) {
         return `
       <div class="hotspot-actions">
-        <button data-action="start-packaging" data-batch-id="${readyBatch.id}" type="button">Package Garage Blonde<small>${readyBatch.casesExpected} cases · ${caseDefinitionLabel}</small></button>
+        <button data-action="start-packaging" data-batch-id="${readyBatch.id}" type="button">Package Garage Blonde<small>${caseCountLabel(readyBatch.casesExpected)}</small></button>
+        <div class="temperature-note"><strong>Gameplay case definition</strong><span>${caseDefinitionExplanation}</span></div>
         <button data-action="clean-equipment" data-equipment-id="bottler" type="button" ${canClean ? '' : `disabled title="Need ${formatCurrency(cleanCost)}"`}>Clean${canClean ? '' : '<small>Need cash</small>'}</button>
         <button data-action="open-overlay" data-overlay="production" type="button">Flow state<small>Fallback</small></button>
       </div>
@@ -976,10 +980,11 @@ const renderSalesOffers = () => `
     const invoiceBlocked = (state.demand.invoiceRequired || (channel.formal && state.visibilityRisk >= channel.invoiceAfter)) && !state.canInvoice;
     const disabled = cases <= 0 || invoiceBlocked;
     return `<button data-action="sell-channel" data-channel-id="${offer.id}" data-cases="${cases}" type="button" ${disabled ? 'disabled' : ''}>
-          ${channel.name}<small>${cases}/${channel.cases} cases (${caseDefinitionLabel}) - ${formatCurrency(payout)} payout - ${offer.risk} - ${invoiceBlocked ? 'Invoice blocked' : offer.invoice}</small>
+          ${channel.name}<small>Selling ${caseCountLabel(cases)} / offer max ${caseCountLabel(channel.cases)} - ${formatCurrency(payout)} payout - ${offer.risk} - ${invoiceBlocked ? 'Invoice blocked' : offer.invoice}</small>
         </button>`;
 })
     .join('')}
+    <div class="temperature-note"><strong>Gameplay case definition</strong><span>${caseDefinitionExplanation}</span></div>
   </div>
 `;
 const getFinishedPalletLevel = (cases) => {
@@ -1022,7 +1027,8 @@ const renderFinishedBeerPallet = () => {
       </button>
       <div class="equipment-object-card sell-point-card ${expanded ? 'expanded' : ''}" ${expanded ? '' : 'hidden'}>
         <span class="hotspot-name">Finished beer</span>
-        <strong>${state.inventory.cases} cases</strong>
+        <strong>${caseCountLabel(state.inventory.cases)}</strong>
+        <small>${caseDefinitionExplanation}</small>
         <small>${active ? 'Ready to sell' : 'Package beer to fill the pallet'}</small>
         ${renderSalesOffers()}
       </div>
@@ -1167,7 +1173,7 @@ const renderBatchBoard = () => {
             return `
               <article class="batch-card">
                 <div><strong>${batch.recipeName}</strong><span>${stepLabel(batch.step)} - Q${batch.quality}</span></div>
-                <small>${batch.casesExpected} cases expected (${caseDefinitionLabel} each) - ${remainingLabel} - contamination risk ${batch.contaminationRisk}%</small>
+                <small>${caseCountLabel(batch.casesExpected)} expected - ${remainingLabel} - contamination risk ${batch.contaminationRisk}%</small>
                 <progress value="${progress}" max="100"></progress>
                 ${batch.step === 'awaiting-transfer'
                 ? `<button data-action="transfer-batch" data-batch-id="${batch.id}" type="button">Transfer to fermenter</button>`
@@ -1179,11 +1185,11 @@ const renderBatchBoard = () => {
         })
             .join('');
     const lotCards = state.finishedBeerLots.length > 0
-        ? `${state.finishedBeerLots.map((lot) => `<article class="batch-card"><div><strong>${lot.recipeName}</strong><span>${lot.cases} cases (${caseDefinitionLabel}) - Q${lot.quality}</span></div><small>Market appeal ${Math.round(lot.marketAppeal * 100)}%</small></article>`).join('')}${renderSalesOffers()}`
+        ? `${state.finishedBeerLots.map((lot) => `<article class="batch-card"><div><strong>${lot.recipeName}</strong><span>${caseCountLabel(lot.cases)} - Q${lot.quality}</span></div><small>Market appeal ${Math.round(lot.marketAppeal * 100)}%</small></article>`).join('')}${renderSalesOffers()}`
         : '';
     return `
     <section class="overlay-section">
-      <div class="panel-heading"><span class="eyebrow gold">Production</span><h2>Production flow</h2></div>
+      <div class="panel-heading"><span class="eyebrow gold">Production</span><h2>Production flow</h2><p>${caseDefinitionExplanation}</p></div>
       ${batchCards}
       ${lotCards}
     </section>
@@ -1207,7 +1213,7 @@ const renderInventory = () => `
     ${renderStorageStatus()}
     <div class="inventory-list">
       <div><span>Water</span><strong>${state.inventory.water} L</strong></div>
-      <div><span>Cases</span><strong>${state.inventory.cases}</strong></div>
+      <div><span>Cases</span><strong>${caseCountLabel(state.inventory.cases)}</strong></div>
       <div><span>Garage equipment space</span><strong>${garageSpaceUsed()}/${garageSpaceLimit()}</strong></div>
       <div><span>Sales channel</span><strong>${state.demand.accountName}</strong></div>
       <div><span>Compliance pressure</span><strong>${state.visibilityRisk >= 30 ? 'Invoice risk' : `${state.visibilityRisk}/30 visible`}</strong></div>

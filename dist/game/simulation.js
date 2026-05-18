@@ -1,7 +1,7 @@
 import { getIngredient } from '../data/ingredients.js';
 import { createOwnedEquipment, getEquipmentCatalogItem, topGarageTier } from '../data/equipment.js';
 import { getRecipe } from '../data/recipes.js';
-import { activeOwnedEquipment, bottlesPerCase, equipmentConditionTier, garageSpaceAvailable, orderCost, recipeBatchCapacity, recipeMissingIngredients, recipeOrderItems, saleValue, salesChannels, storageOverflowByArea, totalStorageOverflow } from './selectors.js';
+import { activeOwnedEquipment, bottlesPerCase, caseCountLabel, equipmentConditionTier, garageSpaceAvailable, orderCost, recipeBatchCapacity, recipeMissingIngredients, recipeOrderItems, saleValue, salesChannels, storageOverflowByArea, totalStorageOverflow } from './selectors.js';
 const orderLeadDays = 3;
 const startOfDayMinute = 7 * 60;
 const manualSteps = ['awaiting-transfer', 'awaiting-packaging', 'ready'];
@@ -258,7 +258,7 @@ const finishConditionedBatch = (state, batch) => {
         marketAppeal: recipe.marketAppeal
     });
     state.batches = state.batches.filter((item) => item.id !== batch.id);
-    addEvent(state, `${batch.casesExpected} cases of ${batch.recipeName} are packaged and ready on the pallet.`);
+    addEvent(state, `${caseCountLabel(batch.casesExpected)} of ${batch.recipeName} are packaged and ready on the pallet.`);
 };
 const completeTimedStep = (state, batch, completedStep) => {
     applyStepQuality(state, batch, completedStep);
@@ -431,10 +431,10 @@ const packageAwaitingBatch = (next, batchId) => {
     advanceGameTime(next, getRecipe(batch.recipeId).stepDurations.packaging, 24);
     completeTimedStep(next, batch, 'packaging');
     if (lostCases > 0) {
-        addEvent(next, `Dirty bottling station lost ${lostCases} case${lostCases === 1 ? '' : 's'}. ${batch.casesExpected} cases are ready on the pallet.`);
+        addEvent(next, `Dirty bottling station lost ${caseCountLabel(lostCases)}. ${caseCountLabel(batch.casesExpected)} are ready on the pallet.`);
     }
     else {
-        addEvent(next, `${batch.casesExpected} cases of ${batch.recipeName} bottled by hand and moved to the pallet.`);
+        addEvent(next, `${caseCountLabel(batch.casesExpected)} of ${batch.recipeName} bottled by hand and moved to the pallet.`);
     }
     return next;
 };
@@ -503,7 +503,7 @@ const sellCases = (next, requestedCases, channelOverride) => {
     next.householdPressure += cases >= 10 ? 2 : 1;
     const repGain = (activeOwnedEquipment(next, 'bottler').tier >= 2 ? 2 : 1) + (next.demand.casesSold >= next.demand.casesRequested ? next.demand.reputationReward : 0);
     next.reputation += repGain;
-    addEvent(next, `Sold ${cases} cases of ${lot.recipeName} through ${channel.name} for EUR ${revenue}. Reputation +${repGain}.`);
+    addEvent(next, `Sold ${caseCountLabel(cases)} of ${lot.recipeName} through ${channel.name} for EUR ${revenue}. Reputation +${repGain}.`);
     if (next.visibilityRisk >= 20)
         addEvent(next, 'Garage visibility is high. Bars and restaurants may now ask for invoices, traceability, and legal release status.');
     if (next.complianceRisk >= 30)

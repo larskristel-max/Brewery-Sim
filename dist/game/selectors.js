@@ -60,6 +60,8 @@ export const garageSpaceAvailable = (state) => Math.max(0, state.garageSpaceLimi
 export const bottleVolumeMl = 330;
 export const bottlesPerCase = 12;
 export const caseDefinitionLabel = `${bottlesPerCase} × 33 cl bottles`;
+export const caseDefinitionExplanation = `In Brewery-Sim, one gameplay case = ${caseDefinitionLabel}.`;
+export const caseCountLabel = (cases) => `${cases} gameplay case${cases === 1 ? '' : 's'} (${caseDefinitionLabel} each)`;
 export const litersToBottles = (liters) => Math.max(1, Math.round((liters * 1000) / bottleVolumeMl));
 export const litersToCases = (liters) => Math.max(1, Math.round(litersToBottles(liters) / bottlesPerCase));
 export const recipeBatchCapacity = (state, recipe) => {
@@ -75,7 +77,7 @@ export const recipeBatchCapacity = (state, recipe) => {
             : 'Can brew now';
     const bottles = litersToBottles(liters);
     const cases = litersToCases(liters);
-    return { liters, bottles, cases, reason: `${limit}: ${liters} L into ${fermenter.name} ≈ ${bottles} bottles / ${cases} cases.`, fermenter };
+    return { liters, bottles, cases, reason: `${limit}: ${liters} L into ${fermenter.name} ≈ ${bottles} bottles / ${caseCountLabel(cases)}.`, fermenter };
 };
 export const orderCost = (items) => Math.round(items.reduce((total, item) => {
     const ingredient = getIngredient(item.ingredientId);

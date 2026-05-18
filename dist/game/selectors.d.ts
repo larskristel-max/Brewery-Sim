@@ -24,6 +24,8 @@ export declare const garageSpaceAvailable: (state: GameState) => number;
 export declare const bottleVolumeMl = 330;
 export declare const bottlesPerCase = 12;
 export declare const caseDefinitionLabel = "12 \u00D7 33 cl bottles";
+export declare const caseDefinitionExplanation = "In Brewery-Sim, one gameplay case = 12 \u00D7 33 cl bottles.";
+export declare const caseCountLabel: (cases: number) => string;
 export declare const litersToBottles: (liters: number) => number;
 export declare const litersToCases: (liters: number) => number;
 export declare const recipeBatchCapacity: (state: GameState, recipe: Recipe) => {
