@@ -405,12 +405,12 @@
 .first-loop-objective {
   position: absolute;
   left: 50%;
-  top: 6.35rem;
+  top: 64%;
   z-index: 10;
-  width: min(34rem, calc(100% - 12rem));
+  width: min(18rem, calc(100% - 15rem));
   translate: -50% 0;
   justify-content: center;
-  gap: 0.8rem;
+  gap: 0.4rem;
   pointer-events: none;
   text-transform: none;
 }
@@ -439,8 +439,8 @@
   align-items: center;
   justify-content: space-between;
   gap: 0.7rem;
-  min-height: 3rem;
-  padding: 0.55rem 0.85rem;
+  min-height: 2.05rem;
+  padding: 0.3rem 0.55rem;
   border: 1px solid var(--border);
   border-radius: 999px;
   color: #fff7e8;
@@ -450,7 +450,7 @@
 }
 
 .scene-pill span {
-  font-size: 0.78rem;
+  font-size: 0.58rem;
   font-weight: 900;
   letter-spacing: 0.06em;
 }
@@ -567,7 +567,7 @@
 .status-lines div {
   display: flex;
   justify-content: space-between;
-  gap: 0.8rem;
+  gap: 0.4rem;
   padding: 0.55rem 0;
   border-top: 1px solid var(--divider);
 }
@@ -596,7 +596,7 @@
   display: grid;
   grid-template-columns: 4.25rem 1fr;
   gap: 0.45rem;
-  font-size: 0.78rem;
+  font-size: 0.58rem;
 }
 
 .notification-popover time {
@@ -1066,7 +1066,7 @@
   .equipment-hotspot,
   .case-hotspot {
     width: 7.5rem;
-    font-size: 0.78rem;
+    font-size: 0.58rem;
   }
 
   .workflow-dock {
@@ -1175,7 +1175,7 @@
   }
 
   .dock-step {
-    min-height: 3rem;
+    min-height: 2.05rem;
   }
 
   .equipment-hotspot,
@@ -1204,7 +1204,7 @@
   }
 
   .expanded .hotspot-toggle {
-    min-height: 3rem;
+    min-height: 2.05rem;
     padding-bottom: 0.38rem;
   }
 
@@ -1289,7 +1289,7 @@ body {
   left: 0.85rem;
   right: 0.85rem;
   grid-template-columns: minmax(8.8rem, 1fr) 0.54fr 0.78fr 0.54fr minmax(7rem, 0.58fr);
-  min-height: 3rem;
+  min-height: 2.05rem;
   border-radius: 14px;
   opacity: 0.94;
 }
@@ -1298,7 +1298,7 @@ body {
 .hud-stat,
 .hud-save {
   gap: 0.45rem;
-  min-height: 3rem;
+  min-height: 2.05rem;
   padding: 0.38rem 0.66rem;
   border-right-color: rgba(255, 255, 255, 0.045);
 }
@@ -1796,7 +1796,7 @@ body {
 }
 
 .upgrade-pallet {
-  min-height: 3rem;
+  min-height: 2.05rem;
   border: 1px solid rgba(226, 179, 84, 0.22);
   background: linear-gradient(135deg, rgba(67, 47, 24, 0.7), rgba(22, 23, 24, 0.64));
 }
@@ -2424,7 +2424,7 @@ body {
 
 .equipment-store-card span {
   color: #fff5dc;
-  font-size: 0.78rem;
+  font-size: 0.58rem;
   font-weight: 900;
   line-height: 1.18;
 }
@@ -2662,8 +2662,8 @@ body {
 .guidance-close,
 .station-panel-close {
   position: relative;
-  width: 1.8rem;
-  min-height: 1.8rem;
+  width: 1.15rem;
+  min-height: 1.15rem;
   padding: 0;
 }
 .guidance-close::before,
@@ -2674,7 +2674,7 @@ body {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 0.9rem;
+  width: 0.55rem;
   height: 2px;
   background: rgba(255,255,255,0.85);
 }
@@ -2710,3 +2710,19 @@ body {
 .station-panel-body { display: grid; gap: 0.45rem; margin-bottom: 0.75rem; }
 .station-panel .hotspot-actions { padding: 0; }
 .station-panel-close { position: absolute; right: 0.75rem; top: 0.75rem; }
+
+
+.station-panel { padding: 0.7rem; }
+.station-panel-header { gap: 0.2rem; margin-bottom: 0.4rem; }
+.station-panel-header h2 { font-size: 1.1rem; line-height: 1.15; }
+.station-panel-body { gap: 0.3rem; margin-bottom: 0.45rem; font-size: 0.86rem; line-height: 1.25; }
+.station-panel .hotspot-actions { gap: 0.32rem; }
+.station-panel .hotspot-actions button { min-height: 2rem; padding: 0.26rem 0.4rem; }
+.recipe-style-list .compact-grid { display:grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap:0.4rem;}
+.recipe-style-list button { min-height:2.2rem; }
+.recipe-page-grid { display:grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap:0.42rem; }
+.compact-recipe-card { gap:0.2rem; padding:0.4rem; }
+.panel-meta-row { display:flex; justify-content:space-between; align-items:center; gap:0.4rem; }
+.panel-meta-row button { min-height:1.9rem; padding:0.2rem 0.45rem; font-size:0.72rem; }
+.panel-note { margin:0; font-size:0.75rem; color:var(--text-muted); }
+@media (max-width: 760px) { .first-loop-objective { top: 65%; width:min(16rem, calc(100% - 14rem)); padding:0.25rem 0.45rem; } }
