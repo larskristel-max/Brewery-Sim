@@ -52,7 +52,7 @@ if (!root) {
 }
 
 type SceneTarget = EquipmentId | 'cases';
-type FocusOverlay = 'recipes' | 'production' | 'inventory' | 'upgrades' | 'log';
+type FocusOverlay = 'production' | 'inventory' | 'upgrades' | 'log';
 type StoreStation = EquipmentId;
 type GarageLayoutDraft = Record<GarageEquipmentSlotId, GarageEquipmentPlacement>;
 type GarageSellPointLayoutDraft = Record<GarageSellPointId, GarageEquipmentPlacement>;
@@ -117,6 +117,9 @@ let missionsOpen = false;
 let notificationsOpen = false;
 let opsOpen = false;
 let activeOverlay: FocusOverlay | null = null;
+let recipePanelOpen = false;
+let recipeStyleFilter: string | null = null;
+let recipePage = 0;
 let audioAllowed = false;
 const GUIDANCE_DISMISSED_KEY = 'brewery-sim-guidance-dismissed';
 let guidanceDismissed = false;
@@ -864,6 +867,51 @@ const renderNotificationControl = () => {
   `;
 };
 
+
+const recipeStyles = () => {
+  const styles = Array.from(new Set(visibleRecipes().map((recipe) => recipe.style))).sort((a, b) => a.localeCompare(b));
+  return styles;
+};
+
+const recipePageSize = 4;
+
+const renderRecipeSelectionPanel = () => {
+  const allRecipes = visibleRecipes();
+  const styles = recipeStyles();
+  if (!recipeStyleFilter) {
+    return `
+      <section class="station-panel-body recipe-style-list">
+        <p class="panel-note">Select a beer style.</p>
+        <div class="compact-grid">${styles
+          .map((style) => {
+            const count = allRecipes.filter((recipe) => recipe.style === style).length;
+            return `<button data-action="select-recipe-style" data-style="${style}" type="button">${style}<small>${count} recipe${count === 1 ? '' : 's'}</small></button>`;
+          })
+          .join('')}</div>
+      </section>
+    `;
+  }
+
+  const filtered = allRecipes.filter((recipe) => recipe.style === recipeStyleFilter);
+  const pageCount = Math.max(1, Math.ceil(filtered.length / recipePageSize));
+  recipePage = Math.max(0, Math.min(recipePage, pageCount - 1));
+  const pageRecipes = filtered.slice(recipePage * recipePageSize, recipePage * recipePageSize + recipePageSize);
+  return `
+    <section class="station-panel-body recipe-panel-flow">
+      <div class="panel-meta-row"><button data-action="back-to-styles" type="button">Back to styles</button><small>Page ${recipePage + 1} / ${pageCount}</small></div>
+      <div class="recipe-page-grid">${pageRecipes.map((recipe) => {
+      const missing = recipeMissingIngredients(state, recipe);
+      const missingCost = orderCost(missing);
+      const startBlocker = recipeStartBlocker(recipe);
+      const canStart = recipeCanStart(state, recipe) && startBlocker === '';
+      const batchLiters = Math.min(recipe.targetBatchLiters, state.equipment.kettle.capacityLiters, state.equipment.fermenter.capacityLiters);
+      return `<article class="batch-card recipe-card compact-recipe-card"><div><strong>${recipe.name}</strong><span>${batchLiters} L · ${caseCountLabel(litersToCases(batchLiters))}</span></div><small>${missing.length > 0 ? `Missing stock · ${formatCurrency(missingCost)}` : 'Stock ready'}</small><div class="hotspot-actions"><button data-action="start-batch" data-recipe-id="${recipe.id}" type="button" ${canStart ? '' : `disabled title="${startBlocker || 'Blocked'}"`}>${canStart ? 'Brew' : 'Blocked'}</button><button data-action="order-recipe" data-order-mode="missing" data-recipe-id="${recipe.id}" type="button" ${missing.length > 0 ? '' : 'disabled'}>Order missing</button></div></article>`;
+    }).join('')}</div>
+      <div class="panel-meta-row page-controls"><button data-action="recipes-prev-page" type="button" ${recipePage === 0 ? 'disabled' : ''}>Previous</button><button data-action="recipes-next-page" type="button" ${recipePage >= pageCount - 1 ? 'disabled' : ''}>Next</button></div>
+    </section>
+  `;
+};
+
 const renderRecipeCards = () =>
   visibleRecipes()
     .map((recipe) => {
@@ -1134,6 +1182,18 @@ const renderSalesOffers = () => `
 
 
 const renderStationPanel = () => {
+  if (recipePanelOpen) {
+    return `
+      <div class="station-panel-layer">
+        <button class="station-panel-scrim" data-action="close-overlay" type="button" aria-label="Close station panel"></button>
+        <aside class="glass-panel station-panel recipe-station-panel" aria-label="Recipe station panel">
+          <button class="station-panel-close" data-action="close-overlay" type="button" aria-label="Close station panel"></button>
+          <header class="station-panel-header"><span class="eyebrow gold">Recipe / Brew</span><h2>${recipeStyleFilter ?? 'Select style'}</h2><p>Choose a style, then brew.</p></header>
+          ${renderRecipeSelectionPanel()}
+        </aside>
+      </div>
+    `;
+  }
   if (!expandedTarget) return '';
   if (expandedTarget === 'cases') {
     return `
@@ -1489,7 +1549,6 @@ const renderEventLog = () => `
 `;
 
 const overlayContent = () => {
-  if (activeOverlay === 'recipes') return `<div class="focus-grid recipe-overlay">${renderRecipeCards()}</div>`;
   if (activeOverlay === 'production') return renderBatchBoard();
   if (activeOverlay === 'inventory') return renderInventory();
   if (activeOverlay === 'upgrades') return renderEquipmentStore();
@@ -1498,7 +1557,7 @@ const overlayContent = () => {
 };
 
 const overlayTitle = () =>
-  ({ recipes: 'Recipe / Brew', production: 'Production', inventory: 'Inventory detail', upgrades: 'Equipment store', log: 'Clipboard log' })[activeOverlay ?? 'production'];
+  ({ production: 'Production', inventory: 'Inventory detail', upgrades: 'Equipment store', log: 'Clipboard log' })[activeOverlay ?? 'production'];
 
 const renderFocusOverlay = () =>
   activeOverlay
@@ -1583,13 +1642,16 @@ root.addEventListener('click', (event) => {
     const isInsideOpenSurface = Boolean(
       clickTarget.closest('.equipment-object, .equipment-hotspot, .sell-point-object, .case-hotspot, .supply-hotspot, .workshop-hotspot, .event-ticker, .missions-control, .notification-control, .ops-control, .layout-debug-panel, .focus-overlay, button')
     );
-    if ((expandedTarget || missionsOpen || notificationsOpen || opsOpen || activeOverlay) && !isInsideOpenSurface) {
+    if ((expandedTarget || missionsOpen || notificationsOpen || opsOpen || activeOverlay || recipePanelOpen) && !isInsideOpenSurface) {
       expandedTarget = null;
       expandedEquipmentInstanceId = null;
       missionsOpen = false;
       notificationsOpen = false;
       opsOpen = false;
       activeOverlay = null;
+      recipePanelOpen = false;
+      recipeStyleFilter = null;
+      recipePage = 0;
       render();
     }
     return;
@@ -1598,13 +1660,27 @@ root.addEventListener('click', (event) => {
   const action = target.dataset.action;
   if (action === 'close-overlay') {
     activeOverlay = null;
+    recipePanelOpen = false;
+    recipeStyleFilter = null;
+    recipePage = 0;
     opsOpen = false;
     render();
     return;
   }
 
   if (action === 'open-overlay') {
-    activeOverlay = target.dataset.overlay as FocusOverlay;
+    const requestedOverlay = target.dataset.overlay;
+    if (requestedOverlay === 'recipes') {
+      recipePanelOpen = true;
+      recipeStyleFilter = null;
+      recipePage = 0;
+      activeOverlay = null;
+    } else {
+      activeOverlay = requestedOverlay as FocusOverlay;
+      recipePanelOpen = false;
+      recipeStyleFilter = null;
+      recipePage = 0;
+    }
     expandedTarget = null;
     expandedEquipmentInstanceId = null;
     missionsOpen = false;
@@ -1633,6 +1709,37 @@ root.addEventListener('click', (event) => {
   if (action === 'close-station-panel') {
     expandedTarget = null;
     expandedEquipmentInstanceId = null;
+    recipePanelOpen = false;
+    recipeStyleFilter = null;
+    recipePage = 0;
+    render();
+    return;
+  }
+
+  if (action === 'select-recipe-style') {
+    recipePanelOpen = true;
+    recipeStyleFilter = target.dataset.style ?? null;
+    recipePage = 0;
+    render();
+    return;
+  }
+
+  if (action === 'back-to-styles') {
+    recipePanelOpen = true;
+    recipeStyleFilter = null;
+    recipePage = 0;
+    render();
+    return;
+  }
+
+  if (action === 'recipes-next-page') {
+    recipePage += 1;
+    render();
+    return;
+  }
+
+  if (action === 'recipes-prev-page') {
+    recipePage = Math.max(0, recipePage - 1);
     render();
     return;
   }
@@ -1644,6 +1751,9 @@ root.addEventListener('click', (event) => {
     expandedTarget = null;
     expandedEquipmentInstanceId = null;
     activeOverlay = null;
+    recipePanelOpen = false;
+    recipeStyleFilter = null;
+    recipePage = 0;
     render();
     return;
   }

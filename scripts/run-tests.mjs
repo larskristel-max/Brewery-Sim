@@ -357,6 +357,11 @@ assert.match(mainSource, /caseCountLabel\(readyBatch\.casesExpected\)/, 'bottlin
 assert.match(mainSource, /caseCountLabel\(state\.inventory\.cases\)/, 'pallet and inventory surfaces should show gameplay case counts with definition');
 assert.match(mainSource, /caseCountLabel\(lot\.cases\)/, 'finished lot cards should show gameplay case counts with definition');
 
+assert.match(mainSource, /recipeStyleFilter/, 'recipe flow should keep a style-selection state');
+assert.match(mainSource, /data-action="select-recipe-style"/, 'recipe panel should render style-selection actions');
+assert.match(mainSource, /recipes-next-page/, 'recipe panel should expose pagination controls');
+assert.match(mainSource, /station-panel recipe-station-panel/, 'recipe selection should use the shared station-panel shell');
+
 const index = await readFile(new URL('../index.html', import.meta.url), 'utf8');
 const garageCss = await readFile(new URL('../src/styles/garage.css', import.meta.url), 'utf8');
 const hasLowOpacityInSelectorBlocks = (cssSource, selectorPatterns, maxOpacityExclusive = 0.9) => {
@@ -399,5 +404,6 @@ assert.equal(
   'obstructed-by-card selectors should not hide equipment with zero opacity'
 );
 assert.doesNotMatch(garageCss, /\.(?:equipment-object|equipment-object-toggle|equipment-hotspot|case-hotspot)[^{]*\.expanded[\s\S]{0,220}opacity:\s*0(?:[;\s}])/, 'expanded-card styling should not set equipment or hotspots to opacity 0');
+assert.match(garageCss, /first-loop-objective[\s\S]*top:\s*64%/, 'guidance pill should be positioned lower in the scene');
 
 console.log('All Brewery Sim prototype checks passed.');
