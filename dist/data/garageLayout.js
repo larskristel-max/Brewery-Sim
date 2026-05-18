@@ -2,17 +2,17 @@ export const garageEquipmentAssetPath = (tier, filename) => `assets/garage/equip
 export const garageSellPointAssetPath = (filename) => `assets/garage/sell-point/${filename}`;
 const defaultTapPadding = { x: 4, y: 8 };
 const tier1GarageEquipmentLayout = {
-    brewhouse: { x: 23.6, y: 54.3, width: 17 },
+    brewhouse: { x: 24.6, y: 53.1, width: 17 },
     'fermenter-slot-1': { x: 38.6, y: 45.2, width: 14.5 },
     'fermenter-slot-2': { x: 49.4, y: 45.2, width: 14.5 },
     'fermenter-slot-3': { x: 60.2, y: 45.2, width: 14.5 },
     'fermenter-slot-4': { x: 50.5, y: 65, width: 12 },
     'fermenter-slot-5': { x: 61.5, y: 65, width: 12 },
-    milling: { x: 18, y: 62, width: 10 },
+    milling: { x: 18, y: 76.5, width: 10 },
     packaging: { x: 74.5, y: 62.4, width: 13.1 }
 };
 const tier2GarageEquipmentLayout = {
-    brewhouse: { x: 23.6, y: 54.3, width: 17 },
+    brewhouse: { x: 24.6, y: 53.1, width: 17 },
     'fermenter-slot-1': { x: 38.6, y: 45.2, width: 14.5 },
     'fermenter-slot-2': { x: 49.4, y: 45.2, width: 14.5 },
     'fermenter-slot-3': { x: 60.2, y: 45.2, width: 14.5 },
@@ -43,7 +43,7 @@ export const garageEquipmentLayoutByItem = {
     'stock-pot-20l': {
         stationType: 'brewhouse',
         sprite: garageEquipmentAssetPath('tier1', 'brewhouse-20l-biab.png'),
-        placement: { x: 23.6, y: 54.3, width: 17 },
+        placement: { x: 24.6, y: 53.1, width: 17 },
         interaction: { action: 'toggle-target', equipmentId: 'kettle' },
         tapPadding: { x: 5, y: 5 },
         interactionPriority: 2
