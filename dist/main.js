@@ -1,5 +1,5 @@
 import { equipmentByStation } from './data/equipment.js';
-import { garageEquipmentLayoutByItem, garageEquipmentLayoutBySlot } from './data/garageLayout.js';
+import { garageEquipmentLayoutByItem, garageEquipmentLayoutBySlot, garageEquipmentLayoutByTier } from './data/garageLayout.js';
 import { ingredients, getIngredient } from './data/ingredients.js';
 import { createInitialState } from './game/initialState.js';
 import { loadSavedGame, resetSavedGame, saveGameState, STORAGE_KEY } from './game/persistence.js';
@@ -22,6 +22,7 @@ const urlParams = new URLSearchParams(globalThis.location.search);
 const layoutDebugEnabled = urlParams.get('layoutDebug') === '1';
 const tierPreview = layoutDebugEnabled ? urlParams.get('tierPreview') : null;
 const tier2PreviewEnabled = tierPreview === '2';
+const activeGarageLayoutTier = tier2PreviewEnabled ? 'tier2' : 'tier1';
 const createTier2PreviewState = () => {
     let preview = createInitialState();
     preview.cash = 5000;
@@ -52,7 +53,10 @@ let notificationsOpen = false;
 let opsOpen = false;
 let activeOverlay = null;
 let audioAllowed = false;
-const garageLayoutDraft = Object.fromEntries(Object.entries(garageEquipmentLayoutBySlot).map(([slotId, placement]) => [slotId, structuredClone(placement)]));
+const garageLayoutDraft = Object.fromEntries(Object.entries(garageEquipmentLayoutByTier[activeGarageLayoutTier] ?? garageEquipmentLayoutBySlot).map(([slotId, placement]) => [
+    slotId,
+    structuredClone(placement)
+]));
 const stationLabels = {
     kettle: 'Brewhouse',
     fermenter: 'Fermentation',

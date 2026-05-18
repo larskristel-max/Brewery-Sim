@@ -2,6 +2,8 @@ import { equipmentByStation } from './data/equipment.js';
 import {
   garageEquipmentLayoutByItem,
   garageEquipmentLayoutBySlot,
+  garageEquipmentLayoutByTier,
+  type GarageEquipmentLayoutTier,
   type GarageEquipmentPlacement,
   type GarageEquipmentSlotId
 } from './data/garageLayout.js';
@@ -69,6 +71,7 @@ const urlParams = new URLSearchParams(globalThis.location.search);
 const layoutDebugEnabled = urlParams.get('layoutDebug') === '1';
 const tierPreview = layoutDebugEnabled ? urlParams.get('tierPreview') : null;
 const tier2PreviewEnabled = tierPreview === '2';
+const activeGarageLayoutTier: GarageEquipmentLayoutTier = tier2PreviewEnabled ? 'tier2' : 'tier1';
 
 const createTier2PreviewState = (): ReturnType<typeof createInitialState> => {
   let preview = createInitialState();
@@ -105,7 +108,10 @@ let activeOverlay: FocusOverlay | null = null;
 let audioAllowed = false;
 
 const garageLayoutDraft: GarageLayoutDraft = Object.fromEntries(
-  Object.entries(garageEquipmentLayoutBySlot).map(([slotId, placement]) => [slotId, structuredClone(placement)])
+  Object.entries(garageEquipmentLayoutByTier[activeGarageLayoutTier] ?? garageEquipmentLayoutBySlot).map(([slotId, placement]) => [
+    slotId,
+    structuredClone(placement)
+  ])
 ) as GarageLayoutDraft;
 
 const stationLabels: Record<StoreStation, string> = {

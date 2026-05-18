@@ -165,6 +165,12 @@ try {
     1,
     'tier 2 preview should expose the grain mill in layout debug'
   );
+  assert.equal(
+    await page.locator('input[type="number"][data-layout-slot-id="milling"][data-layout-field="y"]').inputValue(),
+    '76.5',
+    'tier 2 preview should use the locked milling placement'
+  );
+  assert.match(await page.locator('[data-layout-json]').inputValue(), /"milling": \{\n    "x": 18,\n    "y": 76\.5,\n    "width": 10/);
   await page.locator('.equipment-object[data-equipment-id="mill"] .equipment-object-toggle').click();
   assert.equal(
     await page.locator('.equipment-object[data-equipment-id="mill"] .equipment-object-card:not([hidden])').count(),

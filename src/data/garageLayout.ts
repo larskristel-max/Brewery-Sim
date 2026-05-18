@@ -26,6 +26,7 @@ export interface GarageEquipmentVisual {
 }
 
 export type GarageEquipmentTier = 'tier1' | 'tier2';
+export type GarageEquipmentLayoutTier = GarageEquipmentTier;
 export type GarageEquipmentSpritePath = `/assets/garage/equipment/tier1/${string}` | `/assets/garage/equipment/tier2/${string}`;
 export type GarageEquipmentSlotId =
   | 'brewhouse'
@@ -40,9 +41,11 @@ export type GarageEquipmentSlotId =
 export const garageEquipmentAssetPath = (tier: GarageEquipmentTier, filename: string): GarageEquipmentSpritePath =>
   `/assets/garage/equipment/${tier}/${filename}` as GarageEquipmentSpritePath;
 
+export type GarageEquipmentSlotLayout = Record<GarageEquipmentSlotId, GarageEquipmentPlacement>;
+
 const defaultTapPadding: GarageEquipmentTapPadding = { x: 4, y: 8 };
 
-export const garageEquipmentLayoutBySlot: Record<GarageEquipmentSlotId, GarageEquipmentPlacement> = {
+const tier1GarageEquipmentLayout: GarageEquipmentSlotLayout = {
   brewhouse: { x: 23.6, y: 54.3, width: 17 },
   'fermenter-slot-1': { x: 38.6, y: 45.2, width: 14.5 },
   'fermenter-slot-2': { x: 49.4, y: 45.2, width: 14.5 },
@@ -52,6 +55,24 @@ export const garageEquipmentLayoutBySlot: Record<GarageEquipmentSlotId, GarageEq
   milling: { x: 18, y: 62, width: 10 },
   packaging: { x: 74.5, y: 62.4, width: 13.1 }
 };
+
+const tier2GarageEquipmentLayout: GarageEquipmentSlotLayout = {
+  brewhouse: { x: 23.6, y: 54.3, width: 17 },
+  'fermenter-slot-1': { x: 38.6, y: 45.2, width: 14.5 },
+  'fermenter-slot-2': { x: 49.4, y: 45.2, width: 14.5 },
+  'fermenter-slot-3': { x: 60.2, y: 45.2, width: 14.5 },
+  'fermenter-slot-4': { x: 50.5, y: 65, width: 12 },
+  'fermenter-slot-5': { x: 61.5, y: 65, width: 12 },
+  milling: { x: 18, y: 76.5, width: 10 },
+  packaging: { x: 74.5, y: 62.4, width: 13.1 }
+};
+
+export const garageEquipmentLayoutByTier: Record<GarageEquipmentLayoutTier, GarageEquipmentSlotLayout> = {
+  tier1: tier1GarageEquipmentLayout,
+  tier2: tier2GarageEquipmentLayout
+};
+
+export const garageEquipmentLayoutBySlot = garageEquipmentLayoutByTier.tier1;
 
 export const garageEquipmentLayoutByItem: Record<EquipmentItemId, GarageEquipmentVisual> = {
   'stock-pot-20l': {
@@ -65,7 +86,7 @@ export const garageEquipmentLayoutByItem: Record<EquipmentItemId, GarageEquipmen
   'all-in-one-40l': {
     stationType: 'brewhouse',
     sprite: garageEquipmentAssetPath('tier2', 'brewhouse-50l-kettle.png'),
-    placement: { x: 24, y: 78.5, width: 14 },
+    placement: tier2GarageEquipmentLayout.brewhouse,
     interaction: { action: 'toggle-target', equipmentId: 'kettle' },
     tapPadding: { x: 5, y: 5 },
     interactionPriority: 2
@@ -97,7 +118,7 @@ export const garageEquipmentLayoutByItem: Record<EquipmentItemId, GarageEquipmen
   'stainless-conical-50l': {
     stationType: 'fermentation',
     sprite: garageEquipmentAssetPath('tier2', 'fermenter-stainless-conical-50l.png'),
-    placement: { x: 52, y: 72.4, width: 12 },
+    placement: tier2GarageEquipmentLayout['fermenter-slot-1'],
     interaction: { action: 'toggle-target', equipmentId: 'fermenter' },
     tapPadding: defaultTapPadding,
     interactionPriority: 3
@@ -113,7 +134,7 @@ export const garageEquipmentLayoutByItem: Record<EquipmentItemId, GarageEquipmen
   'grain-mill-tier2': {
     stationType: 'milling',
     sprite: garageEquipmentAssetPath('tier2', 'malt-mill.png'),
-    placement: { x: 18, y: 62, width: 10 },
+    placement: tier2GarageEquipmentLayout.milling,
     interaction: { action: 'toggle-target', equipmentId: 'mill' },
     tapPadding: { x: 5, y: 5 },
     interactionPriority: 3
@@ -129,7 +150,7 @@ export const garageEquipmentLayoutByItem: Record<EquipmentItemId, GarageEquipmen
   'semi-auto-filler': {
     stationType: 'packaging',
     sprite: garageEquipmentAssetPath('tier2', 'packaging-enolmatic-station.png'),
-    placement: { x: 78, y: 73, width: 12 },
+    placement: tier2GarageEquipmentLayout.packaging,
     interaction: { action: 'toggle-target', equipmentId: 'bottler' },
     tapPadding: { x: 6, y: 5 },
     interactionPriority: 4
