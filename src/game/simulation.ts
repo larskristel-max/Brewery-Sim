@@ -264,11 +264,15 @@ const finishConditionedBatch = (state: GameState, batch: Batch): void => {
   state.inventory.cases += batch.casesExpected;
   state.finishedBeerLots.push({
     id: `${batch.id}-lot`,
+    sourceBatchId: batch.id,
     recipeId: batch.recipeId,
     recipeName: batch.recipeName,
     cases: batch.casesExpected,
+    volumeLiters: batch.volumeLiters,
     quality: Math.min(100, batch.quality + bottler.qualityBonus),
-    marketAppeal: recipe.marketAppeal
+    marketAppeal: recipe.marketAppeal,
+    packagingState: 'packaged',
+    saleState: 'available'
   });
   state.batches = state.batches.filter((item) => item.id !== batch.id);
   addEvent(state, `${caseCountLabel(batch.casesExpected)} of ${batch.recipeName} are packaged and ready on the pallet.`);

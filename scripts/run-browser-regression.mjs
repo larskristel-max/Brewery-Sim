@@ -91,6 +91,7 @@ try {
   await assert.doesNotReject(page.locator('.garage-scene').waitFor({ state: 'visible', timeout: 5000 }));
   assert.match(await visibleText(page), /May 16/i);
   assert.equal(await page.locator('.case-hotspot').count(), 0, 'legacy case hotspot should not render');
+  assert.equal(await page.locator('.supply-hotspot').count(), 0, 'scene should not render floating inventory alert badges');
   assert.match(await visibleText(page), /Tap the stock pot to brew Garage Blonde/i, 'fresh game should show the garage-floor first-loop objective');
   await assertFinishedPallet(page, 'empty', 'fresh game');
   assert.equal(
@@ -108,8 +109,22 @@ try {
   await page.locator('.hotspot-kettle').click();
   assert.equal(await page.getByRole('dialog', { name: 'Recipe / Brew' }).count(), 0, 'kettle tap should not open the full recipe overlay');
   await assert.doesNotReject(page.getByRole('button', { name: /Brew Garage Blonde/ }).waitFor({ state: 'visible', timeout: 5000 }));
+  await page.getByRole('button', { name: /Other recipes/ }).click();
+  await assert.doesNotReject(page.locator('.recipe-category-card').filter({ hasText: 'Starter' }).waitFor({ state: 'visible', timeout: 5000 }));
+  assert.match(await page.locator('.recipe-category-card').filter({ hasText: 'Starter' }).innerText(), /Stock: \d+ batch(?:es)? in stock/i, 'recipe category cards should show how many batches stock supports');
+  await page.locator('.recipe-category-card').filter({ hasText: 'Starter' }).click();
+  assert.match(await page.locator('.recipe-card').filter({ hasText: 'Garage Blonde' }).innerText(), /\d+ batch(?:es)? in stock/i, 'recipe cards should show stock-supported brew count');
+  assert.match(await page.locator('.recipe-card').filter({ hasText: 'Garage Blonde' }).innerText(), /Pilsner malt[\s\S]*Saaz hops[\s\S]*Ale yeast[\s\S]*Bottles and caps/i, 'recipe card should show the ingredient bill of materials');
+  assert.equal(
+    await page.locator('.recipe-station-panel').evaluate((node) => node.scrollHeight <= node.clientHeight + 1),
+    true,
+    'starter recipe station panel should fit without internal scrolling'
+  );
+  await page.locator('.station-panel-close').click();
+  await page.locator('.hotspot-kettle').click();
   await page.getByRole('button', { name: /Brew Garage Blonde/ }).click();
   await waitForBatchStep(page, 'awaiting-transfer');
+  assert.equal(await page.locator('.equipment-object-toggle.next-tap').count(), 1, 'the reserved fermenter should pulse when transfer is waiting');
   await assertFinishedPallet(page, 'empty', 'brewing beer not yet sellable');
   assert.match(await visibleText(page), /Tap the fermenter to transfer Garage Blonde/i);
 
@@ -117,6 +132,7 @@ try {
   await assert.doesNotReject(page.getByRole('button', { name: /Transfer to fermenter/ }).waitFor({ state: 'visible', timeout: 5000 }), 'assigned fermenter should show Transfer to fermenter without opening Production');
   await page.getByRole('button', { name: /Transfer to fermenter/ }).click();
   await waitForBatchStep(page, 'fermenting');
+  assert.equal(await page.locator('.equipment-object-toggle.active.next-tap').count(), 0, 'actively fermenting equipment should not keep a ready-to-click pulse');
   assert.doesNotMatch(await visibleText(page), /in-game minutes remaining/i, 'fermenter card should use readable time labels');
 
   for (let day = 0; day < 8; day += 1) {
@@ -148,10 +164,25 @@ try {
   await assert.doesNotReject(page.getByRole('button', { name: /Friends and family/ }).waitFor({ state: 'visible', timeout: 5000 }));
   await page.getByRole('button', { name: /Friends and family/ }).click();
 
-  assert.match(await visibleText(page), /REP\s+1/);
-  await assertFinishedPallet(page, 'empty', 'sold-out inventory');
+  assert.match(await visibleText(page), /REP\s+[1-9]/);
+  await assertFinishedPallet(page, finishedPalletLevelName(await finishedCases(page)), 'post-sale inventory');
 
+  assert.equal(await page.locator('.workshop-hotspot').getAttribute('aria-label'), 'Shop cart', 'workshop hotspot should be labelled as a shop cart');
+  assert.equal((await page.locator('.workshop-hotspot').innerText()).trim(), '', 'shop cart hotspot should be icon-only');
+  const shopButtonBox = await page.locator('.shop-cart-hotspot').boundingBox();
+  const opsButtonBox = await page.locator('.ops-button').boundingBox();
+  assert.ok(
+    shopButtonBox &&
+      opsButtonBox &&
+      Math.abs(shopButtonBox.y - opsButtonBox.y) < 2 &&
+      shopButtonBox.x + shopButtonBox.width <= opsButtonBox.x - 4,
+    'shop cart icon should sit immediately left of the plus button'
+  );
   await page.locator('.workshop-hotspot').click();
+  await assert.doesNotReject(page.getByRole('dialog', { name: 'Shop cart' }).waitFor({ state: 'visible', timeout: 5000 }));
+  assert.equal(await page.locator('.shop-section-card').count(), 2, 'shop cart should first ask whether to shop supplies or equipment');
+  assert.equal(await page.locator('.ingredient-cart-card[data-action="order-ingredient"]').count(), 0, 'shop cart should not show supplies before a section is chosen');
+  await page.locator('.shop-section-card').filter({ hasText: 'Equipment' }).click();
   await page.locator('[data-action="buy-equipment"][data-equipment-item-id="plastic-bucket"]').click();
   await page.locator('[data-action="buy-equipment"][data-equipment-item-id="plastic-bucket"]').click();
   assert.equal(
@@ -230,7 +261,7 @@ try {
   assert.match(await page.locator('[data-layout-json]').inputValue(), /"milling": \{\n    "x": 18,\n    "y": 76\.5,\n    "width": 10/);
   await page.locator('.equipment-object[data-equipment-id="mill"] .equipment-object-toggle').click();
   assert.equal(
-    await page.locator('.equipment-object[data-equipment-id="mill"] .equipment-object-card:not([hidden])').count(),
+    await page.locator('.station-panel').count(),
     1,
     'tier 2 grain mill should be clickable'
   );

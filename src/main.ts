@@ -10,7 +10,7 @@ import {
   type GarageEquipmentSlotId
 } from './data/garageLayout.js';
 import { ingredients, getIngredient } from './data/ingredients.js';
-import type { Batch, Equipment, EquipmentCatalogItem, EquipmentId, EquipmentItemId, GameAction, IngredientId, OwnedEquipment, SalesChannelId } from './game/schema.js';
+import type { Batch, Equipment, EquipmentCatalogItem, EquipmentId, EquipmentItemId, GameAction, IngredientId, OwnedEquipment, RecipeCategoryId, SalesChannelId } from './game/schema.js';
 import { createInitialState } from './game/initialState.js';
 import { loadSavedGame, resetSavedGame, saveGameState, STORAGE_KEY } from './game/persistence.js';
 import {
@@ -26,15 +26,18 @@ import {
   formatGameDate,
   formatClock,
   formatCurrency,
+  garageSpaceAvailable,
   ingredientAmountLabel,
   litersToBottles,
   litersToCases,
   objectiveProgress,
   orderCost,
   recipeCanStart,
+  recipeCategories,
   recipeIngredientCost,
   recipeMissingIngredients,
   recipeOrderItems,
+  recipeStockBatchCount,
   saleCasesForChannel,
   salesChannels,
   saleValueForChannel,
@@ -54,6 +57,7 @@ if (!root) {
 type SceneTarget = EquipmentId | 'cases';
 type FocusOverlay = 'production' | 'inventory' | 'upgrades' | 'log';
 type StoreStation = EquipmentId;
+type ShopSection = 'supplies' | 'equipment';
 type GarageLayoutDraft = Record<GarageEquipmentSlotId, GarageEquipmentPlacement>;
 type GarageSellPointLayoutDraft = Record<GarageSellPointId, GarageEquipmentPlacement>;
 
@@ -118,7 +122,8 @@ let notificationsOpen = false;
 let opsOpen = false;
 let activeOverlay: FocusOverlay | null = null;
 let recipePanelOpen = false;
-let recipeStyleFilter: string | null = null;
+let selectedRecipeCategoryId: RecipeCategoryId | null = null;
+let selectedShopSection: ShopSection | null = null;
 let recipePage = 0;
 let audioAllowed = false;
 const GUIDANCE_DISMISSED_KEY = 'brewery-sim-guidance-dismissed';
@@ -696,12 +701,13 @@ const activeForEquipmentInstance = (equipment: GarageSceneEquipmentInstance): bo
 };
 
 const isNextTapTargetForInstance = (equipment: GarageSceneEquipmentInstance): boolean => {
+  if (equipment.equipmentId === 'kettle') return isNextTapTarget('kettle') && state.batches.length === 0;
+  if (equipment.equipmentId === 'bottler') return isNextTapTarget('bottler') && state.batches.some((batch) => batch.step === 'awaiting-packaging');
   if (equipment.equipmentId !== 'fermenter') return isNextTapTarget(equipment.equipmentId);
   if (!isNextTapTarget('fermenter')) return false;
   const waitingTransfer = state.batches.find((batch) => batch.step === 'awaiting-transfer');
   if (waitingTransfer) return waitingTransfer.fermenterInstanceId === equipment.instanceId;
-  const activeBatch = state.batches.find((batch) => batch.step === 'fermenting');
-  return activeBatch ? activeBatch.fermenterInstanceId === equipment.instanceId : true;
+  return false;
 };
 
 const equipmentInstanceStatus = (equipment: GarageSceneEquipmentInstance): { label: string; detail: string; toneClass: string } => {
@@ -868,43 +874,75 @@ const renderNotificationControl = () => {
 };
 
 
-const recipeStyles = () => {
-  const styles = Array.from(new Set(visibleRecipes().map((recipe) => recipe.style))).sort((a, b) => a.localeCompare(b));
-  return styles;
-};
-
 const recipePageSize = 4;
+
+const brewStockLabel = (count: number): string => `${count} batch${count === 1 ? '' : 'es'} in stock`;
+
+const renderRecipeIngredientRows = (recipe: ReturnType<typeof visibleRecipes>[number]) => `
+  <div class="recipe-ingredient-list" aria-label="${recipe.name} ingredients">
+    ${recipe.ingredients
+      .map((item) => {
+        const ingredient = getIngredient(item.ingredientId);
+        const stock = state.inventory.ingredients[item.ingredientId]?.amount ?? 0;
+        const missing = Math.max(0, item.amount - stock);
+        const incoming = incomingForIngredient(item.ingredientId);
+        return `
+          <div class="${missing > 0 ? 'missing' : 'ready'}">
+            <span>${ingredient.name}</span>
+            <strong>${ingredientAmountLabel(item.ingredientId, item.amount)}</strong>
+            <small>${missing > 0 ? `Missing ${ingredientAmountLabel(item.ingredientId, missing)}` : `${ingredientAmountLabel(item.ingredientId, stock)} stocked`}${incoming.amount > 0 && incoming.arrivalDay ? ` - ${ingredientAmountLabel(item.ingredientId, incoming.amount)} incoming ${formatGameDate(incoming.arrivalDay)}` : ''}</small>
+          </div>
+        `;
+      })
+      .join('')}
+  </div>
+`;
 
 const renderRecipeSelectionPanel = () => {
   const allRecipes = visibleRecipes();
-  const styles = recipeStyles();
-  if (!recipeStyleFilter) {
+  const firstSaleDone = state.demand.casesSold > 0 || state.salesToday > 0;
+  if (!selectedRecipeCategoryId) {
     return `
       <section class="station-panel-body recipe-style-list">
-        <p class="panel-note">Select a beer style.</p>
-        <div class="compact-grid">${styles
-          .map((style) => {
-            const count = allRecipes.filter((recipe) => recipe.style === style).length;
-            return `<button data-action="select-recipe-style" data-style="${style}" type="button">${style}<small>${count} recipe${count === 1 ? '' : 's'}</small></button>`;
+        <p class="panel-note">${firstSaleDone ? 'Choose a beer family, then a recipe.' : 'Recommended first: Garage Blonde.'}</p>
+        <div class="compact-grid recipe-category-grid">${recipeCategories
+          .map((category) => {
+            const categoryRecipes = category.recipeIds.map((recipeId) => allRecipes.find((recipe) => recipe.id === recipeId)).filter(Boolean);
+            const bestStockCount = Math.max(0, ...categoryRecipes.map((recipe) => (recipe ? recipeStockBatchCount(state, recipe) : 0)));
+            const stockSummary = categoryRecipes
+              .map((recipe) => (recipe ? `${recipe.name.replace(/^Garage /, '')} x${recipeStockBatchCount(state, recipe)}` : ''))
+              .filter(Boolean)
+              .join(' - ');
+            const starterClass = category.id === 'starter' && !firstSaleDone ? 'recommended' : '';
+            return `<button class="recipe-category-card ${starterClass}" data-action="select-recipe-category" data-category-id="${category.id}" type="button"><span>${category.name}</span><em class="recipe-stock-badge">${bestStockCount > 0 ? `Stock: ${brewStockLabel(bestStockCount)}` : 'Stock: needs order'}</em><strong>${categoryRecipes.map((recipe) => recipe?.name).join(', ')}</strong><small class="recipe-stock-line">${stockSummary}</small><small>${category.recommendation ?? 'Check stock and risk before brewing'}</small></button>`;
           })
           .join('')}</div>
       </section>
     `;
   }
 
-  const filtered = allRecipes.filter((recipe) => recipe.style === recipeStyleFilter);
+  const category = recipeCategories.find((item) => item.id === selectedRecipeCategoryId) ?? recipeCategories[0];
+  const filtered = category.recipeIds
+    .map((recipeId) => allRecipes.find((recipe) => recipe.id === recipeId))
+    .filter((recipe): recipe is (typeof allRecipes)[number] => Boolean(recipe));
   const pageCount = Math.max(1, Math.ceil(filtered.length / recipePageSize));
   recipePage = Math.max(0, Math.min(recipePage, pageCount - 1));
   const pageRecipes = filtered.slice(recipePage * recipePageSize, recipePage * recipePageSize + recipePageSize);
   return `
     <section class="station-panel-body recipe-panel-flow">
-      <div class="panel-meta-row"><button data-action="back-to-styles" type="button">Back to styles</button><small>Page ${recipePage + 1} / ${pageCount}</small></div>
+      <div class="panel-meta-row"><button data-action="back-to-categories" type="button">Back</button><small>${category.name} - Page ${recipePage + 1} / ${pageCount}</small></div>
       <div class="recipe-page-grid">${pageRecipes.map((recipe) => {
       const missing = recipeMissingIngredients(state, recipe);
+      const incomingMissing = missingOrderStatus(missing);
       const missingCost = orderCost(missing);
+      const extraCost = orderCost(recipeOrderItems(state, recipe, 'extra'));
       const startBlocker = recipeStartBlocker(recipe);
       const canStart = recipeCanStart(state, recipe) && startBlocker === '';
       const batchLiters = Math.min(recipe.targetBatchLiters, state.equipment.kettle.capacityLiters, state.equipment.fermenter.capacityLiters);
+      const stockBatchCount = recipeStockBatchCount(state, recipe);
+      const expectedValue = formatCurrency(Math.round(litersToCases(batchLiters) * recipe.salePricePerCase * recipe.marketAppeal));
+      const estimatedArrivalDay = state.day + 3;
+      return `<article class="batch-card recipe-card compact-recipe-card"><div class="recipe-card-title"><strong>${recipe.name}</strong><em class="recipe-stock-badge">${brewStockLabel(stockBatchCount)}</em><span>${batchLiters} L - ${caseCountLabel(litersToCases(batchLiters))}</span></div>${renderRecipeIngredientRows(recipe)}<div class="recipe-decision-lines"><span>${canStart ? 'Can brew now' : startBlocker || 'Blocked'}</span><span>${expectedValue} expected value</span><span>${missing.length > 0 ? `${missing.length} missing item${missing.length === 1 ? '' : 's'}` : 'All recipe supplies stocked'}${incomingMissing.label ? ` - ${incomingMissing.label}` : ''}</span><span>${recipe.riskTags.slice(0, 2).join(', ') || 'Low risk'}</span></div><div class="hotspot-actions recipe-actions"><button data-action="start-batch" data-recipe-id="${recipe.id}" type="button" ${canStart ? '' : `disabled title="${startBlocker || 'Blocked'}"`}>${canStart ? 'Brew' : 'Blocked'}</button><button data-action="order-recipe" data-order-mode="missing" data-recipe-id="${recipe.id}" type="button" ${recipe.enabled && missing.length > 0 && !incomingMissing.fullyIncoming && state.cash >= missingCost ? '' : 'disabled'}>${incomingMissing.fullyIncoming ? 'Ordered' : `Order missing ${formatCurrency(missingCost)}`}<small>${missing.length === 0 ? 'Stock ready' : incomingMissing.fullyIncoming ? `Arrives ${formatGameDate(incomingMissing.arrivalDay ?? state.day)}` : state.cash < missingCost ? 'Need cash' : formatGameDate(estimatedArrivalDay)}</small></button><button data-action="order-recipe" data-order-mode="extra" data-recipe-id="${recipe.id}" type="button" ${recipe.enabled && state.cash >= extraCost ? '' : 'disabled'}>Order 1 batch ${formatCurrency(extraCost)}<small>${state.cash < extraCost ? 'Need cash' : `${recipe.name} x1 - ${formatGameDate(estimatedArrivalDay)}`}</small></button></div></article>`;
       return `<article class="batch-card recipe-card compact-recipe-card"><div><strong>${recipe.name}</strong><span>${batchLiters} L · ${caseCountLabel(litersToCases(batchLiters))}</span></div><small>${missing.length > 0 ? `Missing stock · ${formatCurrency(missingCost)}` : 'Stock ready'}</small><div class="hotspot-actions"><button data-action="start-batch" data-recipe-id="${recipe.id}" type="button" ${canStart ? '' : `disabled title="${startBlocker || 'Blocked'}"`}>${canStart ? 'Brew' : 'Blocked'}</button><button data-action="order-recipe" data-order-mode="missing" data-recipe-id="${recipe.id}" type="button" ${missing.length > 0 ? '' : 'disabled'}>Order missing</button></div></article>`;
     }).join('')}</div>
       <div class="panel-meta-row page-controls"><button data-action="recipes-prev-page" type="button" ${recipePage === 0 ? 'disabled' : ''}>Previous</button><button data-action="recipes-next-page" type="button" ${recipePage >= pageCount - 1 ? 'disabled' : ''}>Next</button></div>
@@ -1134,11 +1172,15 @@ const renderSceneSupplyHotspots = () => {
 
 
 const renderWorkshopHotspot = () => {
-  const installed = state.ownedEquipment.filter((item) => item.installed).reduce((total, equipment) => total + equipment.tier, 0);
-  const total = (Object.keys(stationLabels) as StoreStation[]).reduce((sum, equipmentId) => sum + equipmentByStation(equipmentId).length, 0);
   return `
-    <button class="workshop-hotspot" data-action="open-overlay" data-overlay="upgrades" type="button" aria-label="Equipment store">
-      <span>Equipment</span><strong>${installed}/${total} tiers - ${garageSpaceUsed()}/${garageSpaceLimit()} space</strong>
+    <button class="workshop-hotspot shop-cart-hotspot" data-action="open-overlay" data-overlay="upgrades" type="button" aria-label="Shop cart">
+      <svg class="shop-cart-icon" aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+        <path d="M3 4h2.4l2.1 11.2h10.8l1.9-7.2H7.1" />
+        <path d="M8.2 8h11.4" />
+        <path d="M8.9 11.3h9.8" />
+        <circle cx="9.2" cy="19" r="1.35" />
+        <circle cx="17.2" cy="19" r="1.35" />
+      </svg>
     </button>
   `;
 };
@@ -1188,7 +1230,7 @@ const renderStationPanel = () => {
         <button class="station-panel-scrim" data-action="close-overlay" type="button" aria-label="Close station panel"></button>
         <aside class="glass-panel station-panel recipe-station-panel" aria-label="Recipe station panel">
           <button class="station-panel-close" data-action="close-overlay" type="button" aria-label="Close station panel"></button>
-          <header class="station-panel-header"><span class="eyebrow gold">Recipe / Brew</span><h2>${recipeStyleFilter ?? 'Select style'}</h2><p>Choose a style, then brew.</p></header>
+          <header class="station-panel-header"><span class="eyebrow gold">Recipe / Brew</span><h2>${selectedRecipeCategoryId ? (recipeCategories.find((item) => item.id === selectedRecipeCategoryId)?.name ?? 'Choose recipe') : 'Choose style'}</h2><p>Choose a style, then brew.</p></header>
           ${renderRecipeSelectionPanel()}
         </aside>
       </div>
@@ -1394,7 +1436,6 @@ const renderGarage = () => {
       ${renderFirstLoopObjective()}
       ${renderMissionsControl()}
       ${renderGaragePressure()}
-      ${renderSceneSupplyHotspots()}
       ${visibility.showWorkshopHotspot ? renderWorkshopHotspot() : ''}
       ${visibility.showFloorNoteTicker ? renderEventTicker() : ''}
       ${equipment}
@@ -1513,29 +1554,113 @@ const renderEquipmentStoreCard = (item: EquipmentCatalogItem) => {
   `;
 };
 
-const renderEquipmentStore = () => `
-  <section class="overlay-section upgrade-shop workshop-overlay">
-    <div class="panel-heading store-heading">
-      <span class="eyebrow gold">Equipment store</span>
-      <h2>Garage equipment</h2>
-      <small>${garageSpaceUsed()}/${garageSpaceLimit()} garage space used</small>
+const ingredientCartButtonState = (ingredient: (typeof ingredients)[number]): { disabled: boolean; label: string; reason: string; className: string } => {
+  const incoming = incomingForIngredient(ingredient.id);
+  if (state.cash < ingredient.packPrice) return { disabled: true, label: 'Need cash', reason: `Need ${formatCurrency(ingredient.packPrice)}`, className: 'upgrade-locked' };
+  if (incoming.amount > 0 && incoming.arrivalDay) return { disabled: false, label: 'Order more', reason: `${ingredientAmountLabel(ingredient.id, incoming.amount)} incoming ${formatGameDate(incoming.arrivalDay)}`, className: 'cart-incoming' };
+  return { disabled: false, label: 'Add to cart', reason: `${ingredientAmountLabel(ingredient.id, ingredient.packSize)} pack - ${formatCurrency(ingredient.packPrice)}`, className: '' };
+};
+
+const renderIngredientCartCard = (ingredient: (typeof ingredients)[number]) => {
+  const stock = state.inventory.ingredients[ingredient.id];
+  const buttonState = ingredientCartButtonState(ingredient);
+  const lowStock = stock.amount <= ingredient.packSize;
+  return `
+    <button class="upgrade-pallet ingredient-cart-card ${buttonState.className} ${lowStock ? 'low-stock-card' : ''}" type="button" data-action="order-ingredient" data-ingredient-id="${ingredient.id}" ${buttonState.disabled ? `disabled title="${buttonState.reason}"` : ''}>
+      <span>${ingredient.name}</span>
+      <small>${ingredient.category} - shelf ${ingredientAmountLabel(ingredient.id, stock.amount)} - ${Math.round(stock.condition)}%</small>
+      <small>${ingredient.sourceNote}</small>
+      <strong>${buttonState.label}</strong>
+      <em>${buttonState.reason}</em>
+    </button>
+  `;
+};
+
+const renderIngredientCart = () => `
+  <section class="equipment-store-group ingredient-cart-group">
+    <div class="store-group-heading">
+      <span class="eyebrow">Supplies</span>
+      <strong>Ingredients and packaging</strong>
+      <small>${state.pendingOrders.length} incoming order${state.pendingOrders.length === 1 ? '' : 's'}</small>
     </div>
-    ${(Object.keys(stationLabels) as StoreStation[])
-      .map(
-        (station) => `
-          <section class="equipment-store-group">
-            <div class="store-group-heading">
-              <span class="eyebrow">${stationLabels[station]}</span>
-              <strong>${displayEquipmentName(state.equipment[station])}</strong>
-              <small>${equipmentCapacityLabel(state.equipment[station])} - ${state.equipment[station].spaceUsed} space</small>
+    <div class="ingredient-cart-grid">
+      ${ingredients.map(renderIngredientCartCard).join('')}
+    </div>
+  </section>
+`;
+
+const renderShopSectionCards = () => {
+  const lowSupplyCount = ingredients.filter((ingredient) => {
+    const stock = state.inventory.ingredients[ingredient.id];
+    return stock.amount <= ingredient.packSize;
+  }).length;
+  const incomingCount = state.pendingOrders.length;
+  const availableEquipmentCount = equipmentByStation('kettle')
+    .concat(equipmentByStation('fermenter'), equipmentByStation('mill'), equipmentByStation('bottler'))
+    .filter((item) => !equipmentStoreButtonState(item).disabled).length;
+  return `
+    <section class="recipe-category-screen shop-section-screen">
+      <div class="panel-heading recipe-flow-heading">
+        <span class="eyebrow gold">Shop cart</span>
+        <h2>Choose cart</h2>
+        <small>${formatCurrency(state.cash)} cash - ${garageSpaceUsed()}/${garageSpaceLimit()} garage space</small>
+      </div>
+      <div class="recipe-category-grid shop-section-grid">
+        <button class="recipe-category-card shop-section-card" data-action="select-shop-section" data-shop-section="supplies" type="button">
+          <span>Supplies</span>
+          <strong>Ingredients and packaging</strong>
+          <small>${lowSupplyCount} low supplies - ${incomingCount} incoming order${incomingCount === 1 ? '' : 's'}</small>
+        </button>
+        <button class="recipe-category-card shop-section-card" data-action="select-shop-section" data-shop-section="equipment" type="button">
+          <span>Equipment</span>
+          <strong>Brewhouse, fermenters and bottling</strong>
+          <small>${availableEquipmentCount} buyable item${availableEquipmentCount === 1 ? '' : 's'} - ${garageSpaceAvailable(state)} space free</small>
+        </button>
+      </div>
+    </section>
+  `;
+};
+
+const renderEquipmentStore = () => `
+  <section class="overlay-section upgrade-shop workshop-overlay shop-cart-overlay">
+    ${
+      selectedShopSection === null
+        ? renderShopSectionCards()
+        : selectedShopSection === 'supplies'
+          ? `
+            <div class="panel-heading store-heading">
+              <button class="back-button" data-action="back-shop-sections" type="button">Back</button>
+              <span class="eyebrow gold">Supplies</span>
+              <h2>Ingredients and packaging</h2>
+              <small>${formatCurrency(state.cash)} cash - ${state.pendingOrders.length} incoming order${state.pendingOrders.length === 1 ? '' : 's'}</small>
             </div>
-            <div class="equipment-store-grid">
-              ${equipmentByStation(station).map(renderEquipmentStoreCard).join('')}
+            ${renderIngredientCart()}
+          `
+          : `
+            <div class="panel-heading store-heading">
+              <button class="back-button" data-action="back-shop-sections" type="button">Back</button>
+              <span class="eyebrow gold">Equipment</span>
+              <h2>Garage equipment</h2>
+              <small>${formatCurrency(state.cash)} cash - ${garageSpaceUsed()}/${garageSpaceLimit()} garage space</small>
             </div>
-          </section>
-        `
-      )
-      .join('')}
+            ${(Object.keys(stationLabels) as StoreStation[])
+              .map(
+                (station) => `
+                  <section class="equipment-store-group">
+                    <div class="store-group-heading">
+                      <span class="eyebrow">${stationLabels[station]}</span>
+                      <strong>${displayEquipmentName(state.equipment[station])}</strong>
+                      <small>${equipmentCapacityLabel(state.equipment[station])} - ${state.equipment[station].spaceUsed} space</small>
+                    </div>
+                    <div class="equipment-store-grid">
+                      ${equipmentByStation(station).map(renderEquipmentStoreCard).join('')}
+                    </div>
+                  </section>
+                `
+              )
+              .join('')}
+          `
+    }
   </section>
 `;
 
@@ -1557,7 +1682,7 @@ const overlayContent = () => {
 };
 
 const overlayTitle = () =>
-  ({ production: 'Production', inventory: 'Inventory detail', upgrades: 'Equipment store', log: 'Clipboard log' })[activeOverlay ?? 'production'];
+  ({ production: 'Production', inventory: 'Inventory detail', upgrades: 'Shop cart', log: 'Clipboard log' })[activeOverlay ?? 'production'];
 
 const renderFocusOverlay = () =>
   activeOverlay
@@ -1650,7 +1775,8 @@ root.addEventListener('click', (event) => {
       opsOpen = false;
       activeOverlay = null;
       recipePanelOpen = false;
-      recipeStyleFilter = null;
+      selectedRecipeCategoryId = null;
+      selectedShopSection = null;
       recipePage = 0;
       render();
     }
@@ -1661,7 +1787,8 @@ root.addEventListener('click', (event) => {
   if (action === 'close-overlay') {
     activeOverlay = null;
     recipePanelOpen = false;
-    recipeStyleFilter = null;
+    selectedRecipeCategoryId = null;
+    selectedShopSection = null;
     recipePage = 0;
     opsOpen = false;
     render();
@@ -1672,13 +1799,14 @@ root.addEventListener('click', (event) => {
     const requestedOverlay = target.dataset.overlay;
     if (requestedOverlay === 'recipes') {
       recipePanelOpen = true;
-      recipeStyleFilter = null;
+      selectedRecipeCategoryId = null;
       recipePage = 0;
       activeOverlay = null;
     } else {
       activeOverlay = requestedOverlay as FocusOverlay;
       recipePanelOpen = false;
-      recipeStyleFilter = null;
+      selectedRecipeCategoryId = null;
+      selectedShopSection = null;
       recipePage = 0;
     }
     expandedTarget = null;
@@ -1710,23 +1838,23 @@ root.addEventListener('click', (event) => {
     expandedTarget = null;
     expandedEquipmentInstanceId = null;
     recipePanelOpen = false;
-    recipeStyleFilter = null;
+    selectedRecipeCategoryId = null;
     recipePage = 0;
     render();
     return;
   }
 
-  if (action === 'select-recipe-style') {
+  if (action === 'select-recipe-category') {
     recipePanelOpen = true;
-    recipeStyleFilter = target.dataset.style ?? null;
+    selectedRecipeCategoryId = target.dataset.categoryId as RecipeCategoryId;
     recipePage = 0;
     render();
     return;
   }
 
-  if (action === 'back-to-styles') {
+  if (action === 'back-to-categories') {
     recipePanelOpen = true;
-    recipeStyleFilter = null;
+    selectedRecipeCategoryId = null;
     recipePage = 0;
     render();
     return;
@@ -1744,6 +1872,18 @@ root.addEventListener('click', (event) => {
     return;
   }
 
+  if (action === 'select-shop-section') {
+    selectedShopSection = target.dataset.shopSection as ShopSection;
+    render();
+    return;
+  }
+
+  if (action === 'back-shop-sections') {
+    selectedShopSection = null;
+    render();
+    return;
+  }
+
   if (action === 'toggle-ops') {
     opsOpen = !opsOpen;
     missionsOpen = false;
@@ -1752,7 +1892,8 @@ root.addEventListener('click', (event) => {
     expandedEquipmentInstanceId = null;
     activeOverlay = null;
     recipePanelOpen = false;
-    recipeStyleFilter = null;
+    selectedRecipeCategoryId = null;
+    selectedShopSection = null;
     recipePage = 0;
     render();
     return;
@@ -1813,6 +1954,9 @@ root.addEventListener('click', (event) => {
   if (action === 'start-batch') {
     activeOverlay = null;
     opsOpen = false;
+    recipePanelOpen = false;
+    expandedTarget = null;
+    expandedEquipmentInstanceId = null;
     dispatch({ type: 'start-batch', recipeId: target.dataset.recipeId ?? 'garage-blonde' });
     return;
   }
@@ -1829,11 +1973,15 @@ root.addEventListener('click', (event) => {
   }
 
   if (action === 'transfer-batch') {
+    expandedTarget = null;
+    expandedEquipmentInstanceId = null;
     dispatch({ type: 'transfer-batch', batchId: target.dataset.batchId ?? '' });
     return;
   }
 
   if (action === 'start-packaging') {
+    expandedTarget = null;
+    expandedEquipmentInstanceId = null;
     dispatch({ type: 'start-packaging', batchId: target.dataset.batchId ?? '' });
     return;
   }
@@ -1848,6 +1996,8 @@ root.addEventListener('click', (event) => {
   if (action === 'sell-channel') {
     activeOverlay = null;
     opsOpen = false;
+    expandedTarget = null;
+    expandedEquipmentInstanceId = null;
     dispatch({ type: 'sell-channel', channelId: target.dataset.channelId as SalesChannelId, cases: Number(target.dataset.cases ?? 0) });
     return;
   }

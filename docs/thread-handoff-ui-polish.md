@@ -1,102 +1,132 @@
-# Brewery-Sim UI Polish Handoff
+# Brewery-Sim Current Handoff
 
-## Current repository state
+Updated: 2026-05-19  
+Local preview: `http://127.0.0.1:4173/`  
+Current branch: `main`  
+Current remote base: `origin/main` at `6b006f0` (`Add deployed garage assets for Pages`)
 
-- Repository: `https://github.com/larskristel-max/Brewery-Sim`
-- GitHub Pages: `https://larskristel-max.github.io/Brewery-Sim/`
-- Local test URL: `http://127.0.0.1:4173/`
-- Latest merged work: PR #14, `[codex] Polish landscape brewery UI`
-- Latest main commit at handoff: `ae68e1c` (`Polish landscape brewery UI`)
+## Current State
 
-## What was completed in this thread
+This thread moved Brewery-Sim further toward the agreed direction: a mobile-first cozy Belgian garage brewery game where the room objects carry the loop. The app still uses the dependency-light TypeScript setup and tracked `dist` output. No Supabase, Notion, Cloudflare, auth, accounts, or Operon API integration was added.
 
-- Preserved the dependency-light TypeScript setup. The app still builds with `tsc`; no React or Vite migration was introduced.
-- Preserved tracked `dist` output and rebuilt it after source changes.
-- Added the clean garage brewery background asset at `assets/garage-brewery-floor.png`.
-- Implemented the garage brewery UI in `src/main.ts` and `src/styles/garage.css`.
-- Added outside-click dismissal for expanded equipment cards, Missions, and Notifications.
-- Kept action buttons working without closing before dispatch:
-  - Brew
-  - Inspect
-  - Bottle
-  - Clean
-  - Sell
-  - Missions
-  - Notifications
-- Reworked Notifications into an icon-only bell button with a small count badge.
-- Reduced expanded-card overlap in phone landscape.
-- Hid obstructing nearby hotspots only when they interfere with the active expanded card.
-- Added a portrait-only rotate blocker that fully covers the game and says Brewery-Sim is played in landscape mode.
-- Verified the browser experience at `844x390` and portrait orientation.
-- Merged the work into `main` through GitHub PR #14.
-- Deleted the merged `codex/create-operon-integration-documentation` remote branch.
-- Left closed-but-unmerged remote branches intact.
+The working tree contains source updates plus rebuilt `dist` output. The untracked review file `docs/ui-ux-gameplay-review-2026-05-18.md` remains present and should be preserved.
 
-## Validation already run
+## Important Branch Notes
 
-- `npm.cmd run build`
-- `npm.cmd run test`
-- In-app browser checks at `844x390`:
-  - expanded equipment card closes when tapping empty scene space
-  - expanded card does not close before its action buttons dispatch
-  - Missions and Notifications close when tapping outside
-  - notification button is icon-only with a count badge
-  - fermenter and bottling station cards avoid awkward overlap better than before
-  - Brew, Inspect, Bottle, Clean, and Sell dispatch correctly
-- In-app browser portrait check:
-  - rotate prompt fully blocks the game
+Do not blindly merge the old local branches into `main`.
 
-## Important correction from latest review
+- `codex/stabilize-garage-hotspots` is already merged into `main`.
+- `codex/add-real-equipment-sprites` has old commits that would conflict with or remove current asset paths if merged directly.
+- `codex/tier2-layout-preview` is older than the current locked placement work now in the working tree.
+- `codex/local-main-before-clean-20260517-135653` is a safety snapshot branch, not a current feature branch.
 
-The attempted "bottom Menu opens lower panels" idea is rejected.
+If old branch content is needed later, cherry-pick deliberately after reviewing the diff.
 
-Brewery-Sim needs to remain a one-screen game in phone landscape. The next implementation should not hide core gameplay information behind a bottom drawer or create a scrolling/dashboard mode.
+## Completed In This Pass
 
-## UI menu TODO for the next thread
+### Direct Garage Loop
 
-Goal: make the `844x390` landscape view a true one-screen playable game.
+- Kept the garage floor as the primary interaction surface.
+- Kettle opens the recipe flow.
+- Fermenters, bottling bench, and pallet open large centered station sheets instead of tiny cards or direct hidden actions.
+- Transfer, package, and sell actions now close the station sheet after dispatch.
+- Active equipment images no longer move or become nearly transparent when clicked.
+- Blue dotted active outlines were removed from working equipment.
+- Equipment now pulses only when player input is actually needed, such as a fermenter reserved for transfer.
 
-1. Keep `body`, `.game-shell`, and `.garage-scene` locked to one viewport in phone landscape.
-   - No browser scrollbar.
-   - No lower dashboard content flowing below the scene.
-   - No bottom drawer menu for normal play.
+### Locked Equipment Placement
 
-2. Remove the lower panels from normal document flow at the phone-landscape breakpoint.
-   - Production, Inventory, Upgrades, and Event Log should not appear below the scene at `844x390`.
-   - Do not replace them with a bottom menu drawer.
+The exact placement values are now centralized in `src/data/garageLayout.ts` and reflected in `dist`.
 
-3. Fold essential information into compact, always-available scene/HUD surfaces.
-   - Production: one compact batch/status strip.
-   - Inventory: only essentials needed for immediate decisions, such as water, cases, and key constrained supplies.
-   - Upgrades/orders/log: expose only urgent/actionable state through Missions or Notifications.
+- `brewhouse`: `x 24.6`, `y 53.1`, `width 17`
+- `fermenter-slot-1`: `x 38.6`, `y 45.2`, `width 14.5`
+- `fermenter-slot-2`: `x 49.4`, `y 45.2`, `width 14.5`
+- `fermenter-slot-3`: `x 60.2`, `y 45.2`, `width 14.5`
+- `fermenter-slot-4`: `x 50.5`, `y 65`, `width 12`
+- `fermenter-slot-5`: `x 61.5`, `y 65`, `width 12`
+- `milling`: `x 18`, `y 76.5`, `width 10`
+- `packaging`: `x 74.5`, `y 62.4`, `width 13.1`
 
-4. Missions must not be blocked by equipment cards.
-   - Raise the Missions popover above hotspot cards.
-   - If the popover overlaps a hotspot, dim or hide only the obstructing hotspot while Missions is open.
-   - Missions itself should not be visually covered by the brew system card.
+### Recipe Flow
 
-5. Notifications should follow the same layering rule as Missions.
-   - The bell remains icon-only with a badge.
-   - The popover should open above scene cards and close on outside click.
+- Recipe selection is category-first:
+  - Starter
+  - Hop-forward
+  - Cool fermentation
+  - Farmhouse/Wheat
+  - Dark
+  - Experimental
+- Recipe cards now show required ingredients, stocked amounts, missing amounts, and incoming deliveries.
+- Category cards and recipe cards show how many batches can be brewed from current stock.
+- `Order 1 batch` orders one full extra recipe ingredient set each click.
+- The recipe modal is larger and centered; a single recipe card spans the full modal width to avoid scrolling in phone landscape.
 
-6. Keep equipment cards as the main interaction surface.
-   - Kettle expanded card: Brew, Clean, disabled Repair, disabled Replace.
-   - Fermenter expanded card: Inspect, Clean, disabled Repair, disabled Replace.
-   - Bottler expanded card: Bottle, Clean, disabled Repair, disabled Replace.
-   - Cases expanded card: Sell.
+### Shop Cart
 
-7. Reverify in the in-app browser at `844x390`.
-   - No scrollbar.
-   - No lower dashboard visible below the scene.
-   - Missions does not collide with the brew system card.
-   - Notifications does not collide with active cards.
-   - Empty scene taps still close open overlays/cards.
-   - Core actions still dispatch.
+- The left-side text shop badge was replaced with an icon-only shopping cart button.
+- The cart icon sits beside the bottom-right `+` button.
+- The shop overlay is centered like the other large modals.
+- Shop flow is now two-step:
+  1. Choose `Supplies` or `Equipment`.
+  2. Show the relevant cart cards.
+- Floating supply/inventory badges, including the `Bottles 20/40` badge, were removed from the garage scene. Inventory remains available through the `+` menu.
 
-## Files most likely to edit next
+### Guidance And Mobile Fit
+
+- Guidance pill is compact and positioned above the pallet lane.
+- Station sheets are checked against `844x390`, `1040x432`, and `667x375` landscape conditions.
+- Large station panels now show active progress for fermenting batches.
+
+### Sales, Lots, And Operon-Informed Local Model
+
+- Sales offers use shared selectors so displayed revenue matches reducer cash delta.
+- Finished beer is modeled as lot-like local stock with source batch, recipe, cases, volume, quality, market appeal, packaging state, and sale state.
+- Sales consume finished lots and record movements.
+- Added a small local Operon mapping module for process, equipment, inventory movement, and sales-risk vocabulary. This is only a semantic mapping layer, not an integration.
+- Added rolling local inventory movement events:
+  - `order-created`
+  - `order-received`
+  - `ingredients-consumed`
+  - `beer-packaged`
+  - `cases-sold`
+  - `loss-recorded`
+
+## Validation Run
+
+Latest successful checks:
+
+- `npm.cmd test`
+- `npm.cmd run test:browser`
+
+The browser regression covers the direct garage loop, recipe category flow, stock batch indicators, station sheet progress, no sprite movement/fading, shop cart flow, centered overlays, hidden floating inventory badges, pallet level changes, and sale payoff.
+
+## Key Files Changed
 
 - `src/main.ts`
 - `src/styles/garage.css`
+- `src/data/garageLayout.ts`
+- `src/game/schema.ts`
+- `src/game/selectors.ts`
+- `src/game/simulation.ts`
+- `src/game/persistence.ts`
+- `src/game/initialState.ts`
+- `src/game/operonMappings.ts`
+- `scripts/run-tests.mjs`
+- `scripts/run-browser-regression.mjs`
 - rebuilt tracked output under `dist/`
 
-Avoid changing the save schema, economy, recipe model, or simulation behavior unless the next task explicitly asks for it.
+## Things To Watch Next
+
+- The shop cart icon is now a real SVG cart, but its final visual quality should be judged in the browser at the target phone-landscape size.
+- Recipe cards fit better now, but future recipes with more ingredients may need pagination or tighter card content.
+- The old `renderSceneSupplyHotspots` helper remains in source but is no longer rendered. It can be removed in a later cleanup if no longer wanted.
+- Browser-local save migrations were extended. Keep testing old saves if the save schema changes again.
+- The current `main` working tree has not been pushed from this machine unless the next operator explicitly commits and pushes.
+
+## Recommended Next Tasks
+
+1. Play one fresh loop from a cleared save on `844x390`.
+2. Tune the cart icon and bottom-right control spacing if the icon still reads poorly.
+3. Continue reducing nonessential overlays in favor of object-first station sheets.
+4. Add richer payoff feedback when pallet fills and when cases are sold.
+5. Remove stale helpers and old branch clutter only after confirming no needed code remains.

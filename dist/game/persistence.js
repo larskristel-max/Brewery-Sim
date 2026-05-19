@@ -7,6 +7,7 @@ const equipmentIds = ['kettle', 'fermenter', 'bottler', 'mill'];
 const upgradeIds = ['larger-kettle', 'temp-control', 'labeler'];
 const ingredientIds = ingredients.map((ingredient) => ingredient.id);
 const batchSteps = ['brewing', 'awaiting-transfer', 'fermenting', 'awaiting-packaging', 'packaging', 'bottle-conditioning', 'ready'];
+const inventoryMovementTypes = ['order-created', 'order-received', 'ingredients-consumed', 'beer-packaged', 'cases-sold', 'loss-recorded'];
 const minFermenterTemperatureC = 8;
 const maxFermenterTemperatureC = 40;
 const getBrowserStorage = () => {
@@ -65,6 +66,15 @@ const isBatch = (value) => isRecord(value) &&
     hasNumber(value, 'storagePenalty') &&
     Array.isArray(value.faultEventsTriggered);
 const isFinishedBeerLot = (value) => isRecord(value) && hasString(value, 'id') && hasString(value, 'recipeId') && hasString(value, 'recipeName') && hasNumber(value, 'cases') && hasNumber(value, 'quality') && hasNumber(value, 'marketAppeal');
+const isInventoryMovement = (value) => isRecord(value) &&
+    hasString(value, 'id') &&
+    typeof value.type === 'string' &&
+    inventoryMovementTypes.includes(value.type) &&
+    hasNumber(value, 'day') &&
+    hasNumber(value, 'minute') &&
+    hasString(value, 'description') &&
+    hasNumber(value, 'quantity') &&
+    hasString(value, 'unit');
 const isSupplyOrder = (value) => isRecord(value) &&
     hasString(value, 'id') &&
     hasNumber(value, 'dayOrdered') &&
@@ -97,6 +107,7 @@ const isSavedGameState = (value) => {
         value.batches.every(isBatch) &&
         Array.isArray(value.finishedBeerLots) &&
         value.finishedBeerLots.every(isFinishedBeerLot) &&
+        (value.inventoryMovements === undefined || (Array.isArray(value.inventoryMovements) && value.inventoryMovements.every(isInventoryMovement))) &&
         Array.isArray(value.pendingOrders) &&
         value.pendingOrders.every(isSupplyOrder) &&
         isStorageState(value.storage) &&
@@ -123,17 +134,26 @@ const parseSavedGame = (rawSave) => {
     if (!isRecord(parsed) || parsed.version !== SAVE_VERSION || !isSavedGameState(parsed.state))
         return null;
     const savedState = parsed.state;
+    const initialState = createInitialState();
     return {
         ...savedState,
         equipment: {
-            ...createInitialState().equipment,
+            ...initialState.equipment,
             ...savedState.equipment
         },
         activeEquipment: {
-            ...createInitialState().activeEquipment,
+            ...initialState.activeEquipment,
             ...savedState.activeEquipment
         },
-        fermenterTemperatureC: clampFermenterTemperature(hasNumber(savedState, 'fermenterTemperatureC') ? savedState.fermenterTemperatureC : createInitialState().fermenterTemperatureC)
+        finishedBeerLots: savedState.finishedBeerLots.map((lot) => ({
+            ...lot,
+            sourceBatchId: hasString(lot, 'sourceBatchId') ? lot.sourceBatchId : lot.id.replace(/-lot$/, ''),
+            volumeLiters: hasNumber(lot, 'volumeLiters') ? lot.volumeLiters : lot.cases * 7.92,
+            packagingState: lot.packagingState ?? 'packaged',
+            saleState: lot.saleState ?? 'available'
+        })),
+        inventoryMovements: Array.isArray(savedState.inventoryMovements) ? savedState.inventoryMovements : [],
+        fermenterTemperatureC: clampFermenterTemperature(hasNumber(savedState, 'fermenterTemperatureC') ? savedState.fermenterTemperatureC : initialState.fermenterTemperatureC)
     };
 };
 export const loadSavedGame = (storage = getBrowserStorage()) => {

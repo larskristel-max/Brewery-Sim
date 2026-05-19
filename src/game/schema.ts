@@ -24,11 +24,22 @@ export type EquipmentTier = 1 | 2 | 3;
 export type UpgradeId = 'larger-kettle' | 'temp-control' | 'labeler';
 export type EquipmentStation = 'brewhouse' | 'fermentation' | 'milling' | 'packaging';
 export type SalesChannelId = 'friends-family' | 'private-event' | 'local-bar' | 'restaurant';
+export type SalesRiskCategory = 'informal' | 'semi-formal' | 'formal';
 export type IngredientCategory = 'malt' | 'hops' | 'yeast' | 'sugar' | 'packaging' | 'cleaning';
 export type StorageArea = 'dry-shelf' | 'cold-box' | 'utility-shelf';
 export type IngredientCondition = 'fresh' | 'stressed' | 'damp' | 'stale' | 'weak';
 export type IngredientUnit = 'kg' | 'g' | 'pack' | 'unit';
 export type OrderMode = 'missing' | 'extra';
+export type RecipeCategoryId = 'starter' | 'hop-forward' | 'cool-fermentation' | 'farmhouse-wheat' | 'dark' | 'experimental';
+export type PackagingState = 'packaged';
+export type SaleState = 'available' | 'partially-sold' | 'sold-out';
+export type InventoryMovementType =
+  | 'order-created'
+  | 'order-received'
+  | 'ingredients-consumed'
+  | 'beer-packaged'
+  | 'cases-sold'
+  | 'loss-recorded';
 export type IngredientId =
   | 'pilsner-malt'
   | 'pale-malt'
@@ -122,11 +133,54 @@ export interface Batch {
 
 export interface FinishedBeerLot {
   id: string;
+  sourceBatchId: string;
   recipeId: string;
   recipeName: string;
   cases: number;
+  volumeLiters: number;
   quality: number;
   marketAppeal: number;
+  packagingState: PackagingState;
+  saleState: SaleState;
+}
+
+export interface InventoryMovement {
+  id: string;
+  type: InventoryMovementType;
+  day: number;
+  minute: number;
+  description: string;
+  quantity: number;
+  unit: 'case' | 'liter' | 'ingredient' | 'order';
+  batchId?: string;
+  lotId?: string;
+  recipeId?: string;
+  channelId?: SalesChannelId;
+  ingredientId?: IngredientId;
+}
+
+export interface SalesOffer {
+  channelId: SalesChannelId;
+  name: string;
+  cases: number;
+  requestedCases: number;
+  revenue: number;
+  reputationDelta: number;
+  visibilityDelta: number;
+  complianceDelta: number;
+  householdPressureDelta: number;
+  invoiceNote: string;
+  complianceNote: string;
+  riskCategory: SalesRiskCategory;
+  disabledReason: string;
+}
+
+export interface PackagingReadiness {
+  canPackage: boolean;
+  batch?: Batch;
+  requiredBottles: number;
+  blockers: string[];
+  summary: string;
 }
 
 export interface SupplyOrderItem {
@@ -259,6 +313,7 @@ export interface GameState {
   pendingOrders: SupplyOrder[];
   storage: StorageState;
   finishedBeerLots: FinishedBeerLot[];
+  inventoryMovements: InventoryMovement[];
   visibilityRisk: number;
   householdPressure: number;
   complianceRisk: number;

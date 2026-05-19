@@ -1,4 +1,4 @@
-import type { Batch, BatchStep, EquipmentId, GameState, IngredientId, OwnedEquipment, Recipe, RecipeIngredient, SalesChannelId, StorageArea } from './schema.js';
+import type { Batch, BatchStep, EquipmentId, GameState, IngredientId, OwnedEquipment, Recipe, RecipeCategoryId, RecipeIngredient, SalesChannelId, StorageArea } from './schema.js';
 export type EquipmentConditionTier = 'clean' | 'worn' | 'dirty' | 'critical';
 export type ContaminationRiskTier = 'low' | 'elevated' | 'high' | 'severe';
 export declare const salesChannels: Record<SalesChannelId, {
@@ -9,6 +9,14 @@ export declare const salesChannels: Record<SalesChannelId, {
     risk: number;
     formal: boolean;
 }>;
+export type RecipeCategory = {
+    id: RecipeCategoryId;
+    name: string;
+    recipeIds: string[];
+    recommendation?: string;
+};
+export declare const recipeCategories: RecipeCategory[];
+export declare const recipeCategoryFor: (recipeId: string) => RecipeCategory;
 export declare const formatClock: (minute: number) => string;
 export declare const formatCurrency: (amount: number) => string;
 export declare const formatGameDate: (day: number) => string;
@@ -16,6 +24,7 @@ export declare const ingredientAmountLabel: (ingredientId: IngredientId, amount:
 export declare const ingredientUnitCost: (ingredientId: IngredientId) => number;
 export declare const recipeIngredientCost: (recipe: Recipe) => number;
 export declare const recipeMissingIngredients: (state: GameState, recipe: Recipe) => RecipeIngredient[];
+export declare const recipeStockBatchCount: (state: GameState, recipe: Recipe) => number;
 export declare const recipeCanStart: (state: GameState, recipe: Recipe) => boolean;
 export declare const ownedByStation: (state: GameState, equipmentId: EquipmentId) => OwnedEquipment[];
 export declare const activeOwnedEquipment: (state: GameState, equipmentId: EquipmentId) => OwnedEquipment;

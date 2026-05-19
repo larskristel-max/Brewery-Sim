@@ -1,6 +1,6 @@
 import { getIngredient } from '../data/ingredients.js';
 import { getRecipe, recipes } from '../data/recipes.js';
-import type { Batch, BatchStep, EquipmentId, GameState, IngredientId, OwnedEquipment, Recipe, RecipeIngredient, SalesChannelId, StorageArea } from './schema.js';
+import type { Batch, BatchStep, EquipmentId, GameState, IngredientId, OwnedEquipment, Recipe, RecipeCategoryId, RecipeIngredient, SalesChannelId, StorageArea } from './schema.js';
 
 const gameStartDateUtc = Date.UTC(2026, 4, 16);
 
@@ -14,6 +14,25 @@ export const salesChannels: Record<SalesChannelId, { name: string; cases: number
   'local-bar': { name: 'Local bar', cases: 12, rep: 3, invoiceAfter: 18, risk: 1.8, formal: true },
   restaurant: { name: 'Restaurant', cases: 16, rep: 4, invoiceAfter: 0, risk: 2.4, formal: true }
 };
+
+export type RecipeCategory = {
+  id: RecipeCategoryId;
+  name: string;
+  recipeIds: string[];
+  recommendation?: string;
+};
+
+export const recipeCategories: RecipeCategory[] = [
+  { id: 'starter', name: 'Starter', recipeIds: ['garage-blonde'], recommendation: 'Start here until the first private sale is complete.' },
+  { id: 'hop-forward', name: 'Hop-forward', recipeIds: ['backyard-ipa'] },
+  { id: 'cool-fermentation', name: 'Cool fermentation', recipeIds: ['basement-pils'] },
+  { id: 'farmhouse-wheat', name: 'Farmhouse/Wheat', recipeIds: ['garage-wheat', 'shed-saison', 'hot-garage-kveik'] },
+  { id: 'dark', name: 'Dark', recipeIds: ['midnight-stout'] },
+  { id: 'experimental', name: 'Experimental', recipeIds: ['custom-recipe'] }
+];
+
+export const recipeCategoryFor = (recipeId: string): RecipeCategory =>
+  recipeCategories.find((category) => category.recipeIds.includes(recipeId)) ?? recipeCategories[0];
 
 export const formatClock = (minute: number): string => {
   const dayMinute = minute % (24 * 60);
@@ -54,6 +73,15 @@ export const recipeMissingIngredients = (state: GameState, recipe: Recipe): Reci
       return { ingredientId: item.ingredientId, amount: Math.max(0, item.amount - stock) };
     })
     .filter((item) => item.amount > 0);
+
+export const recipeStockBatchCount = (state: GameState, recipe: Recipe): number => {
+  if (!recipe.enabled) return 0;
+  const ingredientCounts = recipe.ingredients.map((item) => {
+    const stock = state.inventory.ingredients[item.ingredientId]?.amount ?? 0;
+    return item.amount > 0 ? Math.floor(stock / item.amount) : Number.POSITIVE_INFINITY;
+  });
+  return Math.max(0, Math.min(Math.floor(state.inventory.water / recipe.waterCost), ...ingredientCounts));
+};
 
 export const recipeCanStart = (state: GameState, recipe: Recipe): boolean =>
   recipe.enabled &&

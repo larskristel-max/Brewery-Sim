@@ -20,6 +20,7 @@ export const createInitialState = () => ({
         utilityShelfCapacity: 40
     },
     finishedBeerLots: [],
+    inventoryMovements: [],
     visibilityRisk: 0,
     householdPressure: 4,
     complianceRisk: 0,

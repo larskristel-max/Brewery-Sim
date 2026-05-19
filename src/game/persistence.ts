@@ -1,6 +1,6 @@
 import { ingredients } from '../data/ingredients.js';
 import { createInitialState } from './initialState.js';
-import type { Batch, Equipment, EquipmentId, FinishedBeerLot, GameState, IngredientId, IngredientStock, Inventory, LocalDemand, OwnedEquipment, StorageState, SupplyOrder, Upgrade, UpgradeId } from './schema.js';
+import type { Batch, Equipment, EquipmentId, FinishedBeerLot, GameState, IngredientId, IngredientStock, Inventory, InventoryMovement, LocalDemand, OwnedEquipment, StorageState, SupplyOrder, Upgrade, UpgradeId } from './schema.js';
 
 export const SAVE_VERSION = 4;
 export const STORAGE_KEY = 'brewery-sim-save-v4';
@@ -17,6 +17,7 @@ const equipmentIds: EquipmentId[] = ['kettle', 'fermenter', 'bottler', 'mill'];
 const upgradeIds: UpgradeId[] = ['larger-kettle', 'temp-control', 'labeler'];
 const ingredientIds = ingredients.map((ingredient) => ingredient.id);
 const batchSteps = ['brewing', 'awaiting-transfer', 'fermenting', 'awaiting-packaging', 'packaging', 'bottle-conditioning', 'ready'];
+const inventoryMovementTypes = ['order-created', 'order-received', 'ingredients-consumed', 'beer-packaged', 'cases-sold', 'loss-recorded'];
 const minFermenterTemperatureC = 8;
 const maxFermenterTemperatureC = 40;
 
@@ -100,6 +101,17 @@ const isBatch = (value: unknown): value is Batch =>
 const isFinishedBeerLot = (value: unknown): value is FinishedBeerLot =>
   isRecord(value) && hasString(value, 'id') && hasString(value, 'recipeId') && hasString(value, 'recipeName') && hasNumber(value, 'cases') && hasNumber(value, 'quality') && hasNumber(value, 'marketAppeal');
 
+const isInventoryMovement = (value: unknown): value is InventoryMovement =>
+  isRecord(value) &&
+  hasString(value, 'id') &&
+  typeof value.type === 'string' &&
+  inventoryMovementTypes.includes(value.type) &&
+  hasNumber(value, 'day') &&
+  hasNumber(value, 'minute') &&
+  hasString(value, 'description') &&
+  hasNumber(value, 'quantity') &&
+  hasString(value, 'unit');
+
 const isSupplyOrder = (value: unknown): value is SupplyOrder =>
   isRecord(value) &&
   hasString(value, 'id') &&
@@ -139,6 +151,7 @@ const isSavedGameState = (value: unknown): value is GameState => {
     value.batches.every(isBatch) &&
     Array.isArray(value.finishedBeerLots) &&
     value.finishedBeerLots.every(isFinishedBeerLot) &&
+    (value.inventoryMovements === undefined || (Array.isArray(value.inventoryMovements) && value.inventoryMovements.every(isInventoryMovement))) &&
     Array.isArray(value.pendingOrders) &&
     value.pendingOrders.every(isSupplyOrder) &&
     isStorageState(value.storage) &&
@@ -166,17 +179,26 @@ const parseSavedGame = (rawSave: string): GameState | null => {
   const parsed = JSON.parse(rawSave) as unknown;
   if (!isRecord(parsed) || parsed.version !== SAVE_VERSION || !isSavedGameState(parsed.state)) return null;
   const savedState = parsed.state as GameState & Record<string, unknown>;
+  const initialState = createInitialState();
   return {
     ...savedState,
     equipment: {
-      ...createInitialState().equipment,
+      ...initialState.equipment,
       ...savedState.equipment
     },
     activeEquipment: {
-      ...createInitialState().activeEquipment,
+      ...initialState.activeEquipment,
       ...savedState.activeEquipment
     },
-    fermenterTemperatureC: clampFermenterTemperature(hasNumber(savedState, 'fermenterTemperatureC') ? savedState.fermenterTemperatureC : createInitialState().fermenterTemperatureC)
+    finishedBeerLots: savedState.finishedBeerLots.map((lot) => ({
+      ...lot,
+      sourceBatchId: hasString(lot as unknown as Record<string, unknown>, 'sourceBatchId') ? lot.sourceBatchId : lot.id.replace(/-lot$/, ''),
+      volumeLiters: hasNumber(lot as unknown as Record<string, unknown>, 'volumeLiters') ? lot.volumeLiters : lot.cases * 7.92,
+      packagingState: lot.packagingState ?? 'packaged',
+      saleState: lot.saleState ?? 'available'
+    })),
+    inventoryMovements: Array.isArray(savedState.inventoryMovements) ? savedState.inventoryMovements : [],
+    fermenterTemperatureC: clampFermenterTemperature(hasNumber(savedState, 'fermenterTemperatureC') ? savedState.fermenterTemperatureC : initialState.fermenterTemperatureC)
   };
 };
 

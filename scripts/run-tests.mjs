@@ -357,8 +357,12 @@ assert.match(mainSource, /caseCountLabel\(readyBatch\.casesExpected\)/, 'bottlin
 assert.match(mainSource, /caseCountLabel\(state\.inventory\.cases\)/, 'pallet and inventory surfaces should show gameplay case counts with definition');
 assert.match(mainSource, /caseCountLabel\(lot\.cases\)/, 'finished lot cards should show gameplay case counts with definition');
 
-assert.match(mainSource, /recipeStyleFilter/, 'recipe flow should keep a style-selection state');
-assert.match(mainSource, /data-action="select-recipe-style"/, 'recipe panel should render style-selection actions');
+assert.match(mainSource, /selectedRecipeCategoryId/, 'recipe flow should keep a category-selection state');
+assert.match(mainSource, /data-action="select-recipe-category"/, 'recipe panel should render category-selection actions');
+assert.match(mainSource, /recipeStockBatchCount/, 'recipe panel should show how many batches current stock supports');
+assert.match(mainSource, /<svg class="shop-cart-icon"/, 'shop cart hotspot should render as a recognizable SVG cart icon');
+assert.match(mainSource, /select-shop-section/, 'shop cart should first ask whether to shop supplies or equipment');
+assert.doesNotMatch(mainSource, /\$\{renderSceneSupplyHotspots\(\)\}/, 'garage scene should not render floating inventory alert badges');
 assert.match(mainSource, /recipes-next-page/, 'recipe panel should expose pagination controls');
 assert.match(mainSource, /station-panel recipe-station-panel/, 'recipe selection should use the shared station-panel shell');
 
