@@ -57,6 +57,9 @@ let selectedRecipeCategoryId = null;
 let selectedShopSection = null;
 let recipePage = 0;
 let audioAllowed = false;
+let scenePayoff = null;
+let scenePayoffTimer = null;
+let scenePayoffKey = 0;
 const GUIDANCE_DISMISSED_KEY = 'brewery-sim-guidance-dismissed';
 let guidanceDismissed = false;
 try {
@@ -390,10 +393,33 @@ const playBell = () => {
         // Browser audio can be blocked; notification sound is optional.
     }
 };
+const showScenePayoff = (kind, title, detail) => {
+    scenePayoffKey += 1;
+    scenePayoff = { kind, title, detail, key: scenePayoffKey };
+    if (scenePayoffTimer !== null)
+        globalThis.clearTimeout(scenePayoffTimer);
+    scenePayoffTimer = globalThis.setTimeout(() => {
+        scenePayoff = null;
+        scenePayoffTimer = null;
+        render();
+    }, 2400);
+};
 const dispatch = (action) => {
     const previousEventId = state.events[0]?.id;
+    const previousCash = state.cash;
+    const previousReputation = state.reputation;
+    const previousCases = state.inventory.cases;
     const overlayScrollTop = document.querySelector('.focus-overlay')?.scrollTop ?? 0;
     state = reduceGame(state, action);
+    const caseDelta = state.inventory.cases - previousCases;
+    if (caseDelta > 0) {
+        showScenePayoff('pallet', 'Pallet filled', `${caseCountLabel(caseDelta)} moved beside the garage door.`);
+    }
+    if ((action.type === 'sell-cases' || action.type === 'sell-channel') && (state.cash > previousCash || state.inventory.cases < previousCases)) {
+        const cashDelta = state.cash - previousCash;
+        const repDelta = state.reputation - previousReputation;
+        showScenePayoff('sale', 'Cases sold', `${cashDelta > 0 ? `+${formatCurrency(cashDelta)}` : 'No cash'}${repDelta > 0 ? ` - Rep +${repDelta}` : ''}`);
+    }
     if (tier2PreviewEnabled) {
         saveStatus = 'Tier 2 layout preview - not saved';
     }
@@ -1058,6 +1084,15 @@ const renderGaragePressure = () => {
     </div>
   `;
 };
+const renderScenePayoff = () => scenePayoff
+    ? `
+      <div class="scene-payoff scene-payoff-${scenePayoff.kind}" data-payoff-key="${scenePayoff.key}" aria-live="polite">
+        <span>${scenePayoff.kind === 'sale' ? 'Sold' : 'Ready'}</span>
+        <strong>${scenePayoff.title}</strong>
+        <small>${scenePayoff.detail}</small>
+      </div>
+    `
+    : '';
 const salesOfferModels = () => [
     { id: 'friends-family', risk: 'Very low visibility', invoice: 'No invoice' },
     { id: 'private-event', risk: 'Medium visibility', invoice: 'Informal receipt' },
@@ -1277,6 +1312,7 @@ const renderGarage = () => {
     <section class="garage-scene ${expandedClass} ${visibility.modeClass} ${layoutDebugEnabled ? 'layout-debug-enabled' : ''}" aria-label="Playable garage brewery floor">
       <div class="scene-vignette"></div>
       ${renderAtmosphere()}
+      ${renderScenePayoff()}
       <div class="stage-summary" aria-label="Workflow overview">Mash · Ferment · Package · Sell</div>
       ${renderFirstLoopObjective()}
       ${renderMissionsControl()}

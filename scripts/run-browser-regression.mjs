@@ -148,6 +148,12 @@ try {
 
   await page.locator('.hotspot-bottler').click();
   await page.getByRole('button', { name: /Package Garage Blonde/ }).click();
+  await page.locator('.scene-payoff-pallet').waitFor({ state: 'visible', timeout: 5000 });
+  assert.match(
+    await page.locator('.scene-payoff-pallet').innerText(),
+    /Pallet filled/i,
+    'packaging should show a floor payoff when cases move to the pallet'
+  );
   await page.waitForFunction(
     (storageKey) => {
       const raw = localStorage.getItem(storageKey);
@@ -165,6 +171,8 @@ try {
   await page.getByRole('button', { name: /Friends and family/ }).click();
 
   assert.match(await visibleText(page), /REP\s+[1-9]/);
+  await page.locator('.scene-payoff-sale').waitFor({ state: 'visible', timeout: 5000 });
+  assert.match(await page.locator('.scene-payoff-sale').innerText(), /Cases sold/i, 'selling should show a cash and rep floor payoff');
   await assertFinishedPallet(page, finishedPalletLevelName(await finishedCases(page)), 'post-sale inventory');
 
   assert.equal(await page.locator('.workshop-hotspot').getAttribute('aria-label'), 'Shop cart', 'workshop hotspot should be labelled as a shop cart');
