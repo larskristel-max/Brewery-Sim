@@ -2968,3 +2968,232 @@ body {
   padding: 0;
 }
 @media (max-width: 760px) { .first-loop-objective { top: 65%; width:min(16rem, calc(100% - 14rem)); padding:0.25rem 0.45rem; } }
+
+/* Mobile landscape priority reset: keep the garage floor readable and let overlays own focus. */
+@media (orientation: landscape) and (max-height: 520px) {
+  .missions-control,
+  .garage-pressure-strip,
+  .event-ticker {
+    display: none;
+  }
+
+  .stage-summary {
+    opacity: 0.18;
+  }
+
+  .first-loop-objective {
+    top: calc(var(--grid-edge-y) + 3.1rem);
+    bottom: auto;
+    left: 50%;
+    width: min(30rem, 46vw);
+    min-height: 1.88rem;
+    padding: 0.22rem 0.4rem 0.22rem 0.58rem;
+    border-radius: 999px;
+    translate: -50% 0;
+  }
+
+  .first-loop-objective span {
+    display: none;
+  }
+
+  .first-loop-objective strong {
+    min-width: 0;
+    height: auto;
+    padding: 0.28rem 0.7rem;
+    color: #241704;
+    font-size: 0.66rem;
+    line-height: 1.08;
+  }
+
+  .guidance-close {
+    width: 1.45rem;
+    min-width: 1.45rem;
+    min-height: 1.45rem;
+  }
+
+  .delivery-pallet {
+    left: calc(var(--grid-edge-x) + 0.3rem);
+    bottom: calc(var(--grid-edge-y) + 0.15rem);
+    display: grid;
+    width: 4.1rem;
+    height: 2.55rem;
+    place-items: center;
+    border: 1px solid rgba(226, 179, 84, 0.24);
+    background:
+      linear-gradient(90deg, rgba(70, 43, 20, 0.22) 0 18%, transparent 18% 34%, rgba(70, 43, 20, 0.2) 34% 52%, transparent 52%),
+      linear-gradient(135deg, rgba(145, 96, 42, 0.62), rgba(62, 38, 21, 0.68));
+    opacity: 0.82;
+  }
+
+  .delivery-pallet strong {
+    color: rgba(255, 247, 232, 0.78);
+    font-size: 0.5rem;
+    font-weight: 900;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .notification-popover {
+    position: fixed;
+    top: calc(var(--grid-edge-y) + 2.9rem);
+    left: 50%;
+    right: auto;
+    width: min(18rem, 34vw);
+    max-height: 7.8rem;
+    overflow: auto;
+    padding: 0.72rem;
+    translate: -50% 0;
+  }
+
+  .notification-popover ol {
+    max-height: 7.5rem;
+    margin-top: 0.55rem;
+  }
+
+  .notification-popover li {
+    grid-template-columns: 3.6rem 1fr;
+    font-size: 0.62rem;
+  }
+
+  .notification-popover > button {
+    min-height: 2rem;
+    margin-top: 0.55rem;
+    padding: 0.3rem 0.55rem;
+    border: 1px solid rgba(226, 179, 84, 0.26);
+    border-radius: 9px;
+    color: #fff4d8;
+    background: rgba(226, 179, 84, 0.1);
+    box-shadow: none;
+    font-size: 0.66rem;
+  }
+
+  .focus-layer {
+    z-index: 80;
+    padding: calc(var(--grid-edge-y) + 2.65rem) var(--grid-edge-x) var(--grid-edge-y);
+  }
+
+  .focus-overlay {
+    width: min(42rem, 66vw);
+    max-height: calc(100dvh - 3.4rem);
+    padding: 0.76rem;
+    border-radius: 16px;
+  }
+
+  .focus-upgrades {
+    align-self: start;
+    justify-self: center;
+    width: min(39rem, 64vw);
+    min-height: 0;
+    margin: 0;
+  }
+
+  .focus-open .top-hud,
+  .focus-open .garage-pressure-strip,
+  .focus-open .missions-control,
+  .focus-open .first-loop-objective,
+  .focus-open .delivery-pallet,
+  .focus-open .workshop-hotspot,
+  .focus-open .ops-control,
+  .focus-open .event-ticker,
+  .station-open .garage-pressure-strip,
+  .station-open .missions-control,
+  .station-open .delivery-pallet,
+  .station-open .workshop-hotspot,
+  .station-open .ops-control,
+  .station-open .event-ticker {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .focus-open .top-hud {
+    visibility: hidden;
+  }
+
+  .shop-section-screen {
+    min-height: 0;
+  }
+
+  .shop-section-screen .recipe-flow-heading {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 0.2rem 0.7rem;
+    align-items: baseline;
+    margin-bottom: 0.6rem;
+  }
+
+  .shop-section-screen .recipe-flow-heading h2 {
+    margin: 0;
+    font-size: 1.05rem;
+  }
+
+  .shop-section-screen .recipe-flow-heading small {
+    color: var(--text-secondary);
+    font-size: 0.7rem;
+  }
+
+  .shop-section-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.55rem;
+  }
+
+  .upgrade-shop .shop-section-card {
+    min-height: 5.15rem;
+    padding: 0.58rem 0.7rem;
+    border-color: rgba(226, 179, 84, 0.24);
+    background: linear-gradient(135deg, rgba(73, 51, 24, 0.62), rgba(16, 17, 17, 0.72));
+  }
+
+  .upgrade-shop .shop-section-card span {
+    color: var(--gold);
+  }
+
+  .upgrade-shop .shop-section-card strong {
+    font-size: 0.78rem;
+  }
+
+  .store-heading {
+    grid-template-columns: auto auto minmax(0, 1fr);
+  }
+
+  .store-heading small {
+    grid-column: 1 / -1;
+  }
+
+  .equipment-store-grid,
+  .ingredient-cart-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (orientation: landscape) and (max-width: 760px) and (max-height: 520px) {
+  .brand-lockup {
+    max-width: 9.6rem;
+  }
+
+  .hud-resources {
+    min-width: 8.2rem;
+  }
+
+  .first-loop-objective {
+    top: calc(var(--grid-edge-y) + 2.72rem);
+    width: min(22rem, 45vw);
+  }
+
+  .first-loop-objective strong {
+    font-size: 0.58rem;
+  }
+
+  .focus-overlay,
+  .focus-upgrades {
+    width: min(34rem, 74vw);
+  }
+
+  .shop-section-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .upgrade-shop .shop-section-card {
+    min-height: 4.35rem;
+  }
+}

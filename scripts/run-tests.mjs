@@ -11,6 +11,7 @@ import {
   contaminationRiskTier,
   bottlesPerCase,
   currentWorkflowStage,
+  demandProgress,
   equipmentConditionLabel,
   equipmentConditionTier,
   orderCost,
@@ -187,6 +188,10 @@ assert.ok(state.demand.casesSold > 0, 'selling should fulfill local demand progr
 assert.ok(['Sell', 'Mash'].includes(currentWorkflowStage(state).stage), 'flow should either keep selling remaining cases or return to brewing after stock sells out');
 assert.ok(state.cash > 140, 'selling cases should increase cash');
 assert.ok(state.visibilityRisk > 0, 'garage sales should increase visibility risk');
+assert.equal(firstLoopObjective(state), 'Tap the pallet to sell Garage Blonde.', 'remaining cases should keep the garage-floor objective on the pallet');
+state = reduceGame(state, { type: 'sell-channel', channelId: 'friends-family', cases: state.inventory.cases });
+assert.equal(firstLoopObjective(state), 'Tap the cart to add a second fermenter.', 'after the first sale clears stock, guidance should advance to the first upgrade');
+assert.match(demandProgress(state), /4\/4 cases/, 'completed demand progress should not display overfilled counts');
 
 const storage = createMemoryStorage();
 saveGameState(state, storage);

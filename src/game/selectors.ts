@@ -229,6 +229,11 @@ export const firstLoopObjective = (state: GameState): string => {
   const blondeBatch = state.batches.find((batch) => batch.recipeId === 'garage-blonde');
   const blondeCases = state.finishedBeerLots.some((lot) => lot.recipeId === 'garage-blonde' && lot.cases > 0) || state.inventory.cases > 0;
   if (blondeCases) return 'Tap the pallet to sell Garage Blonde.';
+  const soldFirstCases = state.demand.casesSold > 0 || state.salesToday > 0;
+  const extraFermenter = ownedByStation(state, 'fermenter').length > 1;
+  if (soldFirstCases && !extraFermenter && state.cash >= 45) return 'Tap the cart to add a second fermenter.';
+  if (soldFirstCases && !extraFermenter) return 'Save for a second plastic fermenter.';
+  if (soldFirstCases) return 'Start another batch when supplies arrive.';
   if (!blondeBatch) return 'Tap the stock pot to brew Garage Blonde.';
   if (blondeBatch.step === 'awaiting-transfer') return 'Tap the fermenter to transfer Garage Blonde.';
   if (blondeBatch.step === 'fermenting') return 'Wait for fermentation, then tap the fermenter.';
@@ -258,7 +263,7 @@ export const objectiveProgress = (state: GameState): { label: string; progress: 
 };
 
 export const demandProgress = (state: GameState): string =>
-  `${state.demand.accountName}: ${state.demand.casesSold}/${state.demand.casesRequested} cases`;
+  `${state.demand.accountName}: ${Math.min(state.demand.casesSold, state.demand.casesRequested)}/${state.demand.casesRequested} cases`;
 
 export type WorkflowStage = {
   stage: 'Mash' | 'Ferment' | 'Package' | 'Sell';

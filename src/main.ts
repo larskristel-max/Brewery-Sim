@@ -851,7 +851,7 @@ const renderMissionsControl = () => {
               <strong>${objective.label}</strong>
               <div class="objective-demand">
                 <span>${demandProgress(state)}</span>
-                <span>${state.demand.casesSold}/${state.demand.casesRequested}</span>
+                <span>${Math.min(state.demand.casesSold, state.demand.casesRequested)}/${state.demand.casesRequested}</span>
               </div>
               <progress value="${objective.progress}" max="100"></progress>
             </aside>
@@ -863,11 +863,6 @@ const renderMissionsControl = () => {
 };
 
 const renderNotificationControl = () => {
-  const fermenting = state.batches.find((batch) => batch.step === 'fermenting');
-  const bottlerTier = equipmentConditionTier(state.equipment.bottler.condition);
-  const fermenterStatus = fermenting ? `${fermenting.contaminationRisk}% ${riskLabel(fermenting.contaminationRisk)}` : equipmentConditionLabel(state.equipment.fermenter.condition);
-  const packagingStatus = bottlerTier === 'dirty' || bottlerTier === 'critical' ? 'Loss risk' : equipmentConditionLabel(state.equipment.bottler.condition);
-  const storageOverflow = Object.values(storageOverflowByArea(state)).reduce((total, amount) => total + amount, 0);
   const eventCount = Math.min(9, state.events.length);
   return `
     <div class="notification-control">
@@ -880,17 +875,10 @@ const renderNotificationControl = () => {
           ? `
             <aside class="glass-panel popover notification-popover" aria-label="Notifications">
               <span class="eyebrow gold">Notifications</span>
-              <div class="status-lines">
-                <div><span>Fermenter</span><strong>${fermenterStatus}</strong></div>
-                <div><span>Packaging</span><strong>${packagingStatus}</strong></div>
-                <div><span>Cases</span><strong>${caseCountLabel(state.inventory.cases)} ready</strong></div>
-                <div><span>Channel</span><strong>${state.demand.accountName}</strong></div>
-                <div><span>Compliance</span><strong>${state.visibilityRisk >= 30 ? 'Invoice pressure' : `${state.visibilityRisk}/30 visible`}</strong></div>
-                <div><span>Garage space</span><strong>${garageSpaceUsed()}/${garageSpaceLimit()}${storageOverflow > 0 ? ' plus clutter' : ''}</strong></div>
-              </div>
               <ol>
-                ${state.events.slice(0, 4).map((event) => `<li><time>${formatClock(event.minute)}</time><span>${event.message}</span></li>`).join('')}
+                ${state.events.slice(0, 5).map((event) => `<li><time>${formatClock(event.minute)}</time><span>${event.message}</span></li>`).join('')}
               </ol>
+              <button data-action="open-overlay" data-overlay="log" type="button">Open floor notes</button>
             </aside>
           `
           : ''
@@ -1165,7 +1153,7 @@ const sceneVisibility = () => {
   const hasSellableCases = state.inventory.cases > 0;
 
   return {
-    showFloorNoteTicker: notificationsOpen,
+    showFloorNoteTicker: false,
     showWorkshopHotspot: true,
     showCases: hasSellableCases && workflow.tapTarget === 'cases',
     spotlightTarget: workflow.tapTarget,
@@ -1397,7 +1385,7 @@ const renderAtmosphere = () => {
     ${activeForEquipment('fermenter') ? '<div class="equipment-glow fermenter-glow"></div>' : ''}
     ${activeForEquipment('bottler') ? '<div class="equipment-glow bottler-glow"></div>' : ''}
     ${anyActive ? '<div class="hose-line"></div>' : ''}
-    ${pending ? `<div class="delivery-pallet" aria-label="${state.pendingOrders.length} incoming deliveries"><span>${state.pendingOrders.length}</span></div>` : ''}
+    ${pending ? `<div class="delivery-pallet" aria-label="${state.pendingOrders.length} incoming deliveries"><span>${state.pendingOrders.length}</span><strong>Delivery</strong></div>` : ''}
     ${worstCondition < 62 ? '<div class="dirty-floor"></div>' : ''}
   `;
 };
@@ -1725,7 +1713,7 @@ const overlayTitle = () =>
 const renderFocusOverlay = () =>
   activeOverlay
     ? `
-      <div class="focus-layer" role="dialog" aria-modal="false" aria-label="${overlayTitle()}">
+      <div class="focus-layer" role="dialog" aria-modal="true" aria-label="${overlayTitle()}">
         <button class="focus-scrim" data-action="close-overlay" type="button" aria-label="Dismiss overlay background"></button>
         <aside class="glass-panel focus-overlay focus-${activeOverlay}">
           <button class="overlay-close" data-action="close-overlay" type="button" aria-label="Close overlay"></button>
@@ -1736,8 +1724,9 @@ const renderFocusOverlay = () =>
     : '';
 
 const render = () => {
+  const shellStateClass = `${activeOverlay ? 'focus-open' : ''} ${recipePanelOpen || expandedTarget ? 'station-open' : ''}`.trim();
   root.innerHTML = `
-    <main class="game-shell">
+    <main class="game-shell ${shellStateClass}">
       ${renderTopHud()}
       ${renderGarage()}
       ${renderFocusOverlay()}

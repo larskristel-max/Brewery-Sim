@@ -38,6 +38,22 @@ const endDay = async (page) => {
 
 const visibleText = async (page) => page.locator('body').innerText();
 
+const styleValue = async (locator, property) =>
+  locator.evaluate((node, prop) => getComputedStyle(node).getPropertyValue(prop), property);
+
+const assertMobileChromeCollapsed = async (page, message) => {
+  assert.equal(await styleValue(page.locator('.missions-control'), 'display'), 'none', `${message}: missions should not persist on mobile landscape`);
+  assert.equal(await styleValue(page.locator('.garage-pressure-strip'), 'display'), 'none', `${message}: pressure strip should not persist on mobile landscape`);
+  assert.equal(await page.locator('.event-ticker').count(), 0, `${message}: floor note ticker should stay collapsed`);
+};
+
+const assertFocusOverlayOwnsLayer = async (page, message) => {
+  assert.equal(await page.locator('.game-shell.focus-open').count(), 1, `${message}: shell should mark focus overlay state`);
+  assert.equal(await styleValue(page.locator('.top-hud'), 'visibility'), 'hidden', `${message}: HUD should not compete with a focus overlay`);
+  assert.equal(await styleValue(page.locator('.shop-cart-hotspot'), 'opacity'), '0', `${message}: cart should hide behind focus overlay`);
+  assert.equal(await styleValue(page.locator('.ops-control'), 'opacity'), '0', `${message}: plus control should hide behind focus overlay`);
+};
+
 const finishedPalletLevelName = (cases) => {
   if (cases <= 0) return 'empty';
   if (cases < 6) return 'level1';
@@ -92,6 +108,7 @@ try {
   assert.match(await visibleText(page), /May 16/i);
   assert.equal(await page.locator('.case-hotspot').count(), 0, 'legacy case hotspot should not render');
   assert.equal(await page.locator('.supply-hotspot').count(), 0, 'scene should not render floating inventory alert badges');
+  await assertMobileChromeCollapsed(page, 'fresh game');
   assert.match(await visibleText(page), /Tap the stock pot to brew Garage Blonde/i, 'fresh game should show the garage-floor first-loop objective');
   await assertFinishedPallet(page, 'empty', 'fresh game');
   assert.equal(
@@ -174,6 +191,24 @@ try {
   await page.locator('.scene-payoff-sale').waitFor({ state: 'visible', timeout: 5000 });
   assert.match(await page.locator('.scene-payoff-sale').innerText(), /Cases sold/i, 'selling should show a cash and rep floor payoff');
   await assertFinishedPallet(page, finishedPalletLevelName(await finishedCases(page)), 'post-sale inventory');
+  if ((await finishedCases(page)) > 0) {
+    await page.locator('.sell-point-object[data-sell-point-id="finished-beer-pallet"]').click();
+    await page.getByRole('button', { name: /Friends and family/ }).click();
+    await page.waitForFunction(
+      (storageKey) => {
+        const raw = localStorage.getItem(storageKey);
+        if (!raw) return false;
+        return (JSON.parse(raw).state.inventory?.cases ?? 0) === 0;
+      },
+      'brewery-sim-save-v4',
+      { timeout: 5000 }
+    );
+  }
+  assert.doesNotMatch(
+    await page.locator('.first-loop-objective strong').innerText(),
+    /stock pot to brew Garage Blonde/i,
+    'post-sale objective should not reset to the completed first brew instruction'
+  );
 
   assert.equal(await page.locator('.workshop-hotspot').getAttribute('aria-label'), 'Shop cart', 'workshop hotspot should be labelled as a shop cart');
   assert.equal((await page.locator('.workshop-hotspot').innerText()).trim(), '', 'shop cart hotspot should be icon-only');
@@ -188,6 +223,7 @@ try {
   );
   await page.locator('.workshop-hotspot').click();
   await assert.doesNotReject(page.getByRole('dialog', { name: 'Shop cart' }).waitFor({ state: 'visible', timeout: 5000 }));
+  await assertFocusOverlayOwnsLayer(page, 'shop cart overlay');
   assert.equal(await page.locator('.shop-section-card').count(), 2, 'shop cart should first ask whether to shop supplies or equipment');
   assert.equal(await page.locator('.ingredient-cart-card[data-action="order-ingredient"]').count(), 0, 'shop cart should not show supplies before a section is chosen');
   await page.locator('.shop-section-card').filter({ hasText: 'Equipment' }).click();
@@ -273,6 +309,24 @@ try {
     1,
     'tier 2 grain mill should be clickable'
   );
+
+  const narrowPage = await browser.newPage({ viewport: { width: 667, height: 375 } });
+  await narrowPage.goto(baseUrl);
+  await narrowPage.evaluate(() => localStorage.clear());
+  await narrowPage.reload();
+  await assert.doesNotReject(narrowPage.locator('.garage-scene').waitFor({ state: 'visible', timeout: 5000 }));
+  await assertMobileChromeCollapsed(narrowPage, '667x375 fresh game');
+  assert.equal(await narrowPage.locator('.shop-cart-hotspot').isVisible(), true, '667x375 cart fallback should remain visible');
+  assert.equal(await narrowPage.locator('.ops-button').isVisible(), true, '667x375 plus fallback should remain visible');
+  await narrowPage.locator('.shop-cart-hotspot').click();
+  await assert.doesNotReject(narrowPage.getByRole('dialog', { name: 'Shop cart' }).waitFor({ state: 'visible', timeout: 5000 }));
+  await assertFocusOverlayOwnsLayer(narrowPage, '667x375 shop overlay');
+  assert.equal(
+    await narrowPage.locator('.focus-upgrades').evaluate((node) => node.scrollWidth <= node.clientWidth + 1),
+    true,
+    '667x375 shop overlay should not need horizontal scrolling'
+  );
+  await narrowPage.close();
 
   await browser.close();
   console.log('Browser regression passed: direct hotspot garage loop works.');
