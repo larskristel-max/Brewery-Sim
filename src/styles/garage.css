@@ -2937,8 +2937,8 @@ body {
   inset: 0;
   z-index: 90;
   display: grid;
-  place-items: center;
-  padding: max(1rem, var(--safe-top)) 1rem max(1rem, var(--safe-bottom));
+  place-items: center end;
+  padding: max(1rem, var(--safe-top)) clamp(1rem, 7vw, 5.5rem) max(1rem, var(--safe-bottom)) 1rem;
 }
 
 .story-intro-scrim {
@@ -2946,7 +2946,9 @@ body {
   inset: 0;
   min-height: 0;
   border-radius: 0;
-  background: rgba(0, 0, 0, 0.42);
+  background:
+    linear-gradient(90deg, rgba(0, 0, 0, 0.06), rgba(0, 0, 0, 0.24)),
+    rgba(0, 0, 0, 0.08);
   box-shadow: none;
 }
 
@@ -2955,16 +2957,16 @@ body {
   z-index: 1;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
-  width: min(23rem, calc(100vw - 2rem));
-  height: min(34rem, calc(100dvh - 1.5rem));
+  width: min(21.5rem, calc(100vw - 2rem));
+  height: min(31.5rem, calc(100dvh - 1.5rem));
   overflow: hidden;
   padding: 0.72rem;
   border-color: rgba(242, 196, 110, 0.36);
   border-radius: 30px;
   background:
-    linear-gradient(145deg, rgba(24, 27, 29, 0.98), rgba(6, 8, 10, 0.96)),
+    linear-gradient(145deg, rgba(26, 30, 32, 0.94), rgba(8, 12, 15, 0.9)),
     radial-gradient(circle at 50% 0%, rgba(242, 196, 110, 0.14), transparent 38%);
-  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.62), inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+  box-shadow: 0 20px 52px rgba(0, 0, 0, 0.52), inset 0 0 0 1px rgba(255, 255, 255, 0.07);
 }
 
 .phone-header {
