@@ -220,6 +220,7 @@ const resetGame = () => {
         notificationsOpen = false;
         opsOpen = false;
         activeOverlay = null;
+        guidanceDismissed = false;
         saveStatus = 'Tier 2 layout preview reset - not saved';
         render();
         return;
@@ -229,6 +230,7 @@ const resetGame = () => {
         globalThis.localStorage?.removeItem(GUIDANCE_DISMISSED_KEY);
     }
     catch { }
+    guidanceDismissed = false;
     state = createInitialState();
     expandedTarget = null;
     expandedEquipmentInstanceId = null;
@@ -274,6 +276,67 @@ const isNextTapTarget = (target) => {
     if (campaignTarget === 'shop' || campaignTarget === 'ops' || campaignTarget === 'notebook')
         return false;
     return campaignTarget === target || currentWorkflowStage(state).tapTarget === target;
+};
+const tutorialTargetLabel = (target) => {
+    if (target === 'kettle')
+        return 'Stock pot';
+    if (target === 'fermenter')
+        return 'Fermenter';
+    if (target === 'bottler')
+        return 'Bottling';
+    if (target === 'mill')
+        return 'Mill';
+    return 'Pallet';
+};
+const renderNextTapBadge = (nextTap, target) => nextTap ? `<span class="next-tap-badge"><b>Next</b>${tutorialTargetLabel(target)}</span>` : '';
+const tutorialLesson = () => {
+    const workflow = currentWorkflowStage(state);
+    if (campaignPrimaryTarget(state) === 'shop') {
+        return {
+            step: 'Supplies',
+            title: 'Order what the next batch needs',
+            detail: 'Cash buys malt, hops, yeast, bottles, and future equipment.',
+            payoff: 'Supplies arrive after you end the day.'
+        };
+    }
+    if (campaignPrimaryTarget(state) === 'ops') {
+        return {
+            step: 'Time',
+            title: 'End the day to receive deliveries',
+            detail: 'Ending the day restores energy and moves incoming orders forward.',
+            payoff: 'Energy returns to 100 each morning.'
+        };
+    }
+    if (workflow.stage === 'Mash') {
+        return {
+            step: 'Mash',
+            title: 'Start with the stock pot',
+            detail: 'Brew day turns water and ingredients into wort for the fermenter.',
+            payoff: 'Energy is spent on work and comes back when you end the day.'
+        };
+    }
+    if (workflow.stage === 'Ferment') {
+        return {
+            step: 'Ferment',
+            title: 'Move wort into the fermenter',
+            detail: 'Fermentation takes time. Skipping ahead advances the batch without waiting.',
+            payoff: 'Cleaner gear and temperature control matter more in later missions.'
+        };
+    }
+    if (workflow.stage === 'Package') {
+        return {
+            step: 'Package',
+            title: 'Bottle the finished beer',
+            detail: 'Packaging moves beer from a batch into sellable cases on the pallet.',
+            payoff: 'One case is 12 bottles, enough to start filling local orders.'
+        };
+    }
+    return {
+        step: 'Sell',
+        title: 'Sell cases to complete the loop',
+        detail: 'Sales bring in cash for supplies and reputation for better buyers.',
+        payoff: 'Samira wants 4 cases before Rudy opens the supply loop.'
+    };
 };
 const equipmentMetaLine = (equipment) => `${equipmentCapacityLabel(equipment)} - ${equipment.spaceUsed || '?'} space`;
 const equipmentSceneStatus = (equipmentId) => {
@@ -536,6 +599,19 @@ const renderFirstLoopObjective = () => guidanceDismissed
     <button class="guidance-close" data-action="dismiss-guidance" type="button" aria-label="Dismiss guidance"></button>
   </div>
 `;
+const renderTutorialLesson = () => {
+    if (guidanceDismissed || !['barbecue-text', 'empty-shelf'].includes(state.campaign.missionId))
+        return '';
+    const lesson = tutorialLesson();
+    return `
+    <aside class="tutorial-lesson scene-pill" aria-label="Tutorial lesson">
+      <span>${lesson.step}</span>
+      <strong>${lesson.title}</strong>
+      <small>${lesson.detail}</small>
+      <em>${lesson.payoff}</em>
+    </aside>
+  `;
+};
 const renderStoryMissionCard = () => {
     const mission = campaignView(state);
     const speaker = mission.characterRole ? `${mission.character}, ${mission.characterRole.toLowerCase()}` : mission.character;
@@ -571,6 +647,18 @@ const renderPhoneSupplyCard = () => {
     </div>
   `;
 };
+const renderPhoneEconomyCard = () => {
+    if (state.campaign.missionId !== 'barbecue-text')
+        return '';
+    return `
+    <div class="phone-recipe-card">
+      <strong>Why this order matters</strong>
+      <span>Sell four cases to earn cash for the next supplies.</span>
+      <span>Reputation starts opening larger local buyers after the first few orders.</span>
+      <em>Cash keeps the garage moving. Reputation makes the next customer less imaginary.</em>
+    </div>
+  `;
+};
 const renderStoryIntroCard = () => {
     const mission = campaignView(state);
     if (isMissionSeen(state))
@@ -591,6 +679,7 @@ const renderStoryIntroCard = () => {
         <div class="phone-thread">
           <p class="phone-thread-title">${mission.title}</p>
           ${mission.phoneThread.map((message) => `<p class="phone-bubble incoming">${message}</p>`).join('')}
+          ${renderPhoneEconomyCard()}
           ${renderPhoneSupplyCard()}
           <div class="phone-task-card">
             <strong>Task</strong>
@@ -783,6 +872,7 @@ const renderFinishedBeerPallet = () => {
         aria-label="${expanded ? 'Collapse' : 'Expand'} finished beer pallet"
       >
         <img class="sell-point-sprite" src="${src}" alt="Finished beer pallet" draggable="false" />
+        ${renderNextTapBadge(nextTap, 'cases')}
       </button>
 
     </article>
@@ -816,8 +906,8 @@ const renderOpsControl = () => `
               <button data-action="open-overlay" data-overlay="upgrades" type="button"><span>Bench</span><strong>Workshop</strong></button>
               <button data-action="open-overlay" data-overlay="log" type="button"><span>Clipboard</span><strong>Floor notes</strong></button>
               <button data-action="end-day" type="button"><span>Time</span><strong>End day</strong></button>
-              <button data-action="restore-guidance" type="button"><span>Help</span><strong>Restore next step</strong></button>
-              <button data-action="reset-save" type="button"><span>Settings</span><strong>New Game / Reset Save</strong></button>
+              <button data-action="restore-guidance" type="button"><span>Help</span><strong>Restore tutorial guidance</strong></button>
+              <button data-action="reset-save" type="button"><span>Replay tutorial</span><strong>New Game / Reset Save</strong></button>
             </div>
           </aside>
         `
@@ -889,6 +979,7 @@ const renderGarage = () => {
             aria-label="${expanded ? 'Collapse' : 'Expand'} ${item.name}"
           >
             <img class="equipment-sprite equipment-sprite-${item.equipmentId}" src="${visual.sprite}" alt="${item.name}" draggable="false" />
+            ${renderNextTapBadge(nextTap, item.equipmentId)}
           </button>
 
         `);
@@ -902,6 +993,7 @@ const renderGarage = () => {
       <div class="stage-summary" aria-label="Workflow overview">Mash · Ferment · Package · Sell</div>
       ${renderStoryMissionCard()}
       ${renderFirstLoopObjective()}
+      ${renderTutorialLesson()}
       ${renderMissionsControl()}
       ${renderGaragePressure()}
       ${visibility.showWorkshopHotspot ? renderWorkshopHotspot() : ''}

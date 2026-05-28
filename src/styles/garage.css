@@ -121,7 +121,7 @@
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 28px;
   background:
-    linear-gradient(180deg, rgba(2, 4, 7, 0.2), rgba(2, 4, 7, 0.1)),
+    linear-gradient(180deg, rgba(255, 244, 214, 0.07), rgba(2, 4, 7, 0.04)),
     url('../../assets/garage/backgrounds/garage-background.png') center / cover no-repeat;
 }
 
@@ -389,8 +389,8 @@
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(circle at 48% 52%, transparent 0 38%, rgba(0, 0, 0, 0.18) 70%),
-    linear-gradient(180deg, rgba(3, 6, 9, 0.34), transparent 28%, rgba(3, 6, 9, 0.45));
+    radial-gradient(circle at 48% 52%, transparent 0 42%, rgba(0, 0, 0, 0.1) 76%),
+    linear-gradient(180deg, rgba(3, 6, 9, 0.18), transparent 32%, rgba(3, 6, 9, 0.28));
   pointer-events: none;
 }
 
@@ -1548,6 +1548,27 @@ body {
 
 .shop-cart-hotspot.next-tap .shop-cart-icon {
   filter: drop-shadow(0 0 14px rgba(242, 196, 110, 0.78));
+}
+
+.shop-cart-hotspot.next-tap::before {
+  content: 'Shop';
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 0.28rem);
+  min-width: 3.6rem;
+  padding: 0.2rem 0.42rem;
+  translate: -50% 0;
+  border: 1px solid rgba(242, 196, 110, 0.68);
+  border-radius: 9px;
+  color: #fff7e6;
+  background: linear-gradient(145deg, rgba(39, 29, 12, 0.96), rgba(9, 10, 10, 0.86));
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.36);
+  font-size: 0.56rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-align: center;
+  text-transform: uppercase;
+  pointer-events: none;
 }
 
 .scene-payoff {
@@ -2828,6 +2849,51 @@ body {
   opacity: 0.96;
 }
 
+.next-tap-badge {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 0.18rem);
+  z-index: 4;
+  display: grid;
+  gap: 0.05rem;
+  min-width: 4.7rem;
+  padding: 0.24rem 0.42rem;
+  translate: -50% 0;
+  border: 1px solid rgba(242, 196, 110, 0.74);
+  border-radius: 10px;
+  color: #fff7e6;
+  background: linear-gradient(145deg, rgba(39, 29, 12, 0.96), rgba(9, 10, 10, 0.86));
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.42), 0 0 20px rgba(226, 179, 84, 0.24);
+  font-size: 0.58rem;
+  font-weight: 900;
+  line-height: 1.05;
+  text-align: center;
+  pointer-events: none;
+}
+
+.next-tap-badge b {
+  color: var(--gold-strong);
+  font-size: 0.5rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.next-tap-badge::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 100%;
+  width: 0;
+  height: 0;
+  translate: -50% 0;
+  border: 0.32rem solid transparent;
+  border-top-color: rgba(242, 196, 110, 0.8);
+}
+
+.sell-point-toggle .next-tap-badge {
+  bottom: calc(100% + 0.28rem);
+}
+
 @media (max-width: 760px) {
   .first-loop-objective {
     top: 5.95rem;
@@ -2862,6 +2928,56 @@ body {
 .guidance-close::before,.station-panel-close::before { transform: translate(-50%,-50%) rotate(45deg); }
 .guidance-close::after,.station-panel-close::after { transform: translate(-50%,-50%) rotate(-45deg); }
 .first-loop-objective { pointer-events: auto; }
+
+.tutorial-lesson {
+  position: absolute;
+  top: 8.8rem;
+  right: var(--grid-edge-x);
+  z-index: 12;
+  display: grid;
+  gap: 0.24rem;
+  width: min(21rem, 30vw);
+  min-height: 0;
+  padding: 0.62rem 0.72rem;
+  border-radius: var(--radius-md);
+  text-transform: none;
+}
+
+.tutorial-lesson span {
+  color: var(--gold);
+}
+
+.tutorial-lesson strong {
+  display: block;
+  min-width: 0;
+  height: auto;
+  place-items: initial;
+  border-radius: 0;
+  color: #fff7e5;
+  background: transparent;
+  font-size: var(--type-card-title-size);
+  line-height: var(--type-card-title-line);
+  text-align: left;
+}
+
+.tutorial-lesson small,
+.tutorial-lesson em {
+  color: var(--text-secondary);
+  font-size: 0.66rem;
+  font-style: normal;
+  font-weight: 800;
+  line-height: 1.28;
+}
+
+.tutorial-lesson em {
+  color: #fff0c4;
+}
+
+.focus-open .tutorial-lesson,
+.station-open .tutorial-lesson {
+  opacity: 0;
+  pointer-events: none;
+}
 
 .story-mission-card {
   position: absolute;
@@ -3353,6 +3469,10 @@ body {
     opacity: 0.18;
   }
 
+  .tutorial-lesson {
+    display: none;
+  }
+
   .first-loop-objective {
     top: calc(var(--grid-edge-y) + 3.1rem);
     bottom: auto;
@@ -3463,12 +3583,14 @@ body {
   .focus-open .garage-pressure-strip,
   .focus-open .missions-control,
   .focus-open .first-loop-objective,
+  .focus-open .tutorial-lesson,
   .focus-open .delivery-pallet,
   .focus-open .workshop-hotspot,
   .focus-open .ops-control,
   .focus-open .event-ticker,
   .station-open .garage-pressure-strip,
   .station-open .missions-control,
+  .station-open .tutorial-lesson,
   .station-open .delivery-pallet,
   .station-open .workshop-hotspot,
   .station-open .ops-control,
