@@ -20,8 +20,12 @@ export const recipes = [
         storageSensitivity: 0.8,
         riskTags: ['young beer', 'rushed fermentation', 'low body'],
         challenge: 'Low-cost, approachable and quick to understand. Good for learning the garage loop.',
+        originalGravity: '1.045',
+        expectedAbv: '4.6%',
+        wortNote: 'Pale, sweet wort. It should look mostly clear once the grain and hop bits settle.',
+        brewNote: 'The mash pulled sugars from pilsner malt, the boil set the hop bite, and yeast will turn that sugar into beer.',
         enabled: true,
-        stepDurations: { brewing: 360, fermenting: 10 * 720, packaging: 120, 'bottle-conditioning': 1440 },
+        stepDurations: { brewing: 360, fermenting: 10 * 1440, packaging: 120, 'bottle-conditioning': 1440 },
         faultEvents: [
             {
                 id: 'blonde-acetaldehyde',
@@ -62,7 +66,7 @@ export const recipes = [
         riskTags: ['oxidation', 'polyphenols', 'chlorophyll', 'hop creep'],
         challenge: 'High hop cost and high reward; old or warm hops can turn grassy and harsh.',
         enabled: true,
-        stepDurations: { brewing: 360, fermenting: 11 * 720, packaging: 120, 'bottle-conditioning': 1440 },
+        stepDurations: { brewing: 360, fermenting: 11 * 1440, packaging: 120, 'bottle-conditioning': 1440 },
         faultEvents: [
             {
                 id: 'ipa-grassy',
@@ -102,7 +106,7 @@ export const recipes = [
         riskTags: ['DMS', 'diacetyl', 'hydrogen sulfide'],
         challenge: 'Broad demand, but pilsner malt and lager yeast punish weak temperature control.',
         enabled: true,
-        stepDurations: { brewing: 360, fermenting: 16 * 720, packaging: 120, 'bottle-conditioning': 1440 },
+        stepDurations: { brewing: 360, fermenting: 16 * 1440, packaging: 120, 'bottle-conditioning': 1440 },
         faultEvents: [
             {
                 id: 'pils-dms',
@@ -143,7 +147,7 @@ export const recipes = [
         riskTags: ['isoamyl acetate', '4-vinyl guaiacol', 'haze'],
         challenge: 'Quick to brew, but warm yeast can push banana and clove too hard.',
         enabled: true,
-        stepDurations: { brewing: 360, fermenting: 9 * 720, packaging: 120, 'bottle-conditioning': 1440 },
+        stepDurations: { brewing: 360, fermenting: 9 * 1440, packaging: 120, 'bottle-conditioning': 1440 },
         faultEvents: [
             {
                 id: 'wheat-banana',
@@ -184,7 +188,7 @@ export const recipes = [
         riskTags: ['over-attenuation', 'fusel alcohols', 'phenolics'],
         challenge: 'Forgives a warm garage but sells slower without the right audience.',
         enabled: true,
-        stepDurations: { brewing: 360, fermenting: 9 * 720, packaging: 120, 'bottle-conditioning': 1440 },
+        stepDurations: { brewing: 360, fermenting: 9 * 1440, packaging: 120, 'bottle-conditioning': 1440 },
         faultEvents: [
             {
                 id: 'saison-fusel',
@@ -218,7 +222,7 @@ export const recipes = [
         riskTags: ['roast harshness', 'astringency', 'slow sell-through'],
         challenge: 'Good margin, but roasted malt can turn harsh and demand is smaller.',
         enabled: true,
-        stepDurations: { brewing: 360, fermenting: 12 * 720, packaging: 120, 'bottle-conditioning': 1440 },
+        stepDurations: { brewing: 360, fermenting: 12 * 1440, packaging: 120, 'bottle-conditioning': 1440 },
         faultEvents: [
             {
                 id: 'stout-astringent',
@@ -252,7 +256,7 @@ export const recipes = [
         riskTags: ['citrus esters', 'underpitch stress', 'old fruit'],
         challenge: 'Thrives when the garage is hot, but cool fermentation can make it sluggish and odd.',
         enabled: true,
-        stepDurations: { brewing: 360, fermenting: 7 * 720, packaging: 120, 'bottle-conditioning': 1440 },
+        stepDurations: { brewing: 360, fermenting: 7 * 1440, packaging: 120, 'bottle-conditioning': 1440 },
         faultEvents: [
             {
                 id: 'kveik-cool-stress',
@@ -280,7 +284,7 @@ export const recipes = [
         riskTags: ['coming later'],
         challenge: 'Custom recipe design is coming later.',
         enabled: false,
-        stepDurations: { brewing: 360, fermenting: 10 * 720, packaging: 120, 'bottle-conditioning': 1440 },
+        stepDurations: { brewing: 360, fermenting: 10 * 1440, packaging: 120, 'bottle-conditioning': 1440 },
         faultEvents: []
     }
 ];

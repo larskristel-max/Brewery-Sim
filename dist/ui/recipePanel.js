@@ -1,5 +1,7 @@
 import { getIngredient } from '../data/ingredients.js';
+import { campaignAllowsAdvancedRecipes, campaignAllowsCleaning } from '../game/campaign.js';
 import { caseCountLabel, formatCurrency, formatGameDate, ingredientAmountLabel, litersToCases, orderCost, recipeCanStart, recipeCategories, recipeMissingIngredients, recipeOrderItems, recipeStockBatchCount, visibleRecipes } from '../game/selectors.js';
+import { renderBrewExplainer } from './brewNotes.js';
 const recipePageSize = 4;
 const brewStockLabel = (count) => `${count} batch${count === 1 ? '' : 'es'} in stock`;
 const incomingForIngredient = (state, ingredientId) => state.pendingOrders.reduce((summary, order) => {
@@ -49,6 +51,7 @@ const renderRecipeCategoryCards = (state) => {
     const allRecipes = visibleRecipes();
     const firstSaleDone = state.demand.casesSold > 0 || state.salesToday > 0;
     return recipeCategories
+        .filter((category) => category.id === 'starter' || campaignAllowsAdvancedRecipes(state))
         .map((category) => {
         const categoryRecipes = category.recipeIds.map((recipeId) => allRecipes.find((recipe) => recipe.id === recipeId)).filter((recipe) => Boolean(recipe));
         const stockCounts = categoryRecipes.map((recipe) => recipeStockBatchCount(state, recipe));
@@ -83,11 +86,12 @@ const renderRecipeCard = ({ state, recipeStartBlocker }, recipe) => {
             : state.cash < missingCost
                 ? 'Need cash'
                 : formatGameDate(estimatedArrivalDay);
-    return `<article class="batch-card recipe-card compact-recipe-card"><div class="recipe-card-title"><strong>${recipe.name}</strong><em class="recipe-stock-badge">${brewStockLabel(stockBatchCount)}</em><span>${batchLiters} L - ${caseCountLabel(litersToCases(batchLiters))}</span></div>${renderRecipeIngredientRows(state, recipe)}<div class="recipe-decision-lines"><span>${canStart ? 'Can brew now' : startBlocker || 'Blocked'}</span><span>${expectedValue} expected value</span><span>${missing.length > 0 ? `${missing.length} missing item${missing.length === 1 ? '' : 's'}` : 'All recipe supplies stocked'}${incomingMissing.label ? ` - ${incomingMissing.label}` : ''}</span><span>${recipe.riskTags.slice(0, 2).join(', ') || 'Low risk'}</span></div><div class="hotspot-actions recipe-actions"><button data-action="start-batch" data-recipe-id="${recipe.id}" type="button" ${canStart ? '' : `disabled title="${startBlocker || 'Blocked'}"`}>${canStart ? 'Brew' : 'Blocked'}</button><button data-action="order-recipe" data-order-mode="missing" data-recipe-id="${recipe.id}" type="button" ${missingOrderDisabled ? 'disabled' : ''}>${missingOrderLabel}<small>${missingOrderNote}</small></button><button data-action="order-recipe" data-order-mode="extra" data-recipe-id="${recipe.id}" type="button" ${recipe.enabled && state.cash >= extraCost ? '' : 'disabled'}>Order 1 batch ${formatCurrency(extraCost)}<small>${state.cash < extraCost ? 'Need cash' : `${recipe.name} x1 - ${formatGameDate(estimatedArrivalDay)}`}</small></button></div></article>`;
+    const riskLine = campaignAllowsCleaning(state) ? `<span>${recipe.riskTags.slice(0, 2).join(', ') || 'Low risk'}</span>` : '';
+    return `<article class="batch-card recipe-card compact-recipe-card"><div class="recipe-card-title"><strong>${recipe.name}</strong><em class="recipe-stock-badge">${brewStockLabel(stockBatchCount)}</em><span>${batchLiters} L - ${caseCountLabel(litersToCases(batchLiters))}</span></div>${renderRecipeIngredientRows(state, recipe)}${renderBrewExplainer(recipe)}<div class="recipe-decision-lines"><span>${canStart ? 'Can brew now' : startBlocker || 'Blocked'}</span><span>${expectedValue} expected value</span><span>${missing.length > 0 ? `${missing.length} missing item${missing.length === 1 ? '' : 's'}` : 'All recipe supplies stocked'}${incomingMissing.label ? ` - ${incomingMissing.label}` : ''}</span>${riskLine}</div><div class="hotspot-actions recipe-actions"><button data-action="start-batch" data-recipe-id="${recipe.id}" type="button" ${canStart ? '' : `disabled title="${startBlocker || 'Blocked'}"`}>${canStart ? 'Brew' : 'Blocked'}</button><button data-action="order-recipe" data-order-mode="missing" data-recipe-id="${recipe.id}" type="button" ${missingOrderDisabled ? 'disabled' : ''}>${missingOrderLabel}<small>${missingOrderNote}</small></button><button data-action="order-recipe" data-order-mode="extra" data-recipe-id="${recipe.id}" type="button" ${recipe.enabled && state.cash >= extraCost ? '' : 'disabled'}>Order 1 batch ${formatCurrency(extraCost)}<small>${state.cash < extraCost ? 'Need cash' : `${recipe.name} x1 - ${formatGameDate(estimatedArrivalDay)}`}</small></button></div></article>`;
 };
 export const renderRecipeSelectionPanel = (context) => {
     const { state, selectedRecipeCategoryId } = context;
-    const allRecipes = visibleRecipes();
+    const allRecipes = campaignAllowsAdvancedRecipes(state) ? visibleRecipes() : visibleRecipes().filter((recipe) => recipe.id === 'garage-blonde');
     const firstSaleDone = state.demand.casesSold > 0 || state.salesToday > 0;
     if (!selectedRecipeCategoryId) {
         return {

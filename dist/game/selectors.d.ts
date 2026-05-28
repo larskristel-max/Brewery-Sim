@@ -33,8 +33,8 @@ export declare const availableFermenters: (state: GameState) => OwnedEquipment[]
 export declare const garageSpaceAvailable: (state: GameState) => number;
 export declare const bottleVolumeMl = 330;
 export declare const bottlesPerCase = 12;
-export declare const caseDefinitionLabel = "12 \u00D7 33 cl bottles";
-export declare const caseDefinitionExplanation = "In Brewery-Sim, one gameplay case = 12 \u00D7 33 cl bottles.";
+export declare const caseDefinitionLabel = "12 x 33 cl bottles";
+export declare const caseDefinitionExplanation = "One case = 12 x 33 cl bottles.";
 export declare const caseCountLabel: (cases: number) => string;
 export declare const litersToBottles: (liters: number) => number;
 export declare const litersToCases: (liters: number) => number;
@@ -47,6 +47,23 @@ export declare const recipeBatchCapacity: (state: GameState, recipe: Recipe) => 
 };
 export declare const orderCost: (items: RecipeIngredient[]) => number;
 export declare const recipeOrderItems: (state: GameState, recipe: Recipe, mode: "missing" | "extra") => RecipeIngredient[];
+export type RecipeSupplyBreakdownItem = {
+    ingredientId: IngredientId;
+    name: string;
+    requiredAmount: number;
+    stockedAmount: number;
+    missingAmount: number;
+    packsToOrder: number;
+    orderAmount: number;
+    requiredLabel: string;
+    stockedLabel: string;
+    missingLabel: string;
+    orderLabel: string;
+};
+export declare const formatList: (items: string[]) => string;
+export declare const recipeSupplyBreakdown: (state: GameState, recipe: Recipe) => RecipeSupplyBreakdownItem[];
+export declare const recipeRequirementSummary: (recipe: Recipe) => string;
+export declare const recipeMissingOrderSummary: (state: GameState, recipe: Recipe) => string;
 export declare const storageUseByArea: (state: GameState) => Record<StorageArea, number>;
 export declare const storageCapacityByArea: (state: GameState) => Record<StorageArea, number>;
 export declare const storageOverflowByArea: (state: GameState) => Record<StorageArea, number>;

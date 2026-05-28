@@ -9,7 +9,7 @@ export const starterUpgrades = [
     {
         id: 'temp-control',
         name: 'Fermentation temp control',
-        description: 'Faster fermentation, higher quality and lower contamination risk.',
+        description: 'Faster fermentation, higher quality and lower infection chance.',
         cost: 380,
         purchased: false
     },

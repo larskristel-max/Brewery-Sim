@@ -15,6 +15,7 @@ export type OrderMode = 'missing' | 'extra';
 export type RecipeCategoryId = 'starter' | 'hop-forward' | 'cool-fermentation' | 'farmhouse-wheat' | 'dark' | 'experimental';
 export type PackagingState = 'packaged';
 export type SaleState = 'available' | 'partially-sold' | 'sold-out';
+export type CampaignMissionId = 'barbecue-text' | 'empty-shelf' | 'bucket-empire' | 'uncle-nico-wedding' | 'warm-garage-week' | 'sticky-bucket' | 'labels-at-midnight' | 'first-bar-account' | 'household-summit' | 'sandbox-unlocked';
 export type InventoryMovementType = 'order-created' | 'order-received' | 'ingredients-consumed' | 'beer-packaged' | 'cases-sold' | 'loss-recorded';
 export type IngredientId = 'pilsner-malt' | 'pale-malt' | 'wheat-malt' | 'crystal-malt' | 'black-malt' | 'saaz-hops' | 'ipa-hops' | 'styrian-hops' | 'fuggles-hops' | 'ale-yeast' | 'lager-yeast' | 'wheat-yeast' | 'saison-yeast' | 'kveik-yeast' | 'stout-yeast' | 'bottles' | 'cleaner';
 export interface Ingredient {
@@ -58,6 +59,10 @@ export interface Recipe {
     storageSensitivity: number;
     riskTags: string[];
     challenge: string;
+    originalGravity?: string;
+    expectedAbv?: string;
+    wortNote?: string;
+    brewNote?: string;
     enabled: boolean;
     stepDurations: Record<TimedBatchStep, number>;
     faultEvents: BeerFaultEvent[];
@@ -224,6 +229,11 @@ export interface LocalDemand {
     invoiceRequired: boolean;
     formalOrder: boolean;
 }
+export interface CampaignState {
+    missionId: CampaignMissionId;
+    completedMissionIds: CampaignMissionId[];
+    seenMissionIds: CampaignMissionId[];
+}
 export interface EventLogEntry {
     id: string;
     minute: number;
@@ -257,6 +267,7 @@ export interface GameState {
     complianceRisk: number;
     canInvoice: boolean;
     fermenterTemperatureC: number;
+    campaign: CampaignState;
 }
 export type GameAction = {
     type: 'tick';
@@ -317,4 +328,6 @@ export type GameAction = {
 } | {
     type: 'clean-equipment';
     equipmentId: EquipmentId;
+} | {
+    type: 'dismiss-story-card';
 };

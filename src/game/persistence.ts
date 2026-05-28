@@ -1,9 +1,10 @@
 import { ingredients } from '../data/ingredients.js';
+import { campaignMissionOrder, initialCampaignState } from './campaign.js';
 import { createInitialState } from './initialState.js';
-import type { Batch, Equipment, EquipmentId, FinishedBeerLot, GameState, IngredientId, IngredientStock, Inventory, InventoryMovement, LocalDemand, OwnedEquipment, StorageState, SupplyOrder, Upgrade, UpgradeId } from './schema.js';
+import type { Batch, CampaignState, Equipment, EquipmentId, FinishedBeerLot, GameState, IngredientId, IngredientStock, Inventory, InventoryMovement, LocalDemand, OwnedEquipment, StorageState, SupplyOrder, Upgrade, UpgradeId } from './schema.js';
 
-export const SAVE_VERSION = 4;
-export const STORAGE_KEY = 'brewery-sim-save-v4';
+export const SAVE_VERSION = 6;
+export const STORAGE_KEY = 'brewery-sim-save-v6';
 
 type BrowserStorage = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
 
@@ -133,7 +134,16 @@ const isLocalDemand = (value: unknown): value is LocalDemand =>
   hasNumber(value, 'casesSold') &&
   hasNumber(value, 'reputationReward') &&
   hasBoolean(value, 'invoiceRequired') &&
-  hasBoolean(value, 'formalOrder');
+    hasBoolean(value, 'formalOrder');
+
+const isCampaignState = (value: unknown): value is CampaignState =>
+  isRecord(value) &&
+  typeof value.missionId === 'string' &&
+  campaignMissionOrder.includes(value.missionId as CampaignState['missionId']) &&
+  Array.isArray(value.completedMissionIds) &&
+  value.completedMissionIds.every((missionId) => typeof missionId === 'string' && campaignMissionOrder.includes(missionId as CampaignState['missionId'])) &&
+  Array.isArray(value.seenMissionIds) &&
+  value.seenMissionIds.every((missionId) => typeof missionId === 'string' && campaignMissionOrder.includes(missionId as CampaignState['missionId']));
 
 const isEventLogEntry = (value: unknown): boolean => isRecord(value) && hasString(value, 'id') && hasNumber(value, 'minute') && hasString(value, 'message');
 
@@ -171,7 +181,8 @@ const isSavedGameState = (value: unknown): value is GameState => {
     hasNumber(value, 'visibilityRisk') &&
     hasNumber(value, 'householdPressure') &&
     hasNumber(value, 'complianceRisk') &&
-    hasBoolean(value, 'canInvoice')
+    hasBoolean(value, 'canInvoice') &&
+    (value.campaign === undefined || isCampaignState(value.campaign))
   );
 };
 
@@ -198,7 +209,8 @@ const parseSavedGame = (rawSave: string): GameState | null => {
       saleState: lot.saleState ?? 'available'
     })),
     inventoryMovements: Array.isArray(savedState.inventoryMovements) ? savedState.inventoryMovements : [],
-    fermenterTemperatureC: clampFermenterTemperature(hasNumber(savedState, 'fermenterTemperatureC') ? savedState.fermenterTemperatureC : initialState.fermenterTemperatureC)
+    fermenterTemperatureC: clampFermenterTemperature(hasNumber(savedState, 'fermenterTemperatureC') ? savedState.fermenterTemperatureC : initialState.fermenterTemperatureC),
+    campaign: isCampaignState(savedState.campaign) ? savedState.campaign : initialCampaignState()
   };
 };
 

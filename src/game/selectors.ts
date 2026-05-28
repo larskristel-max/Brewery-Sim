@@ -61,6 +61,7 @@ export const formatGameDate = (day: number): string => {
 
 export const ingredientAmountLabel = (ingredientId: IngredientId, amount: number): string => {
   const ingredient = getIngredient(ingredientId);
+  if (ingredient.id === 'bottles') return `${Math.round(amount)} bottle${Math.round(amount) === 1 ? '' : 's'}`;
   if (ingredient.unit === 'kg') return `${amount.toFixed(amount % 1 === 0 ? 0 : 1)} kg`;
   if (ingredient.unit === 'g') return `${Math.round(amount)} g`;
   if (ingredient.unit === 'pack') return `${amount} pack${amount === 1 ? '' : 's'}`;
@@ -117,9 +118,9 @@ export const garageSpaceAvailable = (state: GameState): number => Math.max(0, st
 
 export const bottleVolumeMl = 330;
 export const bottlesPerCase = 12;
-export const caseDefinitionLabel = `${bottlesPerCase} × 33 cl bottles`;
-export const caseDefinitionExplanation = `In Brewery-Sim, one gameplay case = ${caseDefinitionLabel}.`;
-export const caseCountLabel = (cases: number): string => `${cases} gameplay case${cases === 1 ? '' : 's'} (${caseDefinitionLabel} each)`;
+export const caseDefinitionLabel = `${bottlesPerCase} x 33 cl bottles`;
+export const caseDefinitionExplanation = `One case = ${caseDefinitionLabel}.`;
+export const caseCountLabel = (cases: number): string => `${cases} case${cases === 1 ? '' : 's'} (${caseDefinitionLabel})`;
 
 export const litersToBottles = (liters: number): number => Math.max(1, Math.round((liters * 1000) / bottleVolumeMl));
 
@@ -153,6 +154,78 @@ export const orderCost = (items: RecipeIngredient[]): number =>
 export const recipeOrderItems = (state: GameState, recipe: Recipe, mode: 'missing' | 'extra'): RecipeIngredient[] => {
   if (mode === 'extra') return recipe.ingredients;
   return recipeMissingIngredients(state, recipe);
+};
+
+export type RecipeSupplyBreakdownItem = {
+  ingredientId: IngredientId;
+  name: string;
+  requiredAmount: number;
+  stockedAmount: number;
+  missingAmount: number;
+  packsToOrder: number;
+  orderAmount: number;
+  requiredLabel: string;
+  stockedLabel: string;
+  missingLabel: string;
+  orderLabel: string;
+};
+
+const recipeAmountWithName = (ingredientId: IngredientId, amount: number): string => {
+  const ingredient = getIngredient(ingredientId);
+  if (ingredient.id === 'bottles') return ingredientAmountLabel(ingredientId, amount);
+  if (ingredient.unit === 'pack') {
+    const rounded = Math.round(amount);
+    return `${rounded} ${ingredient.name.toLowerCase()} pack${rounded === 1 ? '' : 's'}`;
+  }
+  return `${ingredientAmountLabel(ingredientId, amount)} ${ingredient.name}`;
+};
+
+const packOrderLabel = (ingredientId: IngredientId, packs: number): string => {
+  const ingredient = getIngredient(ingredientId);
+  if (ingredient.id === 'bottles') return `${packs} x ${ingredient.packSize} bottle pack${packs === 1 ? '' : 's'}`;
+  if (ingredient.unit === 'kg') return `${packs} x ${ingredientAmountLabel(ingredientId, ingredient.packSize)} ${ingredient.name} sack${packs === 1 ? '' : 's'}`;
+  if (ingredient.unit === 'g') return `${packs} x ${ingredientAmountLabel(ingredientId, ingredient.packSize)} ${ingredient.name} pack${packs === 1 ? '' : 's'}`;
+  if (ingredient.unit === 'pack') return `${packs} x ${ingredient.name.toLowerCase()} pack${packs === 1 ? '' : 's'}`;
+  return `${packs} x ${ingredient.name} pack${packs === 1 ? '' : 's'}`;
+};
+
+export const formatList = (items: string[]): string => {
+  if (items.length <= 1) return items[0] ?? '';
+  if (items.length === 2) return `${items[0]} and ${items[1]}`;
+  return `${items.slice(0, -1).join(', ')}, and ${items[items.length - 1]}`;
+};
+
+export const recipeSupplyBreakdown = (state: GameState, recipe: Recipe): RecipeSupplyBreakdownItem[] =>
+  recipe.ingredients.map((item) => {
+    const ingredient = getIngredient(item.ingredientId);
+    const stockedAmount = state.inventory.ingredients[item.ingredientId]?.amount ?? 0;
+    const missingAmount = Math.max(0, item.amount - stockedAmount);
+    const packsToOrder = missingAmount > 0 ? Math.ceil(missingAmount / ingredient.packSize) : 0;
+    const orderAmount = packsToOrder * ingredient.packSize;
+    return {
+      ingredientId: item.ingredientId,
+      name: ingredient.name,
+      requiredAmount: item.amount,
+      stockedAmount,
+      missingAmount,
+      packsToOrder,
+      orderAmount,
+      requiredLabel: recipeAmountWithName(item.ingredientId, item.amount),
+      stockedLabel: ingredientAmountLabel(item.ingredientId, stockedAmount),
+      missingLabel: ingredientAmountLabel(item.ingredientId, missingAmount),
+      orderLabel: packsToOrder > 0 ? packOrderLabel(item.ingredientId, packsToOrder) : ''
+    };
+  });
+
+export const recipeRequirementSummary = (recipe: Recipe): string =>
+  formatList(recipe.ingredients.map((item) => recipeAmountWithName(item.ingredientId, item.amount)));
+
+export const recipeMissingOrderSummary = (state: GameState, recipe: Recipe): string => {
+  const missing = recipeSupplyBreakdown(state, recipe).filter((item) => item.missingAmount > 0);
+  if (missing.length === 0) return 'All supplies for the next batch are stocked.';
+  const need = formatList(missing.map((item) => `${item.missingLabel} ${item.name === 'Bottles and caps' ? '' : item.name}`.trim()));
+  const order = formatList(missing.map((item) => item.orderLabel));
+  return `Need ${need}. Order ${order}.`;
 };
 
 export const storageUseByArea = (state: GameState): Record<StorageArea, number> => {
@@ -202,9 +275,9 @@ export const equipmentConditionTier = (condition: number): EquipmentConditionTie
 export const equipmentConditionLabel = (condition: number): string => {
   const tier = equipmentConditionTier(condition);
   if (tier === 'clean') return 'Clean';
-  if (tier === 'worn') return 'Worn';
-  if (tier === 'dirty') return 'Dirty';
-  return 'Critical';
+  if (tier === 'worn') return 'Usable';
+  if (tier === 'dirty') return 'Needs cleaning';
+  return 'Dirty';
 };
 
 export const contaminationRiskTier = (risk: number): ContaminationRiskTier => {
@@ -246,9 +319,9 @@ export const firstLoopObjective = (state: GameState): string => {
   if (!blondeBatch) return 'Tap the stock pot to brew Garage Blonde.';
   if (blondeBatch.step === 'brewing') return 'Tap the stock pot to finish the brew day.';
   if (blondeBatch.step === 'awaiting-transfer') return 'Tap the stock pot to transfer Garage Blonde.';
-  if (blondeBatch.step === 'fermenting') return 'Tap the fermenter to wait through fermentation.';
+  if (blondeBatch.step === 'fermenting') return 'Tap the fermenter to fast-forward fermentation.';
   if (blondeBatch.step === 'awaiting-packaging') return 'Tap the fermenter to transfer Garage Blonde to bottling.';
-  if (blondeBatch.step === 'packaging' || blondeBatch.step === 'bottle-conditioning') return 'Tap the bottling bench to transfer cases to the pallet.';
+  if (blondeBatch.step === 'packaging' || blondeBatch.step === 'bottle-conditioning') return 'Tap the bottling bench to bottle the beer.';
   return 'Tap the stock pot to brew Garage Blonde.';
 };
 
@@ -329,7 +402,7 @@ export const currentWorkflowStage = (state: GameState): WorkflowStage => {
     return {
       stage: 'Ferment',
       tapTarget: 'fermenter',
-      instruction: 'Fermentation is running. Tap the fermenter to wait until it is ready.'
+      instruction: 'Fermentation is running. Tap the fermenter to fast-forward until it is ready.'
     };
   }
 
@@ -344,7 +417,7 @@ export const currentWorkflowStage = (state: GameState): WorkflowStage => {
   return {
     stage: 'Package',
     tapTarget: 'bottler',
-    instruction: 'Packaging is running. Tap the bottling bench to wait until cases are ready.'
+    instruction: 'Packaging is running. Tap the bottling bench to bottle the beer.'
   };
 };
 

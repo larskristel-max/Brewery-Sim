@@ -1,7 +1,8 @@
 import { ingredients } from '../data/ingredients.js';
+import { campaignMissionOrder, initialCampaignState } from './campaign.js';
 import { createInitialState } from './initialState.js';
-export const SAVE_VERSION = 4;
-export const STORAGE_KEY = 'brewery-sim-save-v4';
+export const SAVE_VERSION = 6;
+export const STORAGE_KEY = 'brewery-sim-save-v6';
 const persistedEquipmentIds = ['kettle', 'fermenter', 'bottler'];
 const equipmentIds = ['kettle', 'fermenter', 'bottler', 'mill'];
 const upgradeIds = ['larger-kettle', 'temp-control', 'labeler'];
@@ -92,6 +93,13 @@ const isLocalDemand = (value) => isRecord(value) &&
     hasNumber(value, 'reputationReward') &&
     hasBoolean(value, 'invoiceRequired') &&
     hasBoolean(value, 'formalOrder');
+const isCampaignState = (value) => isRecord(value) &&
+    typeof value.missionId === 'string' &&
+    campaignMissionOrder.includes(value.missionId) &&
+    Array.isArray(value.completedMissionIds) &&
+    value.completedMissionIds.every((missionId) => typeof missionId === 'string' && campaignMissionOrder.includes(missionId)) &&
+    Array.isArray(value.seenMissionIds) &&
+    value.seenMissionIds.every((missionId) => typeof missionId === 'string' && campaignMissionOrder.includes(missionId));
 const isEventLogEntry = (value) => isRecord(value) && hasString(value, 'id') && hasNumber(value, 'minute') && hasString(value, 'message');
 const isSavedGameState = (value) => {
     if (!isRecord(value))
@@ -127,7 +135,8 @@ const isSavedGameState = (value) => {
         hasNumber(value, 'visibilityRisk') &&
         hasNumber(value, 'householdPressure') &&
         hasNumber(value, 'complianceRisk') &&
-        hasBoolean(value, 'canInvoice'));
+        hasBoolean(value, 'canInvoice') &&
+        (value.campaign === undefined || isCampaignState(value.campaign)));
 };
 const parseSavedGame = (rawSave) => {
     const parsed = JSON.parse(rawSave);
@@ -153,7 +162,8 @@ const parseSavedGame = (rawSave) => {
             saleState: lot.saleState ?? 'available'
         })),
         inventoryMovements: Array.isArray(savedState.inventoryMovements) ? savedState.inventoryMovements : [],
-        fermenterTemperatureC: clampFermenterTemperature(hasNumber(savedState, 'fermenterTemperatureC') ? savedState.fermenterTemperatureC : initialState.fermenterTemperatureC)
+        fermenterTemperatureC: clampFermenterTemperature(hasNumber(savedState, 'fermenterTemperatureC') ? savedState.fermenterTemperatureC : initialState.fermenterTemperatureC),
+        campaign: isCampaignState(savedState.campaign) ? savedState.campaign : initialCampaignState()
     };
 };
 export const loadSavedGame = (storage = getBrowserStorage()) => {

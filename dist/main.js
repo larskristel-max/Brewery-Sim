@@ -3,7 +3,8 @@ import { garageEquipmentLayoutByItem, garageSellPointLayout } from './data/garag
 import { ingredients, getIngredient } from './data/ingredients.js';
 import { createInitialState } from './game/initialState.js';
 import { resetSavedGame, saveGameState } from './game/persistence.js';
-import { caseCountLabel, caseDefinitionExplanation, contaminationRiskTier, currentWorkflowStage, demandProgress, equipmentConditionLabel, equipmentConditionTier, firstLoopObjective, formatBatchRemainingTime, formatGameDate, formatClock, formatCurrency, garageSpaceAvailable, ingredientAmountLabel, objectiveProgress, recipeMissingIngredients, storageCapacityByArea, storageOverflowByArea, storageUseByArea, visibleRecipes } from './game/selectors.js';
+import { campaignAllowsCleaning, campaignAllowsFormalBuyers, campaignAllowsPressure, campaignAllowsTemperature, campaignNextStep, campaignPrimaryTarget, campaignView, isMissionSeen } from './game/campaign.js';
+import { caseCountLabel, caseDefinitionExplanation, contaminationRiskTier, currentWorkflowStage, equipmentConditionLabel, equipmentConditionTier, formatBatchRemainingTime, formatGameDate, formatClock, formatCurrency, garageSpaceAvailable, ingredientAmountLabel, objectiveProgress, orderCost, recipeMissingOrderSummary, recipeMissingIngredients, recipeRequirementSummary, recipeSupplyBreakdown, storageCapacityByArea, storageOverflowByArea, storageUseByArea, visibleRecipes } from './game/selectors.js';
 import { reduceGame } from './game/simulation.js';
 import { createBootState, createTier2PreviewState } from './ui/appBoot.js';
 import { createLayoutDebugModel, handleLayoutDebugInput, renderLayoutDebugPanel } from './ui/layoutDebug.js';
@@ -126,15 +127,20 @@ const fermenterTemperatureHint = () => {
     if (!recipe)
         return 'Set for next batch';
     const ingredientIds = recipe.ingredients.map((ingredient) => ingredient.ingredientId);
-    if (ingredientIds.includes('lager-yeast'))
-        return 'Lager target 9-14 C';
-    if (ingredientIds.includes('kveik-yeast') || recipe.style.toLowerCase().includes('kveik'))
-        return 'Kveik target 28-40 C';
-    if (ingredientIds.includes('saison-yeast'))
-        return 'Saison target 20-30 C';
-    if (ingredientIds.includes('wheat-yeast'))
-        return 'Wheat target 18-24 C';
-    return 'Ale target 17-22 C';
+    const target = ingredientIds.includes('lager-yeast')
+        ? { label: 'lager', min: 9, max: 14 }
+        : ingredientIds.includes('kveik-yeast') || recipe.style.toLowerCase().includes('kveik')
+            ? { label: 'kveik', min: 28, max: 40 }
+            : ingredientIds.includes('saison-yeast')
+                ? { label: 'saison', min: 20, max: 30 }
+                : ingredientIds.includes('wheat-yeast')
+                    ? { label: 'wheat ale', min: 18, max: 24 }
+                    : { label: 'ale', min: 17, max: 22 };
+    if (state.fermenterTemperatureC < target.min)
+        return `Too cool for ${target.label} - slower fermentation`;
+    if (state.fermenterTemperatureC > target.max)
+        return `Too warm for ${target.label} - off-flavor risk`;
+    return `${target.label[0].toUpperCase()}${target.label.slice(1)} target ${target.min}-${target.max} C`;
 };
 const playBell = () => {
     if (!audioAllowed)
@@ -219,6 +225,10 @@ const resetGame = () => {
         return;
     }
     resetSavedGame();
+    try {
+        globalThis.localStorage?.removeItem(GUIDANCE_DISMISSED_KEY);
+    }
+    catch { }
     state = createInitialState();
     expandedTarget = null;
     expandedEquipmentInstanceId = null;
@@ -259,30 +269,25 @@ const batchForEquipment = (equipmentId) => {
         return undefined;
     return state.batches.find((batch) => batch.step === step);
 };
-const isNextTapTarget = (target) => currentWorkflowStage(state).tapTarget === target;
-const riskLabel = (risk) => {
-    const tier = contaminationRiskTier(risk);
-    if (tier === 'low')
-        return 'low';
-    if (tier === 'elevated')
-        return 'moderate';
-    if (tier === 'high')
-        return 'watch';
-    return 'high';
+const isNextTapTarget = (target) => {
+    const campaignTarget = campaignPrimaryTarget(state);
+    if (campaignTarget === 'shop' || campaignTarget === 'ops' || campaignTarget === 'notebook')
+        return false;
+    return campaignTarget === target || currentWorkflowStage(state).tapTarget === target;
 };
 const equipmentMetaLine = (equipment) => `${equipmentCapacityLabel(equipment)} - ${equipment.spaceUsed || '?'} space`;
 const equipmentSceneStatus = (equipmentId) => {
     const equipment = state.equipment[equipmentId];
     const activeBatch = batchForEquipment(equipmentId);
     const conditionLabel = equipmentConditionLabel(equipment.condition);
-    const conditionDetail = `${Math.round(equipment.condition)}% clean`;
+    const conditionDetail = `Cleanliness: ${conditionLabel}`;
     if (equipmentId === 'kettle') {
         const brewing = brewingBatch();
         const waitingTransfer = awaitingTransferBatch();
         if (waitingTransfer) {
             return {
                 label: 'Ready to transfer',
-                detail: `${waitingTransfer.recipeName} - send to fermenter`,
+                detail: `Brew check: clear wort, ${caseCountLabel(waitingTransfer.casesExpected)} expected. Transfer when the fermenter is ready.`,
                 toneClass: 'risk-low'
             };
         }
@@ -295,7 +300,7 @@ const equipmentSceneStatus = (equipmentId) => {
         }
         return {
             label: 'Idle',
-            detail: `${conditionDetail} - ready for Garage Blonde`,
+            detail: `${conditionDetail} - ready to brew`,
             toneClass: `condition-${equipmentConditionTier(equipment.condition)}`
         };
     }
@@ -303,17 +308,22 @@ const equipmentSceneStatus = (equipmentId) => {
         const waitingTransfer = state.batches.find((batch) => batch.step === 'awaiting-transfer');
         if (waitingTransfer) {
             return {
-                label: 'Transfer waiting',
-                detail: `${waitingTransfer.recipeName} needs player input`,
+                label: 'Waiting at kettle',
+                detail: `${waitingTransfer.recipeName} is still in the stock pot`,
                 toneClass: 'risk-high'
             };
         }
         const fermenting = activeBatch ?? state.batches.find((batch) => batch.step === 'fermenting');
         if (fermenting) {
             const tier = contaminationRiskTier(fermenting.contaminationRisk);
+            const detailParts = [fermenting.recipeName, batchRemainingLabel(fermenting)];
+            if (campaignAllowsTemperature(state))
+                detailParts.splice(1, 0, `${state.fermenterTemperatureC} C`);
+            if (campaignAllowsCleaning(state))
+                detailParts.push(`infection chance ${fermenting.contaminationRisk}%`);
             return {
                 label: 'Fermenting',
-                detail: `${fermenting.recipeName} - contamination ${fermenting.contaminationRisk}% (${riskLabel(fermenting.contaminationRisk)}) - ${state.fermenterTemperatureC} C - ${batchRemainingLabel(fermenting)}`,
+                detail: detailParts.join(' - '),
                 toneClass: `risk-${tier}`
             };
         }
@@ -325,6 +335,7 @@ const equipmentSceneStatus = (equipmentId) => {
     }
     if (equipmentId === 'bottler') {
         const readyBatch = state.batches.find((batch) => batch.step === 'awaiting-packaging');
+        const packagingBatch = state.batches.find((batch) => batch.step === 'packaging' || batch.step === 'bottle-conditioning');
         const conditioningBatch = state.batches.find((batch) => batch.step === 'bottle-conditioning');
         const tier = equipmentConditionTier(equipment.condition);
         if (readyBatch) {
@@ -332,6 +343,13 @@ const equipmentSceneStatus = (equipmentId) => {
                 label: 'Package available',
                 detail: tier === 'dirty' || tier === 'critical' ? `${caseCountLabel(readyBatch.casesExpected)} - packaging loss risk` : `${caseCountLabel(readyBatch.casesExpected)} ready`,
                 toneClass: tier === 'dirty' || tier === 'critical' ? 'risk-high' : 'risk-low'
+            };
+        }
+        if (packagingBatch) {
+            return {
+                label: 'Bottling',
+                detail: `${packagingBatch.recipeName} - ${batchRemainingLabel(packagingBatch)} - ${caseCountLabel(packagingBatch.casesExpected)} headed to the pallet`,
+                toneClass: 'risk-low'
             };
         }
         if (conditioningBatch) {
@@ -351,7 +369,7 @@ const equipmentSceneStatus = (equipmentId) => {
         if (tier !== 'dirty' && tier !== 'critical') {
             return {
                 label: 'Idle',
-                detail: 'No batch ready to package',
+                detail: `${conditionDetail} - no batch at the bottling bench`,
                 toneClass: `condition-${tier}`
             };
         }
@@ -416,9 +434,14 @@ const equipmentInstanceStatus = (equipment) => {
     }
     if (batch?.step === 'fermenting') {
         const tier = contaminationRiskTier(batch.contaminationRisk);
+        const detailParts = [batch.recipeName, batchRemainingLabel(batch)];
+        if (campaignAllowsTemperature(state))
+            detailParts.splice(1, 0, `${state.fermenterTemperatureC} C`);
+        if (campaignAllowsCleaning(state))
+            detailParts.push(`infection chance ${batch.contaminationRisk}%`);
         return {
             label: 'Fermenting',
-            detail: `${batch.recipeName} - contamination ${batch.contaminationRisk}% (${riskLabel(batch.contaminationRisk)}) - ${state.fermenterTemperatureC} C - ${batchRemainingLabel(batch)}`,
+            detail: detailParts.join(' - '),
             toneClass: `risk-${tier}`
         };
     }
@@ -438,7 +461,7 @@ const equipmentInstanceStatus = (equipment) => {
     }
     return {
         label: 'Empty',
-        detail: `${Math.round(equipment.condition)}% clean - ${detailBase}`,
+        detail: `${equipmentConditionLabel(equipment.condition)} - ${detailBase}`,
         toneClass: `condition-${conditionTier}`
     };
 };
@@ -509,28 +532,104 @@ const renderFirstLoopObjective = () => guidanceDismissed
     : `
   <div class="first-loop-objective scene-pill" aria-label="Current garage-floor objective">
     <span>Next step</span>
-    <strong>${firstLoopObjective(state)}</strong>
+    <strong>${campaignNextStep(state)}</strong>
     <button class="guidance-close" data-action="dismiss-guidance" type="button" aria-label="Dismiss guidance"></button>
   </div>
 `;
+const renderStoryMissionCard = () => {
+    const mission = campaignView(state);
+    const speaker = mission.characterRole ? `${mission.character}, ${mission.characterRole.toLowerCase()}` : mission.character;
+    return `
+    <aside class="glass-panel story-mission-card" data-tutorial-mission-id="${mission.id}" aria-label="Story mission">
+      <header class="story-mission-header">
+        <span class="eyebrow gold">${mission.act}</span>
+        <strong>${mission.title}</strong>
+      </header>
+      <p><b>${speaker}:</b> ${mission.message}</p>
+      <div class="story-mission-progress">
+        <span>${mission.progressLabel}</span>
+        <progress value="${mission.progress}" max="100"></progress>
+      </div>
+      <button class="story-mission-action" data-action="toggle-missions" type="button">Open notebook</button>
+    </aside>
+  `;
+};
+const garageBlondeRecipe = () => visibleRecipes().find((recipe) => recipe.id === 'garage-blonde') ?? visibleRecipes()[0];
+const renderPhoneSupplyCard = () => {
+    if (state.campaign.missionId !== 'empty-shelf')
+        return '';
+    const recipe = garageBlondeRecipe();
+    const missing = recipeSupplyBreakdown(state, recipe).filter((item) => item.missingAmount > 0);
+    return `
+    <div class="phone-recipe-card">
+      <strong>Garage Blonde supply bill</strong>
+      <span>${recipeRequirementSummary(recipe)}</span>
+      <span>${recipeMissingOrderSummary(state, recipe)}</span>
+      ${missing.length > 0
+        ? `<em>${missing.map((item) => item.orderLabel).join(' + ')} - about ${formatCurrency(orderCost(recipeMissingIngredients(state, recipe)))}</em>`
+        : '<em>Nothing to order right now.</em>'}
+    </div>
+  `;
+};
+const renderStoryIntroCard = () => {
+    const mission = campaignView(state);
+    if (isMissionSeen(state))
+        return '';
+    const role = mission.characterRole ? `<span>${mission.characterRole}</span>` : '';
+    return `
+    <div class="story-intro-layer" data-tutorial-card="intro" data-tutorial-mission-id="${mission.id}" role="dialog" aria-modal="true" aria-label="${mission.title}">
+      <button class="story-intro-scrim" data-action="dismiss-story-card" type="button" aria-label="Continue"></button>
+      <article class="glass-panel story-phone">
+        <header class="phone-header">
+          <span class="phone-signal" aria-hidden="true"></span>
+          <div>
+            <strong>${mission.character}</strong>
+            ${role}
+          </div>
+          <small>${mission.act}</small>
+        </header>
+        <div class="phone-thread">
+          <p class="phone-thread-title">${mission.title}</p>
+          ${mission.phoneThread.map((message) => `<p class="phone-bubble incoming">${message}</p>`).join('')}
+          ${renderPhoneSupplyCard()}
+          <div class="phone-task-card">
+            <strong>Task</strong>
+            <span>${mission.goal}</span>
+            <em>${mission.reward}</em>
+          </div>
+        </div>
+        <div class="phone-reply-bar">
+          <button class="phone-reply-button" data-action="dismiss-story-card" type="button" aria-label="Reply: ${mission.replyText}">
+            <span>Reply</span>
+            <strong>${mission.replyText}</strong>
+          </button>
+        </div>
+      </article>
+    </div>
+  `;
+};
 const renderMissionsControl = () => {
+    const mission = campaignView(state);
     const objective = objectiveProgress(state);
     return `
     <div class="missions-control">
       <button class="scene-pill missions-button ${missionsOpen ? 'open' : ''}" data-action="toggle-missions" type="button" aria-expanded="${missionsOpen}">
-        <span>Missions</span>
-        <strong>${objective.progress}%</strong>
+        <span>Story</span>
+        <strong>${mission.progress}%</strong>
       </button>
       ${missionsOpen
         ? `
             <aside class="glass-panel popover mission-popover" aria-label="Missions">
-              <span class="eyebrow gold">Current objective</span>
-              <strong>${objective.label}</strong>
+              <span class="eyebrow gold">${mission.act}</span>
+              <strong>${mission.title}</strong>
+              <p>${mission.character}${mission.characterRole ? `, ${mission.characterRole.toLowerCase()}` : ''}: ${mission.message}</p>
+              <div class="story-goal compact"><strong>Goal</strong><span>${mission.goal}</span></div>
               <div class="objective-demand">
-                <span>${demandProgress(state)}</span>
+                <span>${mission.progressLabel}</span>
                 <span>${Math.min(state.demand.casesSold, state.demand.casesRequested)}/${state.demand.casesRequested}</span>
               </div>
-              <progress value="${objective.progress}" max="100"></progress>
+              <progress value="${mission.progress}" max="100"></progress>
+              <small>${objective.label}</small>
             </aside>
           `
         : ''}
@@ -608,8 +707,9 @@ const renderSceneSupplyHotspots = () => {
         .join('');
 };
 const renderWorkshopHotspot = () => {
+    const nextTap = campaignPrimaryTarget(state) === 'shop';
     return `
-    <button class="workshop-hotspot shop-cart-hotspot" data-action="open-overlay" data-overlay="upgrades" type="button" aria-label="Shop cart">
+    <button class="workshop-hotspot shop-cart-hotspot ${nextTap ? 'next-tap' : ''}" data-action="open-overlay" data-overlay="upgrades" type="button" aria-label="${nextTap ? 'Shop cart, next step' : 'Shop cart'}">
       <svg class="shop-cart-icon" aria-hidden="true" viewBox="0 0 24 24" focusable="false">
         <path d="M3 4h2.4l2.1 11.2h10.8l1.9-7.2H7.1" />
         <path d="M8.2 8h11.4" />
@@ -621,6 +721,8 @@ const renderWorkshopHotspot = () => {
   `;
 };
 const renderGaragePressure = () => {
+    if (!campaignAllowsPressure(state))
+        return '';
     const storageOverflow = Object.values(storageOverflowByArea(state)).reduce((total, amount) => total + amount, 0);
     const firstSaleDone = state.demand.casesSold > 0 || state.salesToday > 0;
     if (!firstSaleDone && storageOverflow === 0 && state.visibilityRisk < 18)
@@ -798,6 +900,7 @@ const renderGarage = () => {
       ${renderAtmosphere()}
       ${renderScenePayoff()}
       <div class="stage-summary" aria-label="Workflow overview">Mash · Ferment · Package · Sell</div>
+      ${renderStoryMissionCard()}
       ${renderFirstLoopObjective()}
       ${renderMissionsControl()}
       ${renderGaragePressure()}
@@ -822,7 +925,7 @@ const renderBatchBoard = () => {
             return `
               <article class="batch-card">
                 <div><strong>${batch.recipeName}</strong><span>${stepLabel(batch.step)} - Q${batch.quality}</span></div>
-                <small>${caseCountLabel(batch.casesExpected)} expected - ${remainingLabel} - contamination risk ${batch.contaminationRisk}%</small>
+                <small>${caseCountLabel(batch.casesExpected)} expected - ${remainingLabel}${campaignAllowsCleaning(state) ? ` - infection chance ${batch.contaminationRisk}%` : ''}</small>
                 <progress value="${progress}" max="100"></progress>
                 ${batch.step === 'awaiting-transfer'
                 ? `<button data-action="transfer-batch" data-batch-id="${batch.id}" type="button">Transfer to fermenter</button>`
@@ -865,7 +968,7 @@ const renderInventory = () => `
       <div><span>Cases</span><strong>${caseCountLabel(state.inventory.cases)}</strong></div>
       <div><span>Garage equipment space</span><strong>${garageSpaceUsed()}/${garageSpaceLimit()}</strong></div>
       <div><span>Sales channel</span><strong>${state.demand.accountName}</strong></div>
-      <div><span>Compliance pressure</span><strong>${state.visibilityRisk >= 30 ? 'Invoice risk' : `${state.visibilityRisk}/30 visible`}</strong></div>
+      ${campaignAllowsFormalBuyers(state) ? `<div><span>Compliance pressure</span><strong>${state.visibilityRisk >= 30 ? 'Invoice risk' : `${state.visibilityRisk}/30 visible`}</strong></div>` : ''}
       ${ingredients
     .map((ingredient) => {
     const stock = state.inventory.ingredients[ingredient.id];
@@ -920,7 +1023,8 @@ const ingredientCartButtonState = (ingredient) => {
         return { disabled: true, label: 'Need cash', reason: `Need ${formatCurrency(ingredient.packPrice)}`, className: 'upgrade-locked' };
     if (incoming.amount > 0 && incoming.arrivalDay)
         return { disabled: false, label: 'Order more', reason: `${ingredientAmountLabel(ingredient.id, incoming.amount)} incoming ${formatGameDate(incoming.arrivalDay)}`, className: 'cart-incoming' };
-    return { disabled: false, label: 'Add to cart', reason: `${ingredientAmountLabel(ingredient.id, ingredient.packSize)} pack - ${formatCurrency(ingredient.packPrice)}`, className: '' };
+    const packLabel = ingredient.id === 'bottles' ? `${ingredient.packSize} bottle pack` : `${ingredientAmountLabel(ingredient.id, ingredient.packSize)} pack`;
+    return { disabled: false, label: 'Add to cart', reason: `${packLabel} - ${formatCurrency(ingredient.packPrice)}`, className: '' };
 };
 const renderIngredientCartCard = (ingredient) => {
     const stock = state.inventory.ingredients[ingredient.id];
@@ -936,6 +1040,23 @@ const renderIngredientCartCard = (ingredient) => {
     </button>
   `;
 };
+const renderCampaignSupplyHint = () => {
+    if (state.campaign.missionId !== 'empty-shelf')
+        return '';
+    const recipe = garageBlondeRecipe();
+    const missing = recipeMissingIngredients(state, recipe);
+    const breakdown = recipeSupplyBreakdown(state, recipe).filter((item) => item.missingAmount > 0);
+    if (missing.length === 0)
+        return `<div class="campaign-shop-hint"><strong>Rudy's shop note</strong><span>Garage Blonde supplies are back. Start the second batch before somebody calls this a business.</span></div>`;
+    return `
+    <button class="campaign-shop-hint action" data-action="order-recipe" data-order-mode="missing" data-recipe-id="garage-blonde" type="button">
+      <strong>Order Garage Blonde supplies</strong>
+      <span>${recipeRequirementSummary(recipe)}</span>
+      <span>${recipeMissingOrderSummary(state, recipe)}</span>
+      <em>${breakdown.map((item) => item.orderLabel).join(' + ')} - ${formatCurrency(orderCost(missing))}</em>
+    </button>
+  `;
+};
 const renderIngredientCart = () => `
   <section class="equipment-store-group ingredient-cart-group">
     <div class="store-group-heading">
@@ -943,6 +1064,7 @@ const renderIngredientCart = () => `
       <strong>Ingredients and packaging</strong>
       <small>${state.pendingOrders.length} incoming order${state.pendingOrders.length === 1 ? '' : 's'}</small>
     </div>
+    ${renderCampaignSupplyHint()}
     <div class="ingredient-cart-grid">
       ${ingredients.map(renderIngredientCartCard).join('')}
     </div>
@@ -1055,6 +1177,7 @@ const render = () => {
       ${renderTopHud()}
       ${renderGarage()}
       ${renderFocusOverlay()}
+      ${renderStoryIntroCard()}
       <div class="rotate-blocker" role="dialog" aria-modal="true" aria-label="Rotate device">
         <strong>Brewery-Sim is played in landscape mode.</strong>
         <span>Rotate your device to continue brewing.</span>
@@ -1115,7 +1238,12 @@ root.addEventListener('click', (event) => {
             activeOverlay = requestedOverlay;
             recipePanelOpen = false;
             selectedRecipeCategoryId = null;
-            selectedShopSection = null;
+            selectedShopSection =
+                requestedOverlay === 'upgrades' && state.campaign.missionId === 'empty-shelf'
+                    ? 'supplies'
+                    : requestedOverlay === 'upgrades' && state.campaign.missionId === 'bucket-empire'
+                        ? 'equipment'
+                        : null;
             recipePage = 0;
         }
         expandedTarget = null;
@@ -1143,6 +1271,10 @@ root.addEventListener('click', (event) => {
         catch { }
         opsOpen = false;
         render();
+        return;
+    }
+    if (action === 'dismiss-story-card') {
+        dispatch({ type: 'dismiss-story-card' });
         return;
     }
     if (action === 'close-station-panel') {
@@ -1252,14 +1384,17 @@ root.addEventListener('click', (event) => {
         activeOverlay = null;
         opsOpen = false;
         recipePanelOpen = false;
-        expandedTarget = null;
+        expandedTarget = 'kettle';
         expandedEquipmentInstanceId = null;
         dispatch({ type: 'start-batch', recipeId: target.dataset.recipeId ?? 'garage-blonde' });
         return;
     }
     if (action === 'wait-until-ready') {
-        expandedTarget = null;
-        expandedEquipmentInstanceId = null;
+        const batch = state.batches.find((item) => item.id === (target.dataset.batchId ?? ''));
+        if (batch?.step === 'packaging' || batch?.step === 'bottle-conditioning') {
+            expandedTarget = 'cases';
+            expandedEquipmentInstanceId = null;
+        }
         dispatch({ type: 'wait-until-ready', batchId: target.dataset.batchId });
         return;
     }
@@ -1273,13 +1408,14 @@ root.addEventListener('click', (event) => {
         return;
     }
     if (action === 'transfer-batch') {
-        expandedTarget = null;
-        expandedEquipmentInstanceId = null;
+        const batch = state.batches.find((item) => item.id === (target.dataset.batchId ?? ''));
+        expandedTarget = 'fermenter';
+        expandedEquipmentInstanceId = batch?.fermenterInstanceId ?? null;
         dispatch({ type: 'transfer-batch', batchId: target.dataset.batchId ?? '' });
         return;
     }
     if (action === 'start-packaging') {
-        expandedTarget = null;
+        expandedTarget = 'bottler';
         expandedEquipmentInstanceId = null;
         dispatch({ type: 'start-packaging', batchId: target.dataset.batchId ?? '' });
         return;

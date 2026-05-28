@@ -4,6 +4,7 @@ import { equipmentCatalog } from '../dist/data/equipment.js';
 import { ingredients } from '../dist/data/ingredients.js';
 import { garageEquipmentLayoutByTier } from '../dist/data/garageLayout.js';
 import { recipes } from '../dist/data/recipes.js';
+import { campaignNextStep, campaignView } from '../dist/game/campaign.js';
 import { createInitialState } from '../dist/game/initialState.js';
 import { loadSavedGame, resetSavedGame, saveGameState, STORAGE_KEY } from '../dist/game/persistence.js';
 import { reduceGame } from '../dist/game/simulation.js';
@@ -21,7 +22,10 @@ import {
   litersToBottles,
   litersToCases,
   recipeCanStart,
+  recipeMissingOrderSummary,
   recipeMissingIngredients,
+  recipeRequirementSummary,
+  recipeSupplyBreakdown,
   saleValueForChannel,
   storageOverflowByArea
 } from '../dist/game/selectors.js';
@@ -44,9 +48,17 @@ const saison = recipes.find((recipe) => recipe.id === 'shed-saison');
 const stout = recipes.find((recipe) => recipe.id === 'midnight-stout');
 const kveik = recipes.find((recipe) => recipe.id === 'hot-garage-kveik');
 assert.ok(blonde && ipa && pils && wheat && saison && stout && kveik, 'starter recipes should include Blonde, IPA, Pils, Wheat, Saison, Stout and Kveik');
+assert.equal(blonde.originalGravity, '1.045', 'Garage Blonde should define original gravity for brew notes');
+assert.equal(blonde.expectedAbv, '4.6%', 'Garage Blonde should define expected ABV for brew notes');
+assert.match(recipeRequirementSummary(blonde), /4\.2 kg Pilsner malt[\s\S]*45 g Saaz hops[\s\S]*1 ale yeast pack[\s\S]*60 bottles/, 'Garage Blonde requirement summary should teach exact quantities');
+const restockPreview = reduceGame(createInitialState(), { type: 'start-batch', recipeId: 'garage-blonde' });
+assert.match(recipeMissingOrderSummary(restockPreview, blonde), /Need 48 bottles\. Order 4 x 12 bottle packs\./, 'restock summary should round missing bottles to shop packs');
+assert.equal(recipeSupplyBreakdown(restockPreview, blonde).find((item) => item.ingredientId === 'bottles')?.packsToOrder, 4, 'supply breakdown should expose rounded packs to order');
 assert.ok(recipes.some((recipe) => recipe.id === 'custom-recipe' && recipe.enabled === false), 'custom recipe should exist as disabled placeholder');
 assert.ok(ingredients.some((ingredient) => ingredient.id === 'pilsner-malt'), 'ingredient catalog should include named malt');
 assert.equal(state.fermenterTemperatureC, 18, 'new games should track fermenter temperature');
+assert.equal(state.campaign.missionId, 'barbecue-text', 'new games should start on the barbecue storyline mission');
+assert.equal(campaignView(state).title, 'The Barbecue Text', 'campaign view should expose the first storyline card');
 assert.deepEqual(
   garageEquipmentLayoutByTier.tier1,
   {
@@ -84,6 +96,8 @@ const brewThroughFermentation = (recipe, temperatureC) => {
   stockRecipeIngredients(testState, recipe);
   testState.equipment.kettle.condition = 100;
   testState.equipment.fermenter.condition = 100;
+  testState.ownedEquipment.find((item) => item.instanceId === testState.activeEquipment.kettle).condition = 100;
+  testState.ownedEquipment.find((item) => item.instanceId === testState.activeEquipment.fermenter).condition = 100;
   testState = reduceGame(testState, { type: 'set-fermenter-temperature', temperatureC });
   testState = reduceGame(testState, { type: 'start-batch', recipeId: recipe.id });
   const startingBatch = testState.batches[0];
@@ -93,7 +107,7 @@ const brewThroughFermentation = (recipe, temperatureC) => {
   testState = reduceGame(testState, { type: 'transfer-batch', batchId: testState.batches[0].id });
   assert.equal(testState.batches[0].step, 'fermenting', `${recipe.name} should reach fermentation in the temperature test`);
 
-  for (let days = 0; days < 20 && testState.batches[0].step === 'fermenting'; days += 1) {
+  for (let days = 0; days < 40 && testState.batches[0].step === 'fermenting'; days += 1) {
     testState = reduceGame(testState, { type: 'end-day' });
   }
   assert.equal(testState.batches[0].step, 'awaiting-packaging', `${recipe.name} should finish fermentation in the temperature test`);
@@ -145,10 +159,11 @@ assert.deepEqual(
   },
   'new games should start with BIAB stock pot, one plastic bucket and hand bottling gear'
 );
-assert.equal(state.equipment.kettle.name, '20 L enamel stock pot', 'starter brewhouse should be the Tier 1 enamel stock pot');
+assert.equal(state.equipment.kettle.name, '20 L stainless stock pot', 'starter brewhouse should be the Tier 1 stainless stock pot');
 assert.equal(state.equipment.fermenter.name, 'Plastic fermentation bucket', 'starter fermentation should be one plastic bucket');
 assert.equal(state.equipment.bottler.name, 'Bottle wand and hand capper', 'starter packaging should be the wand and hand capper');
 assert.equal(firstLoopObjective(state), 'Tap the stock pot to brew Garage Blonde.', 'fresh first-loop objective should point at the stock pot');
+assert.equal(campaignNextStep(state), 'Tap the stock pot to brew Garage Blonde.', 'fresh campaign guidance should point at the stock pot');
 assert.equal(bottlesPerCase, 12, 'one in-game case should be a 12 bottle case');
 assert.equal(litersToBottles(20), 61, '20 L should be about 61 Belgian 33 cl bottles before case rounding');
 assert.equal(litersToCases(20), 5, '20 L should package as about five 12 bottle cases');
@@ -171,7 +186,7 @@ assert.equal(firstLoopObjective(state), 'Tap the stock pot to transfer Garage Bl
 state = tickUntilStep(state, 'fermenting');
 assert.equal(state.batches[0].step, 'fermenting', 'batch should enter fermentation only after manual transfer');
 assert.equal(currentWorkflowStage(state).tapTarget, 'fermenter', 'fermenting stage should point at the fermenter');
-assert.equal(firstLoopObjective(state), 'Tap the fermenter to wait through fermentation.', 'fermenting objective should point at the fermenter time skip');
+assert.equal(firstLoopObjective(state), 'Tap the fermenter to fast-forward fermentation.', 'fermenting objective should point at the fermenter time skip');
 assert.doesNotMatch(formatBatchRemainingTime(state, state.batches[0], blonde), /in-game minutes/, 'remaining time should be player-readable');
 
 state = tickUntilStep(state, 'awaiting-packaging');
@@ -198,17 +213,19 @@ state = reduceGame(state, { type: 'sell-channel', channelId: 'friends-family', c
 assert.equal(state.cash - cashBeforeSale, displayedPayout, 'displayed sale payout helper should match the reducer cash delta');
 assert.ok(state.inventory.cases < casesBeforeSale, 'selling should remove cases from inventory');
 assert.ok(state.demand.casesSold > 0, 'selling should fulfill local demand progress');
+assert.equal(state.campaign.missionId, 'empty-shelf', 'selling the first four cases should advance to the restock storyline mission');
+assert.match(campaignNextStep(state), /4\.2 kg Pilsner malt[\s\S]*Need 48 bottles[\s\S]*Order 4 x 12 bottle packs/i, 'post-sale campaign guidance should teach exact restock quantities before upgrades');
 assert.ok(['Sell', 'Mash'].includes(currentWorkflowStage(state).stage), 'flow should either keep selling remaining cases or return to brewing after stock sells out');
 assert.ok(state.cash > 140, 'selling cases should increase cash');
 assert.ok(state.visibilityRisk > 0, 'garage sales should increase visibility risk');
 assert.equal(firstLoopObjective(state), 'Tap the pallet to sell Garage Blonde.', 'remaining cases should keep the garage-floor objective on the pallet');
 state = reduceGame(state, { type: 'sell-channel', channelId: 'friends-family', cases: state.inventory.cases });
-assert.equal(firstLoopObjective(state), 'Tap the cart to add a second fermenter.', 'after the first sale clears stock, guidance should advance to the first upgrade');
+assert.equal(state.campaign.missionId, 'empty-shelf', 'clearing leftover beer should not skip the restock lesson');
 assert.match(demandProgress(state), /4\/4 cases/, 'completed demand progress should not display overfilled counts');
 
 const storage = createMemoryStorage();
 saveGameState(state, storage);
-assert.match(storage.getItem(STORAGE_KEY), /\"version\":4/, 'save should use the v4 storage envelope');
+assert.match(storage.getItem(STORAGE_KEY), /\"version\":6/, 'save should use the v6 storage envelope');
 const restored = loadSavedGame(storage);
 assert.deepEqual(restored, state, 'saved state should restore after refresh');
 storage.setItem(STORAGE_KEY, '{bad json');
@@ -231,11 +248,56 @@ saveGameState(state, storage);
 resetSavedGame(storage);
 assert.equal(storage.getItem(STORAGE_KEY), null, 'reset should clear browser-local save data');
 
+let campaignState = createInitialState();
+campaignState.campaign = { missionId: 'warm-garage-week', completedMissionIds: ['barbecue-text', 'empty-shelf', 'bucket-empire', 'uncle-nico-wedding'], seenMissionIds: [] };
+campaignState = reduceGame(campaignState, { type: 'set-fermenter-temperature', temperatureC: 19 });
+assert.equal(campaignState.campaign.missionId, 'sticky-bucket', 'temperature adjustment should advance the warm-garage tutorial mission');
+campaignState = reduceGame(campaignState, { type: 'clean-equipment', equipmentId: 'fermenter' });
+assert.equal(campaignState.campaign.missionId, 'labels-at-midnight', 'cleaning should advance the sticky-bucket tutorial mission');
+assert.equal(campaignState.demand.channelId, 'private-event', 'packaging presentation mission should create a private event demand');
+campaignState.inventory.cases = 8;
+campaignState.finishedBeerLots = [
+  {
+    id: 'campaign-event-lot',
+    sourceBatchId: 'campaign-event-batch',
+    recipeId: 'garage-blonde',
+    recipeName: 'Garage Blonde',
+    cases: 8,
+    volumeLiters: 32,
+    quality: 80,
+    marketAppeal: 1,
+    packagingState: 'packaged',
+    saleState: 'available'
+  }
+];
+campaignState = reduceGame(campaignState, { type: 'sell-channel', channelId: 'private-event', cases: 8 });
+assert.equal(campaignState.campaign.missionId, 'first-bar-account', 'private event sale should unlock the bar-account tutorial mission');
+assert.equal(campaignState.demand.channelId, 'local-bar', 'bar-account mission should create a local bar demand');
+campaignState.inventory.cases = 12;
+campaignState.finishedBeerLots = [
+  {
+    id: 'campaign-bar-lot',
+    sourceBatchId: 'campaign-bar-batch',
+    recipeId: 'garage-blonde',
+    recipeName: 'Garage Blonde',
+    cases: 12,
+    volumeLiters: 48,
+    quality: 82,
+    marketAppeal: 1,
+    packagingState: 'packaged',
+    saleState: 'available'
+  }
+];
+campaignState = reduceGame(campaignState, { type: 'sell-channel', channelId: 'local-bar', cases: 12 });
+assert.equal(campaignState.campaign.missionId, 'household-summit', 'first bar sale should unlock the household-pressure tutorial mission');
+campaignState = reduceGame(campaignState, { type: 'crisis-action', actionId: 'pause-public-sales' });
+assert.equal(campaignState.campaign.missionId, 'sandbox-unlocked', 'household-pressure action should unlock the normal sandbox');
+
 assert.equal(equipmentConditionTier(92), 'clean', 'high condition should be clean');
 assert.equal(equipmentConditionTier(70), 'worn', 'mid condition should be worn');
 assert.equal(equipmentConditionTier(50), 'dirty', 'low condition should be dirty');
 assert.equal(equipmentConditionTier(25), 'critical', 'very low condition should be critical');
-assert.equal(equipmentConditionLabel(50), 'Dirty', 'condition labels should be player-readable');
+assert.equal(equipmentConditionLabel(50), 'Needs cleaning', 'condition labels should be player-readable');
 assert.equal(contaminationRiskTier(13), 'low', 'low contamination risk should be labeled low');
 assert.equal(contaminationRiskTier(35), 'severe', 'high contamination risk should be labeled severe');
 
@@ -368,9 +430,10 @@ dirtyIpa.inventory.ingredients['ale-yeast'].amount = 3;
 dirtyIpa.inventory.ingredients.bottles.amount = 80;
 dirtyIpa.inventory.ingredients['ipa-hops'].condition = 55;
 dirtyIpa.equipment.fermenter.condition = 35;
+dirtyIpa.ownedEquipment.find((item) => item.instanceId === dirtyIpa.activeEquipment.fermenter).condition = 35;
 dirtyIpa = reduceGame(dirtyIpa, { type: 'start-batch', recipeId: 'backyard-ipa' });
 dirtyIpa = tickUntilStep(dirtyIpa, 'awaiting-packaging', 20);
-assert.ok(dirtyIpa.events.some((event) => /Polyphenols|hop creep|Contamination/.test(event.message)), 'IPA should trigger hop or contamination fault events under bad conditions');
+assert.ok(dirtyIpa.events.some((event) => /Polyphenols|hop creep|Sanitation|Infection/.test(event.message)), 'IPA should trigger hop or infection fault events under bad conditions');
 
 let dirtyPils = createInitialState();
 dirtyPils.inventory.ingredients['lager-yeast'].amount = 2;
@@ -379,9 +442,11 @@ dirtyPils.inventory.ingredients.bottles.amount = 72;
 dirtyPils.inventory.ingredients['pilsner-malt'].condition = 50;
 dirtyPils.equipment.kettle.condition = 30;
 dirtyPils.equipment.fermenter.condition = 30;
+dirtyPils.ownedEquipment.find((item) => item.instanceId === dirtyPils.activeEquipment.kettle).condition = 30;
+dirtyPils.ownedEquipment.find((item) => item.instanceId === dirtyPils.activeEquipment.fermenter).condition = 30;
 dirtyPils = reduceGame(dirtyPils, { type: 'start-batch', recipeId: 'basement-pils' });
 dirtyPils = tickUntilStep(dirtyPils, 'awaiting-packaging', 25);
-assert.ok(dirtyPils.events.some((event) => /dimethyl sulfide|hydrogen sulfide|Contamination/.test(event.message)), 'Pils should trigger DMS or sulfur-style events under bad conditions');
+assert.ok(dirtyPils.events.some((event) => /dimethyl sulfide|hydrogen sulfide|Sanitation|Infection/.test(event.message)), 'Pils should trigger DMS or sulfur-style events under bad conditions');
 
 let dirtyBottler = createInitialState();
 dirtyBottler.equipment.bottler.condition = 50;
@@ -389,7 +454,7 @@ dirtyBottler.ownedEquipment.find((item) => item.instanceId === dirtyBottler.acti
 dirtyBottler = reduceGame(dirtyBottler, { type: 'start-batch', recipeId: 'garage-blonde' });
 dirtyBottler = tickUntilStep(dirtyBottler, undefined, 20);
 assert.ok(dirtyBottler.inventory.cases > 0, 'dirty bottler should still package some cases');
-assert.match(eventMessages(dirtyBottler), /Dirty bottling station lost \d+ gameplay cases? \(12 × 33 cl bottles each\)/, 'dirty packaging should produce a plain-language warning with the gameplay case definition');
+assert.match(eventMessages(dirtyBottler), /Dirty bottling station lost \d+ cases? \(12 . 33 cl bottles\)/, 'dirty packaging should produce a plain-language warning with the case definition');
 
 let nextDay = createInitialState();
 nextDay = reduceGame(nextDay, { type: 'end-day' });
@@ -408,14 +473,19 @@ assert.match(mainSource, /Mash.*Ferment.*Package.*Sell/s, 'UI should show clear 
 assert.match(appBootSource, /loadSavedGame/, 'UI should load browser-local saves on startup');
 assert.match(mainSource, /saveGameState/, 'UI should save browser-local progress after actions and ticks');
 assert.match(mainSource, /New Game \/ Reset Save/, 'UI should expose a reset save button');
-assert.match(mainSource, /caseDefinitionExplanation/, 'UI should reuse the persistent gameplay case explanation');
+assert.match(mainSource, /caseDefinitionExplanation/, 'UI should reuse the persistent case explanation');
 assert.match(stationPanelSource, /caseCountLabel\(readyBatch\.casesExpected\)/, 'bottling bench should show case counts with the 12 bottle definition');
-assert.match(`${mainSource}\n${stationPanelSource}`, /caseCountLabel\(state\.inventory\.cases\)/, 'pallet and inventory surfaces should show gameplay case counts with definition');
-assert.match(mainSource, /caseCountLabel\(lot\.cases\)/, 'finished lot cards should show gameplay case counts with definition');
+assert.match(`${mainSource}\n${stationPanelSource}`, /caseCountLabel\(state\.inventory\.cases\)/, 'pallet and inventory surfaces should show case counts with definition');
+assert.match(mainSource, /caseCountLabel\(lot\.cases\)/, 'finished lot cards should show case counts with definition');
 
 assert.match(mainSource, /selectedRecipeCategoryId/, 'recipe flow should keep a category-selection state');
 assert.match(recipePanelSource, /data-action="select-recipe-category"/, 'recipe panel should render category-selection actions');
 assert.match(recipePanelSource, /recipeStockBatchCount/, 'recipe panel should show how many batches current stock supports');
+assert.match(mainSource, /story-phone/, 'mission intros should render as a phone screen');
+assert.match(mainSource, /phone-reply-button/, 'mission phone should use a reply button');
+assert.doesNotMatch(mainSource, /Start the shift/, 'mission intro should not use shift wording');
+assert.match(recipePanelSource, /renderBrewExplainer/, 'recipe panel should explain mash, boil and transfer before brewing');
+assert.match(stationPanelSource, /renderBrewDayNotes/, 'kettle panel should show brew day notes after brewing');
 assert.match(mainSource, /<svg class="shop-cart-icon"/, 'shop cart hotspot should render as a recognizable SVG cart icon');
 assert.match(mainSource, /select-shop-section/, 'shop cart should first ask whether to shop supplies or equipment');
 assert.doesNotMatch(mainSource, /\$\{renderSceneSupplyHotspots\(\)\}/, 'garage scene should not render floating inventory alert badges');

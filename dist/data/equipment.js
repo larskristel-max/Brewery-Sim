@@ -3,8 +3,8 @@ export const equipmentCatalog = [
         id: 'stock-pot-20l',
         equipmentId: 'kettle',
         station: 'brewhouse',
-        name: '20 L enamel stock pot',
-        description: 'BIAB enamel pot and grain bag. Slow, hands-on, and capped at one small garage batch.',
+        name: '20 L stainless stock pot',
+        description: 'BIAB stainless pot and grain bag. Slow, hands-on, and capped at one small garage batch.',
         tier: 1,
         cost: 0,
         spaceUsed: 2,
@@ -12,7 +12,7 @@ export const equipmentCatalog = [
         batchTimeModifier: 1.25,
         attentionModifier: 1.3,
         lossModifier: 0.08,
-        visualClass: 'visual-enamel-pot',
+        visualClass: 'visual-stainless-pot',
         operonTypeKey: 'equipment.kettle',
         qualityBonus: -2,
         riskModifier: 2,
@@ -251,7 +251,7 @@ export const createOwnedEquipment = (itemId, instanceNumber = 1, installed = tru
         station: item.station,
         name: item.name,
         tier: item.tier,
-        condition: item.cost === 0 ? 74 : 94,
+        condition: item.cost === 0 ? 86 : 94,
         capacityLiters: item.capacityLiters,
         spaceUsed: item.spaceUsed,
         batchTimeModifier: item.batchTimeModifier,
@@ -267,10 +267,10 @@ export const createOwnedEquipment = (itemId, instanceNumber = 1, installed = tru
 export const equipmentByStation = (equipmentId) => equipmentCatalog.filter((item) => item.equipmentId === equipmentId).sort((a, b) => a.tier - b.tier);
 export const topGarageTier = (equipmentId) => Math.max(...equipmentByStation(equipmentId).map((item) => item.tier));
 export const starterEquipment = [
-    createEquipment('stock-pot-20l', 76, 17, 42),
-    createEquipment('plastic-bucket', 72, 50, 35),
+    createEquipment('stock-pot-20l', 88, 17, 42),
+    createEquipment('plastic-bucket', 86, 50, 35),
     createEquipment('grain-mill-tier2', 94, 35, 56),
-    createEquipment('wand-capper', 70, 76, 56)
+    createEquipment('wand-capper', 84, 76, 56)
 ];
 export const starterOwnedEquipment = [
     createOwnedEquipment('stock-pot-20l', 1, true),

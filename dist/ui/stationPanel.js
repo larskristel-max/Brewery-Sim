@@ -1,10 +1,20 @@
-import { caseCountLabel, caseDefinitionExplanation, cleaningPlanForEquipment, formatClock, formatCurrency, formatGameDate, recipeCanStart, recipeCategories, saleCasesForChannel, salesChannels, saleValueForChannel, visibleRecipes } from '../game/selectors.js';
+import { getRecipe } from '../data/recipes.js';
+import { campaignAllowsCleaning, campaignAllowsTemperature, campaignVisibleSalesChannels } from '../game/campaign.js';
+import { caseCountLabel, caseDefinitionExplanation, cleaningPlanForEquipment, formatClock, formatCurrency, formatGameDate, recipeCanStart, recipeCategories, recipeIngredientCost, saleCasesForChannel, salesChannels, saleValueForChannel, visibleRecipes } from '../game/selectors.js';
+import { renderBrewDayNotes, renderBrewExplainer } from './brewNotes.js';
 import { garageSceneEquipmentInstances } from './sceneEquipment.js';
 const salesOfferModels = (state) => [
     { id: 'friends-family', risk: 'Very low visibility', invoice: 'No invoice' },
     { id: 'private-event', risk: 'Medium visibility', invoice: 'Informal receipt' },
     { id: 'local-bar', risk: 'High formal risk', invoice: state.canInvoice ? 'Invoice ready' : 'May ask for invoice' }
-];
+].filter((offer) => campaignVisibleSalesChannels(state).includes(offer.id));
+const finishedBeerCostBasis = (state, cases) => {
+    const totalCases = state.finishedBeerLots.reduce((total, lot) => total + lot.cases, 0);
+    if (totalCases <= 0 || cases <= 0)
+        return 0;
+    const ingredientCost = state.finishedBeerLots.reduce((total, lot) => total + recipeIngredientCost(getRecipe(lot.recipeId)), 0);
+    return Math.round((ingredientCost / totalCases) * cases);
+};
 export const renderSalesOffers = (state) => `
   <div class="hotspot-actions sales-offers">
     ${salesOfferModels(state)
@@ -12,21 +22,39 @@ export const renderSalesOffers = (state) => `
     const channel = salesChannels[offer.id];
     const cases = saleCasesForChannel(state, offer.id);
     const payout = saleValueForChannel(state, offer.id);
+    const costBasis = finishedBeerCostBasis(state, cases);
+    const margin = payout - costBasis;
     const invoiceBlocked = (state.demand.invoiceRequired || (channel.formal && state.visibilityRisk >= channel.invoiceAfter)) && !state.canInvoice;
     const disabled = cases <= 0 || invoiceBlocked;
     return `<button data-action="sell-channel" data-channel-id="${offer.id}" data-cases="${cases}" type="button" ${disabled ? 'disabled' : ''}>
-          ${channel.name}<small>Selling ${caseCountLabel(cases)} / offer max ${caseCountLabel(channel.cases)} - ${formatCurrency(payout)} payout - ${offer.risk} - ${invoiceBlocked ? 'Invoice blocked' : offer.invoice}</small>
+          ${channel.name}<small>${caseCountLabel(cases)} - payout ${formatCurrency(payout)} - ingredients about ${formatCurrency(costBasis)} - margin about ${formatCurrency(margin)} - ${invoiceBlocked ? 'Invoice blocked' : offer.invoice}</small>
         </button>`;
 })
     .join('')}
-    <div class="temperature-note"><strong>Gameplay case definition</strong><span>${caseDefinitionExplanation}</span></div>
+    <div class="temperature-note"><strong>Case size</strong><span>${caseDefinitionExplanation}</span></div>
   </div>
 `;
 export const renderEquipmentActions = (context, equipmentId, instance) => {
     const { state } = context;
     const cleanPlan = cleaningPlanForEquipment(state, equipmentId);
-    const canClean = state.cash >= cleanPlan.cost;
-    const cleanButton = `<button data-action="clean-equipment" data-equipment-id="${equipmentId}" type="button" ${canClean ? '' : `disabled title="Need ${formatCurrency(cleanPlan.cost)}"`}>Clean<small>${canClean ? cleanPlan.duration : 'Need cash'}</small></button>`;
+    const hasBeerInStation = equipmentId === 'kettle'
+        ? state.batches.some((batch) => batch.step === 'brewing' || batch.step === 'awaiting-transfer')
+        : equipmentId === 'fermenter'
+            ? state.batches.some((batch) => batch.fermenterInstanceId === instance?.instanceId && (batch.step === 'fermenting' || batch.step === 'awaiting-packaging'))
+            : equipmentId === 'bottler'
+                ? state.batches.some((batch) => batch.step === 'packaging' || batch.step === 'bottle-conditioning')
+                : false;
+    const canClean = state.cash >= cleanPlan.cost && !hasBeerInStation;
+    const cleanDisabledReason = hasBeerInStation ? 'Beer inside' : `Need ${formatCurrency(cleanPlan.cost)}`;
+    const cleanButton = campaignAllowsCleaning(state)
+        ? `<button data-action="clean-equipment" data-equipment-id="${equipmentId}" type="button" ${canClean ? '' : `disabled title="${cleanDisabledReason}"`}>Clean & sanitize<small>${canClean ? cleanPlan.duration : hasBeerInStation ? 'Beer inside' : 'Need cash'}</small></button>`
+        : '';
+    const temperatureButtons = campaignAllowsTemperature(state)
+        ? `
+          <button data-action="set-fermenter-temperature" data-temperature="${state.fermenterTemperatureC - 1}" type="button">Cool<small>${state.fermenterTemperatureC - 1} C</small></button>
+          <button data-action="set-fermenter-temperature" data-temperature="${state.fermenterTemperatureC + 1}" type="button">Warm<small>${state.fermenterTemperatureC + 1} C</small></button>
+      `
+        : '';
     if (equipmentId === 'kettle') {
         const recipe = visibleRecipes().find((item) => item.id === 'garage-blonde');
         const canBrew = recipe ? recipeCanStart(state, recipe) && context.recipeStartBlocker(recipe) === '' : false;
@@ -34,8 +62,10 @@ export const renderEquipmentActions = (context, equipmentId, instance) => {
         const brewing = state.batches.find((batch) => batch.step === 'brewing');
         const waitingTransfer = state.batches.find((batch) => batch.step === 'awaiting-transfer');
         if (waitingTransfer) {
+            const waitingRecipe = getRecipe(waitingTransfer.recipeId);
             return `
         <div class="hotspot-actions">
+          ${renderBrewDayNotes(waitingRecipe)}
           <button data-action="transfer-batch" data-batch-id="${waitingTransfer.id}" type="button">Transfer to fermenter<small>${waitingTransfer.recipeName}</small></button>
           <button data-action="open-overlay" data-overlay="recipes" type="button">Other recipes</button>
           ${cleanButton}
@@ -45,7 +75,7 @@ export const renderEquipmentActions = (context, equipmentId, instance) => {
         if (brewing) {
             return `
         <div class="hotspot-actions">
-          <button data-action="wait-until-ready" data-batch-id="${brewing.id}" type="button">Skip to transfer<small>${context.batchRemainingLabel(brewing)}</small></button>
+          <button data-action="wait-until-ready" data-batch-id="${brewing.id}" type="button">Skip ahead<small>${context.batchRemainingLabel(brewing)} to transfer</small></button>
           <button data-action="open-overlay" data-overlay="recipes" type="button">Other recipes</button>
           ${cleanButton}
         </div>
@@ -53,6 +83,7 @@ export const renderEquipmentActions = (context, equipmentId, instance) => {
         }
         return `
       <div class="hotspot-actions">
+        ${recipe ? renderBrewExplainer(recipe) : ''}
         <button data-action="start-batch" data-recipe-id="garage-blonde" type="button" ${canBrew ? '' : `disabled title="${blocker || 'Blocked'}"`}>Brew Garage Blonde${canBrew ? '<small>First batch</small>' : `<small>${blocker}</small>`}</button>
         <button data-action="open-overlay" data-overlay="recipes" type="button">Other recipes</button>
         ${cleanButton}
@@ -67,8 +98,7 @@ export const renderEquipmentActions = (context, equipmentId, instance) => {
             return `
         <div class="hotspot-actions">
           <button type="button" disabled>Ready at kettle<small>Use stock pot</small></button>
-          <button data-action="set-fermenter-temperature" data-temperature="${state.fermenterTemperatureC - 1}" type="button">Cool<small>${state.fermenterTemperatureC - 1} C</small></button>
-          <button data-action="set-fermenter-temperature" data-temperature="${state.fermenterTemperatureC + 1}" type="button">Warm<small>${state.fermenterTemperatureC + 1} C</small></button>
+          ${temperatureButtons}
           ${cleanButton}
         </div>
       `;
@@ -76,20 +106,17 @@ export const renderEquipmentActions = (context, equipmentId, instance) => {
         if (batch?.step === 'fermenting') {
             return `
         <div class="hotspot-actions">
-          <button data-action="wait-until-ready" data-batch-id="${batch.id}" type="button">Skip to packaging<small>${context.batchRemainingLabel(batch)}</small></button>
-          <button data-action="set-fermenter-temperature" data-temperature="${state.fermenterTemperatureC - 1}" type="button">Cool<small>${state.fermenterTemperatureC - 1} C</small></button>
-          <button data-action="set-fermenter-temperature" data-temperature="${state.fermenterTemperatureC + 1}" type="button">Warm<small>${state.fermenterTemperatureC + 1} C</small></button>
+          <button data-action="wait-until-ready" data-batch-id="${batch.id}" type="button">Skip ahead<small>${context.batchRemainingLabel(batch)} to bottling</small></button>
+          ${temperatureButtons}
           ${cleanButton}
-          <div class="temperature-note"><strong>${state.fermenterTemperatureC} C - ${context.fermenterTemperatureHint()}</strong><span>Clean equipment and fresh ingredients reduce contamination.</span></div>
+          ${campaignAllowsTemperature(state) ? `<div class="temperature-note"><strong>${state.fermenterTemperatureC} C - ${context.fermenterTemperatureHint()}</strong><span>Temperature affects flavor when you skip time.</span></div>` : ''}
         </div>
       `;
         }
         if (batch?.step === 'awaiting-packaging') {
             return `
         <div class="hotspot-actions">
-          <button data-action="start-packaging" data-batch-id="${batch.id}" type="button">Transfer to bottling<small>${batch.recipeName} - ${caseCountLabel(batch.casesExpected)}</small></button>
-          <button data-action="set-fermenter-temperature" data-temperature="${state.fermenterTemperatureC - 1}" type="button">Cool<small>${state.fermenterTemperatureC - 1} C</small></button>
-          <button data-action="set-fermenter-temperature" data-temperature="${state.fermenterTemperatureC + 1}" type="button">Warm<small>${state.fermenterTemperatureC + 1} C</small></button>
+          <button data-action="start-packaging" data-batch-id="${batch.id}" type="button">Move to bottling bench<small>${batch.recipeName} - ${caseCountLabel(batch.casesExpected)}</small></button>
           ${cleanButton}
         </div>
       `;
@@ -97,8 +124,7 @@ export const renderEquipmentActions = (context, equipmentId, instance) => {
         return `
       <div class="hotspot-actions">
         <button type="button" disabled>Empty fermenter<small>${state.fermenterTemperatureC} C</small></button>
-        <button data-action="set-fermenter-temperature" data-temperature="${state.fermenterTemperatureC - 1}" type="button">Cool<small>${state.fermenterTemperatureC - 1} C</small></button>
-        <button data-action="set-fermenter-temperature" data-temperature="${state.fermenterTemperatureC + 1}" type="button">Warm<small>${state.fermenterTemperatureC + 1} C</small></button>
+        ${temperatureButtons}
         ${cleanButton}
       </div>
     `;
@@ -119,7 +145,7 @@ export const renderEquipmentActions = (context, equipmentId, instance) => {
         return `
       <div class="hotspot-actions">
         <button type="button" disabled>Ready at fermenter<small>${caseCountLabel(readyBatch.casesExpected)} - transfer from fermenter</small></button>
-        <div class="temperature-note"><strong>Gameplay case definition</strong><span>${caseDefinitionExplanation}</span></div>
+        <div class="temperature-note"><strong>Case size</strong><span>${caseDefinitionExplanation}</span></div>
         ${cleanButton}
         <button data-action="open-overlay" data-overlay="production" type="button">Flow state<small>Fallback</small></button>
       </div>
@@ -128,7 +154,7 @@ export const renderEquipmentActions = (context, equipmentId, instance) => {
     if (packagingBatch) {
         return `
       <div class="hotspot-actions">
-        <button data-action="wait-until-ready" data-batch-id="${packagingBatch.id}" type="button">Skip to pallet<small>${context.batchRemainingLabel(packagingBatch)}</small></button>
+        <button data-action="wait-until-ready" data-batch-id="${packagingBatch.id}" type="button">Skip ahead<small>${context.batchRemainingLabel(packagingBatch)} to pallet</small></button>
         ${cleanButton}
       </div>
     `;
@@ -157,6 +183,14 @@ export const renderStationPanel = (context) => {
     }
     if (!context.expandedTarget)
         return '';
+    const selectedEquipment = context.expandedTarget === 'cases'
+        ? null
+        : garageSceneEquipmentInstances(state).find((item) => item.instanceId === context.expandedEquipmentInstanceId && item.equipmentId === context.expandedTarget) ??
+            garageSceneEquipmentInstances(state).find((item) => item.equipmentId === context.expandedTarget);
+    const compactBody = (status, batch) => {
+        const duplicateBatchLine = batch && status.detail.includes(batch.recipeName) && status.detail.includes(context.batchRemainingLabel(batch));
+        return `<section class="station-panel-body"><p>${status.detail}</p>${batch && !duplicateBatchLine ? `<p>Batch: ${batch.recipeName} - ${context.stepLabel(batch.step)} - ${context.batchRemainingLabel(batch)}</p>` : ''}<p>Time: ${formatGameDate(state.day)} - ${formatClock(state.minute)}</p></section>`;
+    };
     if (context.expandedTarget === 'cases') {
         return `
       <div class="station-panel-layer">
@@ -170,9 +204,7 @@ export const renderStationPanel = (context) => {
       </div>
     `;
     }
-    const equipment = garageSceneEquipmentInstances(state);
-    const selected = equipment.find((item) => item.instanceId === context.expandedEquipmentInstanceId && item.equipmentId === context.expandedTarget) ??
-        equipment.find((item) => item.equipmentId === context.expandedTarget);
+    const selected = selectedEquipment;
     if (!selected)
         return '';
     const status = context.equipmentInstanceStatus(selected);
@@ -183,7 +215,7 @@ export const renderStationPanel = (context) => {
       <aside class="glass-panel station-panel" aria-label="Station panel">
         <button class="station-panel-close" data-action="close-station-panel" type="button" aria-label="Close station panel"></button>
         <header class="station-panel-header"><span class="eyebrow gold">${selected.label}</span><h2>${selected.name}</h2><p>${status.label}</p></header>
-        <section class="station-panel-body"><p>${status.detail}</p>${batch ? `<p>Batch: ${batch.recipeName} - ${context.stepLabel(batch.step)} - ${context.batchRemainingLabel(batch)}</p>` : '<p>No active batch.</p>'}<p>Time: ${formatGameDate(state.day)} - ${formatClock(state.minute)}</p></section>
+        ${compactBody(status, batch)}
         ${renderEquipmentActions(context, selected.equipmentId, selected)}
       </aside>
     </div>

@@ -1,6 +1,7 @@
 import { starterEquipment, starterOwnedEquipment } from '../data/equipment.js';
 import { createIngredientStock } from '../data/ingredients.js';
 import { starterUpgrades } from '../data/upgrades.js';
+import { initialCampaignState } from './campaign.js';
 export const createInitialState = () => ({
     cash: 180,
     reputation: 0,
@@ -26,6 +27,7 @@ export const createInitialState = () => ({
     complianceRisk: 0,
     canInvoice: false,
     fermenterTemperatureC: 18,
+    campaign: initialCampaignState(),
     batches: [],
     equipment: Object.fromEntries(starterEquipment.map((item) => [item.id, { ...item }])),
     ownedEquipment: starterOwnedEquipment.map((item) => ({ ...item })),
