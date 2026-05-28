@@ -1,0 +1,42 @@
+import type {
+  EquipmentId,
+  EquipmentItemId,
+  GameState,
+  RecipeCategoryId
+} from '../game/schema.js';
+import type { GarageEquipmentPlacement, GarageEquipmentSlotId, GarageSellPointId } from '../data/garageLayout.js';
+
+export type SceneTarget = EquipmentId | 'cases';
+export type FocusOverlay = 'production' | 'inventory' | 'upgrades' | 'log';
+export type StoreStation = EquipmentId;
+export type ShopSection = 'supplies' | 'equipment';
+export type GarageLayoutDraft = Record<GarageEquipmentSlotId, GarageEquipmentPlacement>;
+export type GarageSellPointLayoutDraft = Record<GarageSellPointId, GarageEquipmentPlacement>;
+
+export type GarageSceneEquipmentInstance = {
+  equipmentId: EquipmentId;
+  itemId: EquipmentItemId;
+  instanceId: string;
+  slotId: GarageEquipmentSlotId;
+  label: string;
+  name: string;
+  condition: number;
+  capacityLiters: number;
+  spaceUsed: number;
+  occupiedBatchId?: string;
+};
+
+export type GarageUiState = {
+  expandedTarget: SceneTarget | null;
+  expandedEquipmentInstanceId: string | null;
+  missionsOpen: boolean;
+  notificationsOpen: boolean;
+  opsOpen: boolean;
+  activeOverlay: FocusOverlay | null;
+  recipePanelOpen: boolean;
+  selectedRecipeCategoryId: RecipeCategoryId | null;
+  selectedShopSection: ShopSection | null;
+  recipePage: number;
+};
+
+export type GarageAppState = GameState;

@@ -43,7 +43,9 @@ const styleValue = async (locator, property) =>
 
 const assertMobileChromeCollapsed = async (page, message) => {
   assert.equal(await styleValue(page.locator('.missions-control'), 'display'), 'none', `${message}: missions should not persist on mobile landscape`);
-  assert.equal(await styleValue(page.locator('.garage-pressure-strip'), 'display'), 'none', `${message}: pressure strip should not persist on mobile landscape`);
+  if ((await page.locator('.garage-pressure-strip').count()) > 0) {
+    assert.equal(await styleValue(page.locator('.garage-pressure-strip'), 'display'), 'none', `${message}: pressure strip should not persist on mobile landscape`);
+  }
   assert.equal(await page.locator('.event-ticker').count(), 0, `${message}: floor note ticker should stay collapsed`);
 };
 
@@ -82,6 +84,28 @@ const assertFinishedPallet = async (page, expectedLevel, message) => {
   );
 };
 
+const boxesOverlap = (a, b) =>
+  a && b && a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
+
+const assertMobileGarageFit = async (page, message) => {
+  const guidance = await page.locator('.first-loop-objective').boundingBox();
+  const hud = await page.locator('.top-hud').boundingBox();
+  assert.ok(guidance && hud, `${message}: guidance and HUD should be measurable`);
+  assert.ok(guidance.y > hud.y + hud.height + 8, `${message}: guidance should sit below the HUD lane`);
+
+  const equipmentBoxes = await page.locator('.equipment-object').evaluateAll((nodes) =>
+    nodes.map((node) => {
+      const box = node.getBoundingClientRect();
+      return { x: box.x, y: box.y, width: box.width, height: box.height };
+    })
+  );
+  assert.ok(equipmentBoxes.length >= 2, `${message}: starter equipment should be visible`);
+  equipmentBoxes.forEach((box, index) => {
+    assert.ok(box.width >= 32 && box.height >= 32, `${message}: equipment ${index + 1} should remain tappable`);
+    assert.equal(boxesOverlap(guidance, box), false, `${message}: guidance should not overlap equipment ${index + 1}`);
+  });
+};
+
 const waitForBatchStep = async (page, step) => {
   await page.waitForFunction(
     ([storageKey, expectedStep]) => {
@@ -110,6 +134,10 @@ try {
   assert.equal(await page.locator('.supply-hotspot').count(), 0, 'scene should not render floating inventory alert badges');
   await assertMobileChromeCollapsed(page, 'fresh game');
   assert.match(await visibleText(page), /Tap the stock pot to brew Garage Blonde/i, 'fresh game should show the garage-floor first-loop objective');
+  await assertMobileGarageFit(page, '844x390 fresh game');
+  await page.setViewportSize({ width: 667, height: 375 });
+  await assertMobileGarageFit(page, '667x375 fresh game');
+  await page.setViewportSize({ width: 844, height: 390 });
   await assertFinishedPallet(page, 'empty', 'fresh game');
   assert.equal(
     await page.locator('.equipment-object[data-equipment-id="fermenter"]').count(),
@@ -132,6 +160,7 @@ try {
   await page.locator('.recipe-category-card').filter({ hasText: 'Starter' }).click();
   assert.match(await page.locator('.recipe-card').filter({ hasText: 'Garage Blonde' }).innerText(), /\d+ batch(?:es)? in stock/i, 'recipe cards should show stock-supported brew count');
   assert.match(await page.locator('.recipe-card').filter({ hasText: 'Garage Blonde' }).innerText(), /Pilsner malt[\s\S]*Saaz hops[\s\S]*Ale yeast[\s\S]*Bottles and caps/i, 'recipe card should show the ingredient bill of materials');
+  assert.doesNotMatch(await page.locator('.recipe-station-panel').innerText(), /Order missing EUR 0/i, 'recipe panel should not show a zero-cost missing-order action');
   assert.equal(
     await page.locator('.recipe-station-panel').evaluate((node) => node.scrollHeight <= node.clientHeight + 1),
     true,
@@ -140,35 +169,51 @@ try {
   await page.locator('.station-panel-close').click();
   await page.locator('.hotspot-kettle').click();
   await page.getByRole('button', { name: /Brew Garage Blonde/ }).click();
+  await waitForBatchStep(page, 'brewing');
+  assert.match(await visibleText(page), /Tap the stock pot to finish the brew day/i, 'started brew should ask the player to wait through the brew day');
+  await page.locator('.hotspot-kettle').click();
+  await assert.doesNotReject(page.getByRole('button', { name: /Skip to transfer/ }).waitFor({ state: 'visible', timeout: 5000 }));
+  await page.getByRole('button', { name: /Skip to transfer/ }).click();
   await waitForBatchStep(page, 'awaiting-transfer');
-  assert.equal(await page.locator('.equipment-object-toggle.next-tap').count(), 1, 'the reserved fermenter should pulse when transfer is waiting');
+  assert.equal(await page.locator('.equipment-object-toggle.next-tap').count(), 1, 'the source station should pulse when transfer is waiting');
+  assert.equal(
+    await page.locator('.equipment-object-toggle.next-tap').evaluate((node) => getComputedStyle(node, '::after').content),
+    'none',
+    'equipment next-target feedback should pulse the image without drawing a large outline'
+  );
   await assertFinishedPallet(page, 'empty', 'brewing beer not yet sellable');
-  assert.match(await visibleText(page), /Tap the fermenter to transfer Garage Blonde/i);
+  assert.match(await visibleText(page), /Tap the stock pot to transfer Garage Blonde/i);
 
-  await page.locator('.hotspot-fermenter').click();
-  await assert.doesNotReject(page.getByRole('button', { name: /Transfer to fermenter/ }).waitFor({ state: 'visible', timeout: 5000 }), 'assigned fermenter should show Transfer to fermenter without opening Production');
+  await page.locator('.hotspot-kettle').click();
+  await assert.doesNotReject(page.getByRole('button', { name: /Transfer to fermenter/ }).waitFor({ state: 'visible', timeout: 5000 }), 'kettle should show Transfer to fermenter without opening Production');
   await page.getByRole('button', { name: /Transfer to fermenter/ }).click();
   await waitForBatchStep(page, 'fermenting');
   assert.equal(await page.locator('.equipment-object-toggle.active.next-tap').count(), 0, 'actively fermenting equipment should not keep a ready-to-click pulse');
+  await page.locator('.hotspot-fermenter').click();
+  await assert.doesNotReject(page.locator('.station-panel').filter({ hasText: /Fermenting/ }).waitFor({ state: 'visible', timeout: 5000 }));
   assert.doesNotMatch(await visibleText(page), /in-game minutes remaining/i, 'fermenter card should use readable time labels');
+  assert.doesNotMatch(await visibleText(page), /High risk\s*-\s*\d+\s*C/i, 'fermenter card should not imply normal ale temperature is high risk');
+  assert.doesNotMatch(await visibleText(page), /\d+\s*C\s*-\s*risk\s*\d+%/i, 'fermenter temperature note should not repeat an unexplained risk warning');
+  assert.match(await visibleText(page), /contamination \d+% \((?:low|moderate|watch|high)\)/i, 'fermenter card should explain that the risk label is contamination risk');
+  await page.locator('.station-panel-close').click();
 
-  for (let day = 0; day < 8; day += 1) {
-    const packagingWaiting = await page.evaluate(() => {
-      const state = JSON.parse(localStorage.getItem('brewery-sim-save-v4') ?? '{}').state;
-      return state.batches?.some?.((batch) => batch.step === 'awaiting-packaging') ?? false;
-    });
-    if (packagingWaiting) break;
-    await endDay(page);
-  }
+  await page.locator('.hotspot-fermenter').click();
+  await assert.doesNotReject(page.getByRole('button', { name: /Skip to packaging/ }).waitFor({ state: 'visible', timeout: 5000 }));
+  await page.getByRole('button', { name: /Skip to packaging/ }).click();
   await waitForBatchStep(page, 'awaiting-packaging');
   await assertFinishedPallet(page, 'empty', 'packaging waiting');
 
+  await page.locator('.hotspot-fermenter').click();
+  await assert.doesNotReject(page.getByRole('button', { name: /Transfer to bottling/ }).waitFor({ state: 'visible', timeout: 5000 }));
+  await page.getByRole('button', { name: /Transfer to bottling/ }).click();
+  await waitForBatchStep(page, 'packaging');
   await page.locator('.hotspot-bottler').click();
-  await page.getByRole('button', { name: /Package Garage Blonde/ }).click();
+  await assert.doesNotReject(page.getByRole('button', { name: /Skip to pallet/ }).waitFor({ state: 'visible', timeout: 5000 }));
+  await page.getByRole('button', { name: /Skip to pallet/ }).click();
   await page.locator('.scene-payoff-pallet').waitFor({ state: 'visible', timeout: 5000 });
   assert.match(
     await page.locator('.scene-payoff-pallet').innerText(),
-    /Pallet filled/i,
+    /Pallet filled[\s\S]*gameplay case/i,
     'packaging should show a floor payoff when cases move to the pallet'
   );
   await page.waitForFunction(
@@ -187,9 +232,16 @@ try {
   await assert.doesNotReject(page.getByRole('button', { name: /Friends and family/ }).waitFor({ state: 'visible', timeout: 5000 }));
   await page.getByRole('button', { name: /Friends and family/ }).click();
 
-  assert.match(await visibleText(page), /REP\s+[1-9]/);
+  assert.ok(
+    await page.evaluate((storageKey) => {
+      const raw = localStorage.getItem(storageKey);
+      if (!raw) return false;
+      return (JSON.parse(raw).state.reputation ?? 0) > 0;
+    }, 'brewery-sim-save-v4'),
+    'selling should increase reputation even when the compact HUD hides the rep label'
+  );
   await page.locator('.scene-payoff-sale').waitFor({ state: 'visible', timeout: 5000 });
-  assert.match(await page.locator('.scene-payoff-sale').innerText(), /Cases sold/i, 'selling should show a cash and rep floor payoff');
+  assert.match(await page.locator('.scene-payoff-sale').innerText(), /Cases sold[\s\S]*\+EUR\s+\d+[\s\S]*Rep \+\d+/i, 'selling should show a cash and rep floor payoff');
   await assertFinishedPallet(page, finishedPalletLevelName(await finishedCases(page)), 'post-sale inventory');
   if ((await finishedCases(page)) > 0) {
     await page.locator('.sell-point-object[data-sell-point-id="finished-beer-pallet"]').click();
@@ -299,10 +351,10 @@ try {
   );
   assert.equal(
     await page.locator('input[type="number"][data-layout-slot-id="milling"][data-layout-field="y"]').inputValue(),
-    '76.5',
-    'tier 2 preview should use the locked milling placement'
+    '76.8',
+    'tier 2 preview should use the tier-specific milling placement'
   );
-  assert.match(await page.locator('[data-layout-json]').inputValue(), /"milling": \{\n    "x": 18,\n    "y": 76\.5,\n    "width": 10/);
+  assert.match(await page.locator('[data-layout-json]').inputValue(), /"milling": \{\n    "x": 16\.2,\n    "y": 76\.8,\n    "width": 11\.2/);
   await page.locator('.equipment-object[data-equipment-id="mill"] .equipment-object-toggle').click();
   assert.equal(
     await page.locator('.station-panel').count(),

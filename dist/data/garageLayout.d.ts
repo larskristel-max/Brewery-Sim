@@ -23,6 +23,8 @@ export interface GarageEquipmentInteraction {
 export interface GarageEquipmentVisual {
     stationType: EquipmentStation;
     sprite: GarageEquipmentSpritePath | null;
+    assetStatus?: 'ready' | 'placeholder';
+    artTodo?: string;
     placement: GarageEquipmentPlacement;
     interaction: GarageEquipmentInteraction;
     tapPadding?: GarageEquipmentTapPadding;

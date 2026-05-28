@@ -1,0 +1,11 @@
+import type { Equipment, EquipmentId, EquipmentItemId, GameState, OwnedEquipment } from '../game/schema.js';
+import type { GarageEquipmentSlotId } from '../data/garageLayout.js';
+import type { GarageSceneEquipmentInstance, StoreStation } from './types.js';
+export declare const stationLabels: Record<StoreStation, string>;
+export declare const stationNouns: Record<StoreStation, string>;
+export declare const displayEquipmentName: (equipment: Equipment) => string;
+export declare const activeEquipmentItemId: (equipment: Equipment) => EquipmentItemId | null;
+export declare const stationSlotId: (equipmentId: EquipmentId) => GarageEquipmentSlotId;
+export declare const fermenterSlotId: (index: number) => GarageEquipmentSlotId;
+export declare const activeOwnedInstance: (state: GameState, equipmentId: EquipmentId) => OwnedEquipment | null;
+export declare const garageSceneEquipmentInstances: (state: GameState) => GarageSceneEquipmentInstance[];

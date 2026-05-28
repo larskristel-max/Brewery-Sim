@@ -273,6 +273,9 @@ export type GameAction = {
     type: 'start-batch';
     recipeId: string;
 } | {
+    type: 'wait-until-ready';
+    batchId?: string;
+} | {
     type: 'transfer-batch';
     batchId: string;
 } | {

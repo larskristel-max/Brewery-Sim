@@ -1,51 +1,23 @@
 import { equipmentByStation } from './data/equipment.js';
-import { garageEquipmentLayoutByItem, garageEquipmentLayoutBySlot, garageEquipmentLayoutByTier, garageSellPointLayout } from './data/garageLayout.js';
+import { garageEquipmentLayoutByItem, garageSellPointLayout } from './data/garageLayout.js';
 import { ingredients, getIngredient } from './data/ingredients.js';
 import { createInitialState } from './game/initialState.js';
-import { loadSavedGame, resetSavedGame, saveGameState, STORAGE_KEY } from './game/persistence.js';
-import { caseCountLabel, caseDefinitionExplanation, contaminationRiskTier, currentWorkflowStage, demandProgress, equipmentConditionLabel, equipmentConditionTier, firstLoopObjective, formatBatchRemainingTime, formatGameDate, formatClock, formatCurrency, garageSpaceAvailable, ingredientAmountLabel, litersToBottles, litersToCases, objectiveProgress, orderCost, recipeCanStart, recipeCategories, recipeIngredientCost, recipeMissingIngredients, recipeOrderItems, recipeStockBatchCount, saleCasesForChannel, salesChannels, saleValueForChannel, storageCapacityByArea, storageOverflowByArea, storageUseByArea, visibleRecipes } from './game/selectors.js';
+import { resetSavedGame, saveGameState } from './game/persistence.js';
+import { caseCountLabel, caseDefinitionExplanation, contaminationRiskTier, currentWorkflowStage, demandProgress, equipmentConditionLabel, equipmentConditionTier, firstLoopObjective, formatBatchRemainingTime, formatGameDate, formatClock, formatCurrency, garageSpaceAvailable, ingredientAmountLabel, objectiveProgress, recipeMissingIngredients, storageCapacityByArea, storageOverflowByArea, storageUseByArea, visibleRecipes } from './game/selectors.js';
 import { reduceGame } from './game/simulation.js';
+import { createBootState, createTier2PreviewState } from './ui/appBoot.js';
+import { createLayoutDebugModel, handleLayoutDebugInput, renderLayoutDebugPanel } from './ui/layoutDebug.js';
+import { renderRecipeSelectionPanel } from './ui/recipePanel.js';
+import { displayEquipmentName, garageSceneEquipmentInstances, stationLabels } from './ui/sceneEquipment.js';
+import { renderEquipmentActions, renderSalesOffers, renderStationPanel } from './ui/stationPanel.js';
 const root = document.querySelector('#root');
 if (!root) {
     throw new Error('Missing #root element');
 }
-const hasBrowserSave = () => {
-    try {
-        return typeof globalThis.localStorage !== 'undefined' && globalThis.localStorage.getItem(STORAGE_KEY) !== null;
-    }
-    catch {
-        return false;
-    }
-};
-const hadBrowserSave = hasBrowserSave();
-const urlParams = new URLSearchParams(globalThis.location.search);
-const layoutDebugEnabled = urlParams.get('layoutDebug') === '1';
-const tierPreview = layoutDebugEnabled ? urlParams.get('tierPreview') : null;
-const tier2PreviewEnabled = tierPreview === '2';
-const activeGarageLayoutTier = tier2PreviewEnabled ? 'tier2' : 'tier1';
-const createTier2PreviewState = () => {
-    let preview = createInitialState();
-    preview.cash = 5000;
-    preview.garageSpaceLimit = 48;
-    ['all-in-one-40l', 'grain-mill-tier2', 'stainless-conical-50l', 'stainless-conical-50l', 'stainless-conical-50l', 'semi-auto-filler'].forEach((equipmentItemId) => {
-        preview = reduceGame(preview, { type: 'buy-equipment', equipmentItemId });
-    });
-    preview.ownedEquipment = preview.ownedEquipment.filter((item) => item.itemId !== 'plastic-bucket');
-    preview.garageSpaceUsed = preview.ownedEquipment.reduce((total, item) => total + item.spaceUsed, 0);
-    preview.cash = 180;
-    preview.events = [
-        {
-            id: 'tier-2-preview',
-            minute: preview.minute,
-            message: 'Tier 2 layout preview loaded for visual placement. This debug state is not saved.'
-        },
-        ...preview.events
-    ];
-    preview.selectedEquipmentId = 'kettle';
-    return preview;
-};
-let state = tier2PreviewEnabled ? createTier2PreviewState() : loadSavedGame();
-let saveStatus = tier2PreviewEnabled ? 'Tier 2 layout preview - not saved' : hadBrowserSave ? 'Browser save loaded' : 'Autosave ready';
+const boot = createBootState();
+const { layoutDebugEnabled, tier2PreviewEnabled, activeGarageLayoutTier } = boot.config;
+let state = boot.state;
+let saveStatus = boot.saveStatus;
 let expandedTarget = null;
 let expandedEquipmentInstanceId = null;
 let missionsOpen = false;
@@ -68,107 +40,12 @@ try {
 catch {
     guidanceDismissed = false;
 }
-const garageLayoutDraft = Object.fromEntries(Object.entries(garageEquipmentLayoutByTier[activeGarageLayoutTier] ?? garageEquipmentLayoutBySlot).map(([slotId, placement]) => [
-    slotId,
-    structuredClone(placement)
-]));
-const garageSellPointLayoutDraft = Object.fromEntries(Object.entries(garageSellPointLayout).map(([sellPointId, visual]) => [sellPointId, structuredClone(visual.placement)]));
-const stationLabels = {
-    kettle: 'Brewhouse',
-    fermenter: 'Fermentation',
-    mill: 'Milling',
-    bottler: 'Packaging'
-};
-const stationNouns = {
-    kettle: 'brewhouse',
-    fermenter: 'fermenter',
-    mill: 'grain mill',
-    bottler: 'packaging station'
-};
-const garageLayoutJson = () => JSON.stringify({ ...garageLayoutDraft, ...garageSellPointLayoutDraft }, null, 2);
-const applySpritePlacement = (slotId) => {
-    const placement = garageLayoutDraft[slotId];
-    root.querySelectorAll(`[data-layout-slot-id="${slotId}"]`).forEach((object) => {
-        if (object.classList.contains('equipment-object')) {
-            object.style.left = `${placement.x}%`;
-            object.style.top = `${placement.y}%`;
-            object.style.width = `${placement.width}%`;
-            return;
-        }
-        object.style.setProperty('--x', `${placement.x}%`);
-        object.style.setProperty('--y', `${placement.y}%`);
-    });
-};
-const applySellPointPlacement = (sellPointId) => {
-    const placement = garageSellPointLayoutDraft[sellPointId];
-    const object = root.querySelector(`[data-sell-point-id="${sellPointId}"]`);
-    if (!object)
-        return;
-    object.style.left = `${placement.x}%`;
-    object.style.top = `${placement.y}%`;
-    object.style.width = `${placement.width}%`;
-};
-const updateLayoutDebugJson = () => {
-    const output = root.querySelector('[data-layout-json]');
-    if (output)
-        output.value = garageLayoutJson();
-};
-const activeEquipmentItemId = (equipment) => equipment.itemId ?? null;
-const stationSlotId = (equipmentId) => {
-    if (equipmentId === 'bottler')
-        return 'packaging';
-    if (equipmentId === 'mill')
-        return 'milling';
-    return 'brewhouse';
-};
-const fermenterSlotId = (index) => `fermenter-slot-${Math.min(index + 1, 5)}`;
-const activeOwnedInstance = (equipmentId) => {
-    const activeId = state.activeEquipment[equipmentId];
-    return state.ownedEquipment.find((item) => item.instanceId === activeId) ?? null;
-};
-const garageSceneEquipmentInstances = () => {
-    const stationInstances = ['kettle', 'mill', 'bottler']
-        .map((equipmentId) => {
-        const equipment = state.equipment[equipmentId];
-        const owned = activeOwnedInstance(equipmentId);
-        const itemId = activeEquipmentItemId(equipment);
-        if (!itemId || (equipmentId === 'mill' && !owned?.installed))
-            return null;
-        return {
-            equipmentId,
-            itemId,
-            instanceId: owned?.instanceId ?? `${equipmentId}-active`,
-            slotId: stationSlotId(equipmentId),
-            label: stationLabels[equipmentId],
-            name: displayEquipmentName(equipment),
-            condition: equipment.condition,
-            capacityLiters: equipment.capacityLiters,
-            spaceUsed: equipment.spaceUsed,
-            occupiedBatchId: owned?.occupiedBatchId
-        };
-    })
-        .filter(Boolean);
-    const fermenters = state.ownedEquipment
-        .filter((item) => item.equipmentId === 'fermenter' && item.installed)
-        .map((item, index) => ({
-        equipmentId: 'fermenter',
-        itemId: item.itemId,
-        instanceId: item.instanceId,
-        slotId: fermenterSlotId(index),
-        label: `Fermenter ${index + 1}`,
-        name: item.name,
-        condition: item.condition,
-        capacityLiters: item.capacityLiters,
-        spaceUsed: item.spaceUsed,
-        occupiedBatchId: item.occupiedBatchId
-    }));
-    return [stationInstances[0], stationInstances[1], ...fermenters, stationInstances[2]].filter((item) => Boolean(item));
-};
+const layoutDebugModel = createLayoutDebugModel(activeGarageLayoutTier, layoutDebugEnabled);
 const renderEquipmentObject = (equipment, content) => {
     const visual = garageEquipmentLayoutByItem[equipment.itemId];
     if (!visual.sprite)
         return '';
-    const placement = garageLayoutDraft[equipment.slotId];
+    const placement = layoutDebugModel.equipmentDraft[equipment.slotId];
     const tapPadding = visual.tapPadding ?? { x: 0, y: 0 };
     const priority = visual.interactionPriority ?? 0;
     return `
@@ -184,102 +61,6 @@ const renderEquipmentObject = (equipment, content) => {
     </article>
   `;
 };
-const renderLayoutDebugPanel = () => layoutDebugEnabled
-    ? `
-      <aside class="layout-debug-panel" aria-label="Equipment sprite layout debugger">
-        <div class="layout-debug-heading">
-          <strong>Layout debug</strong>
-          <span>Percent values inside .garage-scene</span>
-        </div>
-        <div class="layout-debug-controls">
-          ${garageSceneEquipmentInstances()
-        .map((equipment) => {
-        const placement = garageLayoutDraft[equipment.slotId];
-        const tapPadding = garageEquipmentLayoutByItem[equipment.itemId].tapPadding;
-        return `
-                <fieldset class="layout-debug-fieldset">
-                  <legend>${equipment.label} / ${equipment.itemId}</legend>
-                  ${['x', 'y', 'width']
-            .map((field) => `
-                        <label class="layout-debug-field-row">
-                          <span>${field}</span>
-                          <input
-                            class="layout-debug-number"
-                            type="number"
-                            min="0"
-                            max="100"
-                            step="0.1"
-                            value="${placement[field]}"
-                            data-layout-slot-id="${equipment.slotId}"
-                            data-layout-field="${field}"
-                            aria-label="${equipment.label} ${field} value"
-                          />
-                          <input
-                            class="layout-debug-slider"
-                            type="range"
-                            min="0"
-                            max="100"
-                            step="0.1"
-                            value="${placement[field]}"
-                            data-layout-slot-id="${equipment.slotId}"
-                            data-layout-field="${field}"
-                            aria-label="${equipment.label} ${field} slider"
-                          />
-                        </label>
-                      `)
-            .join('')}
-                  ${tapPadding ? `<small>Tap zone preview: +${tapPadding.x}% x, +${tapPadding.y}% y</small>` : ''}
-                </fieldset>
-              `;
-    })
-        .join('')}
-          ${Object.entries(garageSellPointLayoutDraft)
-        .map(([sellPointId, placement]) => {
-        const sellPointLabel = sellPointId === 'finished-beer-pallet' ? 'Finished beer pallet' : sellPointId;
-        return `
-                <fieldset class="layout-debug-fieldset">
-                  <legend>${sellPointLabel} / sell point</legend>
-                  ${['x', 'y', 'width']
-            .map((field) => `
-                        <label class="layout-debug-field-row">
-                          <span>${field}</span>
-                          <input
-                            class="layout-debug-number"
-                            type="number"
-                            min="0"
-                            max="100"
-                            step="0.1"
-                            value="${placement[field]}"
-                            data-sell-point-layout-id="${sellPointId}"
-                            data-sell-point-layout-field="${field}"
-                            aria-label="${sellPointLabel} ${field} value"
-                          />
-                          <input
-                            class="layout-debug-slider"
-                            type="range"
-                            min="0"
-                            max="100"
-                            step="0.1"
-                            value="${placement[field]}"
-                            data-sell-point-layout-id="${sellPointId}"
-                            data-sell-point-layout-field="${field}"
-                            aria-label="${sellPointLabel} ${field} slider"
-                          />
-                        </label>
-                      `)
-            .join('')}
-                  <small>Permanent sell target placement</small>
-                </fieldset>
-              `;
-    })
-        .join('')}
-        </div>
-        <label class="layout-debug-json-label" for="layout-debug-json">Copyable JSON</label>
-        <textarea id="layout-debug-json" data-layout-json readonly>${garageLayoutJson()}</textarea>
-      </aside>
-    `
-    : '';
-const displayEquipmentName = (equipment) => equipment.name;
 const equipmentCapacityLabel = (equipment) => {
     const liters = equipment.capacityLiters;
     if (equipment.id === 'mill')
@@ -339,18 +120,6 @@ const incomingForIngredient = (ingredientId) => state.pendingOrders.reduce((summ
         arrivalDay: summary.arrivalDay === null ? order.arrivalDay : Math.min(summary.arrivalDay, order.arrivalDay)
     };
 }, { amount: 0, arrivalDay: null });
-const missingOrderStatus = (missing) => {
-    if (missing.length === 0)
-        return { fullyIncoming: false, label: '', arrivalDay: null };
-    const arrivals = missing.map((item) => incomingForIngredient(item.ingredientId));
-    const fullyIncoming = missing.every((item, index) => arrivals[index].amount >= item.amount);
-    const earliest = arrivals.map((arrival) => arrival.arrivalDay).filter((day) => day !== null).sort((a, b) => a - b)[0] ?? null;
-    return {
-        fullyIncoming,
-        arrivalDay: earliest,
-        label: fullyIncoming && earliest ? `Already ordered. Arrives ${formatGameDate(earliest)}.` : earliest ? `Some supplies arrive ${formatGameDate(earliest)}.` : ''
-    };
-};
 const fermenterTemperatureHint = () => {
     const fermenting = state.batches.find((batch) => batch.step === 'fermenting');
     const recipe = fermenting ? visibleRecipes().find((item) => item.id === fermenting.recipeId) : null;
@@ -476,8 +245,6 @@ const batchRemainingLabel = (batch) => {
 };
 const brewingBatch = () => state.batches.find((batch) => batch.step === 'brewing');
 const awaitingTransferBatch = () => state.batches.find((batch) => batch.step === 'awaiting-transfer');
-const awaitingPackagingBatch = () => state.batches.find((batch) => batch.step === 'awaiting-packaging');
-const conditioningOrPackagingBatch = () => state.batches.find((batch) => batch.step === 'packaging' || batch.step === 'bottle-conditioning');
 const activeForEquipment = (equipmentId) => {
     const stepByEquipment = { kettle: 'brewing', fermenter: 'fermenting', bottler: 'packaging' };
     const step = stepByEquipment[equipmentId];
@@ -496,12 +263,12 @@ const isNextTapTarget = (target) => currentWorkflowStage(state).tapTarget === ta
 const riskLabel = (risk) => {
     const tier = contaminationRiskTier(risk);
     if (tier === 'low')
-        return 'Low risk';
+        return 'low';
     if (tier === 'elevated')
-        return 'Rising risk';
+        return 'moderate';
     if (tier === 'high')
-        return 'High risk';
-    return 'Severe risk';
+        return 'watch';
+    return 'high';
 };
 const equipmentMetaLine = (equipment) => `${equipmentCapacityLabel(equipment)} - ${equipment.spaceUsed || '?'} space`;
 const equipmentSceneStatus = (equipmentId) => {
@@ -515,7 +282,7 @@ const equipmentSceneStatus = (equipmentId) => {
         if (waitingTransfer) {
             return {
                 label: 'Ready to transfer',
-                detail: `${waitingTransfer.recipeName} - tap the fermenter`,
+                detail: `${waitingTransfer.recipeName} - send to fermenter`,
                 toneClass: 'risk-low'
             };
         }
@@ -546,7 +313,7 @@ const equipmentSceneStatus = (equipmentId) => {
             const tier = contaminationRiskTier(fermenting.contaminationRisk);
             return {
                 label: 'Fermenting',
-                detail: `${fermenting.recipeName} - ${state.fermenterTemperatureC} C - ${batchRemainingLabel(fermenting)}`,
+                detail: `${fermenting.recipeName} - contamination ${fermenting.contaminationRisk}% (${riskLabel(fermenting.contaminationRisk)}) - ${state.fermenterTemperatureC} C - ${batchRemainingLabel(fermenting)}`,
                 toneClass: `risk-${tier}`
             };
         }
@@ -622,16 +389,16 @@ const activeForEquipmentInstance = (equipment) => {
 };
 const isNextTapTargetForInstance = (equipment) => {
     if (equipment.equipmentId === 'kettle')
-        return isNextTapTarget('kettle') && state.batches.length === 0;
+        return isNextTapTarget('kettle') && (state.batches.length === 0 || state.batches.some((batch) => batch.step === 'brewing' || batch.step === 'awaiting-transfer'));
     if (equipment.equipmentId === 'bottler')
-        return isNextTapTarget('bottler') && state.batches.some((batch) => batch.step === 'awaiting-packaging');
+        return isNextTapTarget('bottler') && state.batches.some((batch) => batch.step === 'packaging' || batch.step === 'bottle-conditioning');
     if (equipment.equipmentId !== 'fermenter')
         return isNextTapTarget(equipment.equipmentId);
     if (!isNextTapTarget('fermenter'))
         return false;
-    const waitingTransfer = state.batches.find((batch) => batch.step === 'awaiting-transfer');
-    if (waitingTransfer)
-        return waitingTransfer.fermenterInstanceId === equipment.instanceId;
+    const packageBatch = state.batches.find((batch) => batch.step === 'awaiting-packaging');
+    if (packageBatch)
+        return packageBatch.fermenterInstanceId === equipment.instanceId;
     return false;
 };
 const equipmentInstanceStatus = (equipment) => {
@@ -642,8 +409,8 @@ const equipmentInstanceStatus = (equipment) => {
     const detailBase = `${equipment.capacityLiters} L capacity - ${equipment.spaceUsed || '?'} space`;
     if (batch?.step === 'awaiting-transfer') {
         return {
-            label: 'Transfer waiting',
-            detail: `${batch.recipeName} is reserved for this fermenter`,
+            label: 'Waiting for kettle',
+            detail: `${batch.recipeName} is still at the stock pot`,
             toneClass: 'risk-high'
         };
     }
@@ -651,7 +418,7 @@ const equipmentInstanceStatus = (equipment) => {
         const tier = contaminationRiskTier(batch.contaminationRisk);
         return {
             label: 'Fermenting',
-            detail: `${batch.recipeName} - ${riskLabel(batch.contaminationRisk)} - ${state.fermenterTemperatureC} C - ${batchRemainingLabel(batch)}`,
+            detail: `${batch.recipeName} - contamination ${batch.contaminationRisk}% (${riskLabel(batch.contaminationRisk)}) - ${state.fermenterTemperatureC} C - ${batchRemainingLabel(batch)}`,
             toneClass: `risk-${tier}`
         };
     }
@@ -675,6 +442,30 @@ const equipmentInstanceStatus = (equipment) => {
         toneClass: `condition-${conditionTier}`
     };
 };
+const renderRecipePanelContent = () => {
+    const result = renderRecipeSelectionPanel({
+        state,
+        selectedRecipeCategoryId,
+        recipePage,
+        recipeStartBlocker
+    });
+    recipePage = result.recipePage;
+    return result.html;
+};
+const stationPanelContext = () => ({
+    state,
+    recipePanelOpen,
+    selectedRecipeCategoryId,
+    expandedTarget,
+    expandedEquipmentInstanceId,
+    renderRecipeSelectionPanel: renderRecipePanelContent,
+    recipeStartBlocker,
+    fermenterTemperatureHint,
+    equipmentInstanceStatus,
+    batchForEquipmentInstance,
+    batchRemainingLabel,
+    stepLabel
+});
 const hotspotPosition = (equipmentId) => {
     if (equipmentId === 'fermenter' && state.equipment.fermenter.tier === 1)
         return { x: 56, y: 55 };
@@ -768,237 +559,6 @@ const renderNotificationControl = () => {
     </div>
   `;
 };
-const recipePageSize = 4;
-const brewStockLabel = (count) => `${count} batch${count === 1 ? '' : 'es'} in stock`;
-const renderRecipeIngredientRows = (recipe) => `
-  <div class="recipe-ingredient-list" aria-label="${recipe.name} ingredients">
-    ${recipe.ingredients
-    .map((item) => {
-    const ingredient = getIngredient(item.ingredientId);
-    const stock = state.inventory.ingredients[item.ingredientId]?.amount ?? 0;
-    const missing = Math.max(0, item.amount - stock);
-    const incoming = incomingForIngredient(item.ingredientId);
-    return `
-          <div class="${missing > 0 ? 'missing' : 'ready'}">
-            <span>${ingredient.name}</span>
-            <strong>${ingredientAmountLabel(item.ingredientId, item.amount)}</strong>
-            <small>${missing > 0 ? `Missing ${ingredientAmountLabel(item.ingredientId, missing)}` : `${ingredientAmountLabel(item.ingredientId, stock)} stocked`}${incoming.amount > 0 && incoming.arrivalDay ? ` - ${ingredientAmountLabel(item.ingredientId, incoming.amount)} incoming ${formatGameDate(incoming.arrivalDay)}` : ''}</small>
-          </div>
-        `;
-})
-    .join('')}
-  </div>
-`;
-const renderRecipeSelectionPanel = () => {
-    const allRecipes = visibleRecipes();
-    const firstSaleDone = state.demand.casesSold > 0 || state.salesToday > 0;
-    if (!selectedRecipeCategoryId) {
-        return `
-      <section class="station-panel-body recipe-style-list">
-        <p class="panel-note">${firstSaleDone ? 'Choose a beer family, then a recipe.' : 'Recommended first: Garage Blonde.'}</p>
-        <div class="compact-grid recipe-category-grid">${recipeCategories
-            .map((category) => {
-            const categoryRecipes = category.recipeIds.map((recipeId) => allRecipes.find((recipe) => recipe.id === recipeId)).filter(Boolean);
-            const bestStockCount = Math.max(0, ...categoryRecipes.map((recipe) => (recipe ? recipeStockBatchCount(state, recipe) : 0)));
-            const stockSummary = categoryRecipes
-                .map((recipe) => (recipe ? `${recipe.name.replace(/^Garage /, '')} x${recipeStockBatchCount(state, recipe)}` : ''))
-                .filter(Boolean)
-                .join(' - ');
-            const starterClass = category.id === 'starter' && !firstSaleDone ? 'recommended' : '';
-            return `<button class="recipe-category-card ${starterClass}" data-action="select-recipe-category" data-category-id="${category.id}" type="button"><span>${category.name}</span><em class="recipe-stock-badge">${bestStockCount > 0 ? `Stock: ${brewStockLabel(bestStockCount)}` : 'Stock: needs order'}</em><strong>${categoryRecipes.map((recipe) => recipe?.name).join(', ')}</strong><small class="recipe-stock-line">${stockSummary}</small><small>${category.recommendation ?? 'Check stock and risk before brewing'}</small></button>`;
-        })
-            .join('')}</div>
-      </section>
-    `;
-    }
-    const category = recipeCategories.find((item) => item.id === selectedRecipeCategoryId) ?? recipeCategories[0];
-    const filtered = category.recipeIds
-        .map((recipeId) => allRecipes.find((recipe) => recipe.id === recipeId))
-        .filter((recipe) => Boolean(recipe));
-    const pageCount = Math.max(1, Math.ceil(filtered.length / recipePageSize));
-    recipePage = Math.max(0, Math.min(recipePage, pageCount - 1));
-    const pageRecipes = filtered.slice(recipePage * recipePageSize, recipePage * recipePageSize + recipePageSize);
-    return `
-    <section class="station-panel-body recipe-panel-flow">
-      <div class="panel-meta-row"><button data-action="back-to-categories" type="button">Back</button><small>${category.name} - Page ${recipePage + 1} / ${pageCount}</small></div>
-      <div class="recipe-page-grid">${pageRecipes.map((recipe) => {
-        const missing = recipeMissingIngredients(state, recipe);
-        const incomingMissing = missingOrderStatus(missing);
-        const missingCost = orderCost(missing);
-        const extraCost = orderCost(recipeOrderItems(state, recipe, 'extra'));
-        const startBlocker = recipeStartBlocker(recipe);
-        const canStart = recipeCanStart(state, recipe) && startBlocker === '';
-        const batchLiters = Math.min(recipe.targetBatchLiters, state.equipment.kettle.capacityLiters, state.equipment.fermenter.capacityLiters);
-        const stockBatchCount = recipeStockBatchCount(state, recipe);
-        const expectedValue = formatCurrency(Math.round(litersToCases(batchLiters) * recipe.salePricePerCase * recipe.marketAppeal));
-        const estimatedArrivalDay = state.day + 3;
-        return `<article class="batch-card recipe-card compact-recipe-card"><div class="recipe-card-title"><strong>${recipe.name}</strong><em class="recipe-stock-badge">${brewStockLabel(stockBatchCount)}</em><span>${batchLiters} L - ${caseCountLabel(litersToCases(batchLiters))}</span></div>${renderRecipeIngredientRows(recipe)}<div class="recipe-decision-lines"><span>${canStart ? 'Can brew now' : startBlocker || 'Blocked'}</span><span>${expectedValue} expected value</span><span>${missing.length > 0 ? `${missing.length} missing item${missing.length === 1 ? '' : 's'}` : 'All recipe supplies stocked'}${incomingMissing.label ? ` - ${incomingMissing.label}` : ''}</span><span>${recipe.riskTags.slice(0, 2).join(', ') || 'Low risk'}</span></div><div class="hotspot-actions recipe-actions"><button data-action="start-batch" data-recipe-id="${recipe.id}" type="button" ${canStart ? '' : `disabled title="${startBlocker || 'Blocked'}"`}>${canStart ? 'Brew' : 'Blocked'}</button><button data-action="order-recipe" data-order-mode="missing" data-recipe-id="${recipe.id}" type="button" ${recipe.enabled && missing.length > 0 && !incomingMissing.fullyIncoming && state.cash >= missingCost ? '' : 'disabled'}>${incomingMissing.fullyIncoming ? 'Ordered' : `Order missing ${formatCurrency(missingCost)}`}<small>${missing.length === 0 ? 'Stock ready' : incomingMissing.fullyIncoming ? `Arrives ${formatGameDate(incomingMissing.arrivalDay ?? state.day)}` : state.cash < missingCost ? 'Need cash' : formatGameDate(estimatedArrivalDay)}</small></button><button data-action="order-recipe" data-order-mode="extra" data-recipe-id="${recipe.id}" type="button" ${recipe.enabled && state.cash >= extraCost ? '' : 'disabled'}>Order 1 batch ${formatCurrency(extraCost)}<small>${state.cash < extraCost ? 'Need cash' : `${recipe.name} x1 - ${formatGameDate(estimatedArrivalDay)}`}</small></button></div></article>`;
-        return `<article class="batch-card recipe-card compact-recipe-card"><div><strong>${recipe.name}</strong><span>${batchLiters} L · ${caseCountLabel(litersToCases(batchLiters))}</span></div><small>${missing.length > 0 ? `Missing stock · ${formatCurrency(missingCost)}` : 'Stock ready'}</small><div class="hotspot-actions"><button data-action="start-batch" data-recipe-id="${recipe.id}" type="button" ${canStart ? '' : `disabled title="${startBlocker || 'Blocked'}"`}>${canStart ? 'Brew' : 'Blocked'}</button><button data-action="order-recipe" data-order-mode="missing" data-recipe-id="${recipe.id}" type="button" ${missing.length > 0 ? '' : 'disabled'}>Order missing</button></div></article>`;
-    }).join('')}</div>
-      <div class="panel-meta-row page-controls"><button data-action="recipes-prev-page" type="button" ${recipePage === 0 ? 'disabled' : ''}>Previous</button><button data-action="recipes-next-page" type="button" ${recipePage >= pageCount - 1 ? 'disabled' : ''}>Next</button></div>
-    </section>
-  `;
-};
-const renderRecipeCards = () => visibleRecipes()
-    .map((recipe) => {
-    const missing = recipeMissingIngredients(state, recipe);
-    const incomingMissing = missingOrderStatus(missing);
-    const missingCost = orderCost(missing);
-    const extraCost = orderCost(recipeOrderItems(state, recipe, 'extra'));
-    const startBlocker = recipeStartBlocker(recipe);
-    const canStart = recipeCanStart(state, recipe) && startBlocker === '';
-    const reservation = fermenterReservation();
-    const batchLiters = Math.min(recipe.targetBatchLiters, state.equipment.kettle.capacityLiters, state.equipment.fermenter.capacityLiters);
-    const expectedBottles = litersToBottles(batchLiters);
-    const expectedCases = litersToCases(batchLiters);
-    const capStation = state.equipment.kettle.capacityLiters <= state.equipment.fermenter.capacityLiters ? stationNouns.kettle : stationNouns.fermenter;
-    const capacityText = state.equipment.kettle.capacityLiters === state.equipment.fermenter.capacityLiters
-        ? `${batchLiters} L garage batch ≈ ${expectedBottles} bottles / ${caseCountLabel(expectedCases)} with the current setup.`
-        : `${batchLiters} L batch capped by the ${capStation} ≈ ${expectedBottles} bottles / ${caseCountLabel(expectedCases)}.`;
-    const missingLabel = missing.map((item) => `${getIngredient(item.ingredientId).name} ${ingredientAmountLabel(item.ingredientId, item.amount)}`).join(', ');
-    const missingOrderBlocker = missing.length === 0 ? 'Nothing missing' : incomingMissing.fullyIncoming ? incomingMissing.label : `Need ${formatCurrency(missingCost)}`;
-    const extraOrderBlocker = `Need ${formatCurrency(extraCost)}`;
-    const estimatedArrivalDay = state.day + 3;
-    const estimatedDelivery = `Estimated delivery: ${formatGameDate(estimatedArrivalDay)}. Arrives in 3 days.`;
-    return `
-        <article class="batch-card recipe-card">
-          <div><strong>${recipe.name}</strong><span>${recipe.style} · ${formatCurrency(recipe.salePricePerCase)} per gameplay case</span></div>
-          <small>${recipe.challenge}</small>
-          <small>${caseDefinitionExplanation}</small>
-          <div class="capacity-note ${reservation.blocked ? 'blocked' : ''}">
-            <strong>${reservation.label}</strong>
-            <span>${capacityText} ${reservation.detail}</span>
-          </div>
-          <small>Uses stocked ingredients worth ${formatCurrency(recipeIngredientCost(recipe))} · no cash charged at brew start · market ${Math.round(recipe.marketAppeal * 100)}%</small>
-          ${missing.length > 0
-        ? `<small class="button-reason">Missing ${missingLabel}${incomingMissing.label ? ` - ${incomingMissing.label}` : ''}</small>`
-        : '<small>Ingredients ready.</small>'}
-          <div class="hotspot-actions">
-            <button data-action="start-batch" data-recipe-id="${recipe.id}" type="button" ${canStart ? '' : `disabled title="${startBlocker || 'Blocked'}"`}>${canStart ? 'Brew' : 'Blocked'}${!canStart && recipe.enabled ? `<small>${startBlocker}</small>` : ''}</button>
-            <button data-action="order-recipe" data-order-mode="missing" data-recipe-id="${recipe.id}" type="button" ${recipe.enabled && missing.length > 0 && !incomingMissing.fullyIncoming && state.cash >= missingCost ? `title="${estimatedDelivery}"` : `disabled title="${missingOrderBlocker}"`}>${incomingMissing.fullyIncoming ? 'Ordered' : `Order missing ${formatCurrency(missingCost)}`}${missing.length === 0 ? '<small>Stock ready</small>' : incomingMissing.fullyIncoming ? `<small>Arrives ${formatGameDate(incomingMissing.arrivalDay ?? state.day)}</small>` : state.cash < missingCost ? '<small>Not enough cash</small>' : `<small>Arrives ${formatGameDate(estimatedArrivalDay)}</small>`}</button>
-            <button data-action="order-recipe" data-order-mode="extra" data-recipe-id="${recipe.id}" type="button" ${recipe.enabled && state.cash >= extraCost ? `title="${estimatedDelivery}"` : `disabled title="${extraOrderBlocker}"`}>Order extra ${formatCurrency(extraCost)}${state.cash < extraCost ? '<small>Not enough cash</small>' : `<small>Arrives ${formatGameDate(estimatedArrivalDay)}</small>`}</button>
-          </div>
-        </article>
-      `;
-})
-    .join('');
-const renderEquipmentActions = (equipmentId, instance) => {
-    const cleanCost = 18;
-    const canClean = state.cash >= cleanCost;
-    if (equipmentId === 'kettle') {
-        const recipe = visibleRecipes().find((item) => item.id === 'garage-blonde');
-        const canBrew = recipe ? recipeCanStart(state, recipe) && recipeStartBlocker(recipe) === '' : false;
-        const blocker = recipe ? recipeStartBlocker(recipe) : 'Recipe unavailable';
-        const brewing = brewingBatch();
-        const waitingTransfer = awaitingTransferBatch();
-        if (waitingTransfer) {
-            return `
-        <div class="hotspot-actions">
-          <button type="button" disabled>Ready to transfer<small>Tap fermenter</small></button>
-          <button data-action="open-overlay" data-overlay="recipes" type="button">Other recipes</button>
-          <button data-action="clean-equipment" data-equipment-id="kettle" type="button" ${canClean ? '' : `disabled title="Need ${formatCurrency(cleanCost)}"`}>Clean${canClean ? '' : '<small>Need cash</small>'}</button>
-        </div>
-      `;
-        }
-        if (brewing) {
-            return `
-        <div class="hotspot-actions">
-          <button type="button" disabled>${brewing.recipeName}<small>${batchRemainingLabel(brewing)}</small></button>
-          <button data-action="open-overlay" data-overlay="recipes" type="button">Other recipes</button>
-          <button data-action="clean-equipment" data-equipment-id="kettle" type="button" ${canClean ? '' : `disabled title="Need ${formatCurrency(cleanCost)}"`}>Clean${canClean ? '' : '<small>Need cash</small>'}</button>
-        </div>
-      `;
-        }
-        return `
-      <div class="hotspot-actions">
-        <button data-action="start-batch" data-recipe-id="garage-blonde" type="button" ${canBrew ? '' : `disabled title="${blocker || 'Blocked'}"`}>Brew Garage Blonde${canBrew ? '<small>First batch</small>' : `<small>${blocker}</small>`}</button>
-        <button data-action="open-overlay" data-overlay="recipes" type="button">Other recipes</button>
-        <button data-action="clean-equipment" data-equipment-id="kettle" type="button" ${canClean ? '' : `disabled title="Need ${formatCurrency(cleanCost)}"`}>Clean${canClean ? '' : '<small>Need cash</small>'}</button>
-      </div>
-    `;
-    }
-    if (equipmentId === 'fermenter') {
-        const batch = instance ? batchForEquipmentInstance(instance) : state.batches.find((item) => item.step === 'fermenting' || item.step === 'awaiting-packaging');
-        const waitingTransfer = awaitingTransferBatch();
-        const canTransferHere = waitingTransfer && (!instance || waitingTransfer.fermenterInstanceId === instance.instanceId);
-        if ((!batch || batch.step === 'awaiting-transfer') && canTransferHere) {
-            return `
-        <div class="hotspot-actions">
-          <button data-action="transfer-batch" data-batch-id="${waitingTransfer.id}" type="button">Transfer to fermenter<small>${waitingTransfer.recipeName}</small></button>
-          <button data-action="set-fermenter-temperature" data-temperature="${state.fermenterTemperatureC - 1}" type="button">Cool<small>${state.fermenterTemperatureC - 1} C</small></button>
-          <button data-action="set-fermenter-temperature" data-temperature="${state.fermenterTemperatureC + 1}" type="button">Warm<small>${state.fermenterTemperatureC + 1} C</small></button>
-          <button data-action="clean-equipment" data-equipment-id="fermenter" type="button" ${canClean ? '' : `disabled title="Need ${formatCurrency(cleanCost)}"`}>Clean${canClean ? '' : '<small>Need cash</small>'}</button>
-        </div>
-      `;
-        }
-        if (batch?.step === 'fermenting') {
-            return `
-        <div class="hotspot-actions">
-          <button type="button" disabled>${batch.recipeName}<small>${batchRemainingLabel(batch)}</small></button>
-          <button data-action="set-fermenter-temperature" data-temperature="${state.fermenterTemperatureC - 1}" type="button">Cool<small>${state.fermenterTemperatureC - 1} C</small></button>
-          <button data-action="set-fermenter-temperature" data-temperature="${state.fermenterTemperatureC + 1}" type="button">Warm<small>${state.fermenterTemperatureC + 1} C</small></button>
-          <button data-action="clean-equipment" data-equipment-id="fermenter" type="button" ${canClean ? '' : `disabled title="Need ${formatCurrency(cleanCost)}"`}>Clean${canClean ? '' : '<small>Need cash</small>'}</button>
-          <div class="temperature-note"><strong>${state.fermenterTemperatureC} C · risk ${batch.contaminationRisk}%</strong><span>${fermenterTemperatureHint()}</span></div>
-        </div>
-      `;
-        }
-        if (batch?.step === 'awaiting-packaging') {
-            return `
-        <div class="hotspot-actions">
-          <button type="button" disabled>Ready to package<small>Tap bottling bench</small></button>
-          <button data-action="set-fermenter-temperature" data-temperature="${state.fermenterTemperatureC - 1}" type="button">Cool<small>${state.fermenterTemperatureC - 1} C</small></button>
-          <button data-action="set-fermenter-temperature" data-temperature="${state.fermenterTemperatureC + 1}" type="button">Warm<small>${state.fermenterTemperatureC + 1} C</small></button>
-          <button data-action="clean-equipment" data-equipment-id="fermenter" type="button" ${canClean ? '' : `disabled title="Need ${formatCurrency(cleanCost)}"`}>Clean${canClean ? '' : '<small>Need cash</small>'}</button>
-        </div>
-      `;
-        }
-        return `
-      <div class="hotspot-actions">
-        <button type="button" disabled>Empty fermenter<small>${state.fermenterTemperatureC} C</small></button>
-        <button data-action="set-fermenter-temperature" data-temperature="${state.fermenterTemperatureC - 1}" type="button">Cool<small>${state.fermenterTemperatureC - 1} C</small></button>
-        <button data-action="set-fermenter-temperature" data-temperature="${state.fermenterTemperatureC + 1}" type="button">Warm<small>${state.fermenterTemperatureC + 1} C</small></button>
-        <button data-action="clean-equipment" data-equipment-id="fermenter" type="button" ${canClean ? '' : `disabled title="Need ${formatCurrency(cleanCost)}"`}>Clean${canClean ? '' : '<small>Need cash</small>'}</button>
-      </div>
-    `;
-    }
-    if (equipmentId === 'mill') {
-        return `
-      <div class="hotspot-actions">
-        <button data-action="use-equipment" data-equipment-id="mill" type="button">Inspect<small>Prep flow</small></button>
-        <button data-action="clean-equipment" data-equipment-id="mill" type="button" ${canClean ? '' : `disabled title="Need ${formatCurrency(cleanCost)}"`}>Clean${canClean ? '' : '<small>Need cash</small>'}</button>
-        <button type="button" disabled title="Milling actions are planned for a future pass">Mill<small>Coming later</small></button>
-        <button data-action="open-overlay" data-overlay="upgrades" type="button">Store<small>Equipment</small></button>
-      </div>
-    `;
-    }
-    const readyBatch = awaitingPackagingBatch();
-    const packagingBatch = conditioningOrPackagingBatch();
-    if (readyBatch) {
-        return `
-      <div class="hotspot-actions">
-        <button data-action="start-packaging" data-batch-id="${readyBatch.id}" type="button">Package Garage Blonde<small>${caseCountLabel(readyBatch.casesExpected)}</small></button>
-        <div class="temperature-note"><strong>Gameplay case definition</strong><span>${caseDefinitionExplanation}</span></div>
-        <button data-action="clean-equipment" data-equipment-id="bottler" type="button" ${canClean ? '' : `disabled title="Need ${formatCurrency(cleanCost)}"`}>Clean${canClean ? '' : '<small>Need cash</small>'}</button>
-        <button data-action="open-overlay" data-overlay="production" type="button">Flow state<small>Fallback</small></button>
-      </div>
-    `;
-    }
-    if (packagingBatch) {
-        return `
-      <div class="hotspot-actions">
-        <button type="button" disabled>Packaging<small>${batchRemainingLabel(packagingBatch)}</small></button>
-        <button data-action="clean-equipment" data-equipment-id="bottler" type="button" ${canClean ? '' : `disabled title="Need ${formatCurrency(cleanCost)}"`}>Clean${canClean ? '' : '<small>Need cash</small>'}</button>
-      </div>
-    `;
-    }
-    return `
-    <div class="hotspot-actions">
-      <button type="button" disabled>Idle<small>No batch ready</small></button>
-      <button data-action="clean-equipment" data-equipment-id="bottler" type="button" ${canClean ? '' : `disabled title="Need ${formatCurrency(cleanCost)}"`}>Clean${canClean ? '' : '<small>Need cash</small>'}</button>
-      <button data-action="open-overlay" data-overlay="upgrades" type="button">Store<small>Equipment</small></button>
-    </div>
-  `;
-};
 const storageToneClass = (used, capacity, overflow) => {
     if (overflow > 0)
         return 'overflowing';
@@ -1062,6 +622,9 @@ const renderWorkshopHotspot = () => {
 };
 const renderGaragePressure = () => {
     const storageOverflow = Object.values(storageOverflowByArea(state)).reduce((total, amount) => total + amount, 0);
+    const firstSaleDone = state.demand.casesSold > 0 || state.salesToday > 0;
+    if (!firstSaleDone && storageOverflow === 0 && state.visibilityRisk < 18)
+        return '';
     const complianceTone = state.visibilityRisk >= 30 ? 'pressure-alert' : state.visibilityRisk >= 18 ? 'pressure-watch' : '';
     const householdTone = storageOverflow > 0 || state.pendingOrders.length > 1 ? 'pressure-watch' : '';
     return `
@@ -1081,74 +644,6 @@ const renderScenePayoff = () => scenePayoff
       </div>
     `
     : '';
-const salesOfferModels = () => [
-    { id: 'friends-family', risk: 'Very low visibility', invoice: 'No invoice' },
-    { id: 'private-event', risk: 'Medium visibility', invoice: 'Informal receipt' },
-    { id: 'local-bar', risk: 'High formal risk', invoice: state.canInvoice ? 'Invoice ready' : 'May ask for invoice' }
-];
-const renderSalesOffers = () => `
-  <div class="hotspot-actions sales-offers">
-    ${salesOfferModels()
-    .map((offer) => {
-    const channel = salesChannels[offer.id];
-    const cases = saleCasesForChannel(state, offer.id);
-    const payout = saleValueForChannel(state, offer.id);
-    const invoiceBlocked = (state.demand.invoiceRequired || (channel.formal && state.visibilityRisk >= channel.invoiceAfter)) && !state.canInvoice;
-    const disabled = cases <= 0 || invoiceBlocked;
-    return `<button data-action="sell-channel" data-channel-id="${offer.id}" data-cases="${cases}" type="button" ${disabled ? 'disabled' : ''}>
-          ${channel.name}<small>Selling ${caseCountLabel(cases)} / offer max ${caseCountLabel(channel.cases)} - ${formatCurrency(payout)} payout - ${offer.risk} - ${invoiceBlocked ? 'Invoice blocked' : offer.invoice}</small>
-        </button>`;
-})
-    .join('')}
-    <div class="temperature-note"><strong>Gameplay case definition</strong><span>${caseDefinitionExplanation}</span></div>
-  </div>
-`;
-const renderStationPanel = () => {
-    if (recipePanelOpen) {
-        return `
-      <div class="station-panel-layer">
-        <button class="station-panel-scrim" data-action="close-overlay" type="button" aria-label="Close station panel"></button>
-        <aside class="glass-panel station-panel recipe-station-panel" aria-label="Recipe station panel">
-          <button class="station-panel-close" data-action="close-overlay" type="button" aria-label="Close station panel"></button>
-          <header class="station-panel-header"><span class="eyebrow gold">Recipe / Brew</span><h2>${selectedRecipeCategoryId ? (recipeCategories.find((item) => item.id === selectedRecipeCategoryId)?.name ?? 'Choose recipe') : 'Choose style'}</h2><p>Choose a style, then brew.</p></header>
-          ${renderRecipeSelectionPanel()}
-        </aside>
-      </div>
-    `;
-    }
-    if (!expandedTarget)
-        return '';
-    if (expandedTarget === 'cases') {
-        return `
-      <div class="station-panel-layer">
-        <button class="station-panel-scrim" data-action="close-station-panel" type="button" aria-label="Close station panel"></button>
-        <aside class="glass-panel station-panel" aria-label="Station panel">
-          <button class="station-panel-close" data-action="close-station-panel" type="button" aria-label="Close station panel"></button>
-          <header class="station-panel-header"><span class="eyebrow gold">Pallet</span><h2>Finished beer pallet</h2><p>${caseCountLabel(state.inventory.cases)} ready</p></header>
-          <section class="station-panel-body"><p>${caseDefinitionExplanation}</p><p>${state.inventory.cases > 0 ? 'Select an offer to sell cases.' : 'Package beer to fill the pallet.'}</p></section>
-          ${renderSalesOffers()}
-        </aside>
-      </div>
-    `;
-    }
-    const equipment = garageSceneEquipmentInstances();
-    const selected = equipment.find((item) => item.instanceId === expandedEquipmentInstanceId && item.equipmentId === expandedTarget) ?? equipment.find((item) => item.equipmentId === expandedTarget);
-    if (!selected)
-        return '';
-    const status = equipmentInstanceStatus(selected);
-    const batch = batchForEquipmentInstance(selected);
-    return `
-    <div class="station-panel-layer">
-      <button class="station-panel-scrim" data-action="close-station-panel" type="button" aria-label="Close station panel"></button>
-      <aside class="glass-panel station-panel" aria-label="Station panel">
-        <button class="station-panel-close" data-action="close-station-panel" type="button" aria-label="Close station panel"></button>
-        <header class="station-panel-header"><span class="eyebrow gold">${selected.label}</span><h2>${selected.name}</h2><p>${status.label}</p></header>
-        <section class="station-panel-body"><p>${status.detail}</p>${batch ? `<p>Batch: ${batch.recipeName} · ${stepLabel(batch.step)} · ${batchRemainingLabel(batch)}</p>` : '<p>No active batch.</p>'}<p>Time: ${formatGameDate(state.day)} · ${formatClock(state.minute)}</p></section>
-        ${renderEquipmentActions(selected.equipmentId, selected)}
-      </aside>
-    </div>
-  `;
-};
 const getFinishedPalletLevel = (cases) => {
     if (cases <= 0)
         return 0;
@@ -1161,7 +656,7 @@ const getFinishedPalletLevel = (cases) => {
 const renderFinishedBeerPallet = () => {
     const sellPointId = 'finished-beer-pallet';
     const visual = garageSellPointLayout[sellPointId];
-    const placement = garageSellPointLayoutDraft[sellPointId];
+    const placement = layoutDebugModel.sellPointDraft[sellPointId];
     const palletLevel = getFinishedPalletLevel(state.inventory.cases);
     const src = visual.spriteByLevel[palletLevel];
     const tapPadding = visual.tapPadding ?? { x: 0, y: 0 };
@@ -1244,7 +739,8 @@ const renderGarage = () => {
     const position = brewerPosition();
     const visibility = sceneVisibility();
     const expandedClass = expandedTarget ? `has-expanded expanded-${expandedTarget}` : '';
-    const equipment = garageSceneEquipmentInstances()
+    const sceneEquipment = garageSceneEquipmentInstances(state);
+    const equipment = sceneEquipment
         .map((item) => {
         const visual = garageEquipmentLayoutByItem[item.itemId];
         const conditionTier = equipmentConditionTier(item.condition);
@@ -1260,7 +756,7 @@ const renderGarage = () => {
                 ? item.equipmentId === 'fermenter'
                 : false;
         if (!visual?.sprite) {
-            const pos = garageLayoutDraft[item.slotId] ?? hotspotPosition(item.equipmentId);
+            const pos = layoutDebugModel.equipmentDraft[item.slotId] ?? hotspotPosition(item.equipmentId);
             return `
           <article
             class="equipment-hotspot hotspot-${item.equipmentId} ${expanded ? 'expanded' : ''} ${contextual ? 'contextual' : ''} ${silent ? 'scene-silent' : ''} ${obstructed ? 'obstructed-by-card' : ''} condition-${conditionTier} ${status.toneClass} ${item.equipmentId === state.selectedEquipmentId ? 'selected' : ''} ${active ? 'active' : ''} ${nextTap ? 'next-tap' : ''}"
@@ -1276,7 +772,7 @@ const renderGarage = () => {
               <strong>${status.label}</strong>
               ${expanded ? `<small>${status.detail}</small>` : ''}
             </button>
-            ${expanded ? renderEquipmentActions(item.equipmentId) : ''}
+            ${expanded ? renderEquipmentActions(stationPanelContext(), item.equipmentId, item) : ''}
           </article>
         `;
         }
@@ -1309,10 +805,10 @@ const renderGarage = () => {
       ${visibility.showFloorNoteTicker ? renderEventTicker() : ''}
       ${equipment}
       ${renderFinishedBeerPallet()}
-      ${renderStationPanel()}
+      ${renderStationPanel(stationPanelContext())}
       <div class="brewer-avatar" style="left: ${position.left}; top: ${position.top}" aria-label="Brewer position"><span></span></div>
       ${renderOpsControl()}
-      ${renderLayoutDebugPanel()}
+      ${renderLayoutDebugPanel(layoutDebugModel, sceneEquipment)}
     </section>
   `;
 };
@@ -1338,7 +834,7 @@ const renderBatchBoard = () => {
         })
             .join('');
     const lotCards = state.finishedBeerLots.length > 0
-        ? `${state.finishedBeerLots.map((lot) => `<article class="batch-card"><div><strong>${lot.recipeName}</strong><span>${caseCountLabel(lot.cases)} - Q${lot.quality}</span></div><small>Market appeal ${Math.round(lot.marketAppeal * 100)}%</small></article>`).join('')}${renderSalesOffers()}`
+        ? `${state.finishedBeerLots.map((lot) => `<article class="batch-card"><div><strong>${lot.recipeName}</strong><span>${caseCountLabel(lot.cases)} - Q${lot.quality}</span></div><small>Market appeal ${Math.round(lot.marketAppeal * 100)}%</small></article>`).join('')}${renderSalesOffers(state)}`
         : '';
     return `
     <section class="overlay-section">
@@ -1573,43 +1069,7 @@ root.addEventListener('error', (event) => {
     }
 }, true);
 root.addEventListener('input', (event) => {
-    if (!layoutDebugEnabled)
-        return;
-    const sellPointInput = event.target.closest('[data-sell-point-layout-id][data-sell-point-layout-field]');
-    if (sellPointInput) {
-        const sellPointId = sellPointInput.dataset.sellPointLayoutId;
-        const field = sellPointInput.dataset.sellPointLayoutField;
-        const nextValue = sellPointInput.valueAsNumber;
-        if (!Number.isFinite(nextValue))
-            return;
-        const placementValue = Math.min(100, Math.max(0, nextValue));
-        const displayValue = String(placementValue);
-        garageSellPointLayoutDraft[sellPointId][field] = placementValue;
-        root.querySelectorAll(`[data-sell-point-layout-id="${sellPointId}"][data-sell-point-layout-field="${field}"]`).forEach((control) => {
-            if (control.value !== displayValue)
-                control.value = displayValue;
-        });
-        applySellPointPlacement(sellPointId);
-        updateLayoutDebugJson();
-        return;
-    }
-    const input = event.target.closest('[data-layout-slot-id][data-layout-field]');
-    if (!input)
-        return;
-    const slotId = input.dataset.layoutSlotId;
-    const field = input.dataset.layoutField;
-    const nextValue = input.valueAsNumber;
-    if (!Number.isFinite(nextValue))
-        return;
-    const placementValue = Math.min(100, Math.max(0, nextValue));
-    const displayValue = String(placementValue);
-    garageLayoutDraft[slotId][field] = placementValue;
-    root.querySelectorAll(`[data-layout-slot-id="${slotId}"][data-layout-field="${field}"]`).forEach((control) => {
-        if (control.value !== displayValue)
-            control.value = displayValue;
-    });
-    applySpritePlacement(slotId);
-    updateLayoutDebugJson();
+    handleLayoutDebugInput(root, layoutDebugModel, event);
 });
 root.addEventListener('click', (event) => {
     audioAllowed = true;
@@ -1795,6 +1255,12 @@ root.addEventListener('click', (event) => {
         expandedTarget = null;
         expandedEquipmentInstanceId = null;
         dispatch({ type: 'start-batch', recipeId: target.dataset.recipeId ?? 'garage-blonde' });
+        return;
+    }
+    if (action === 'wait-until-ready') {
+        expandedTarget = null;
+        expandedEquipmentInstanceId = null;
+        dispatch({ type: 'wait-until-ready', batchId: target.dataset.batchId });
         return;
     }
     if (action === 'order-recipe') {

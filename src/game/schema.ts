@@ -327,6 +327,7 @@ export type GameAction =
   | { type: 'select-equipment'; equipmentId: EquipmentId }
   | { type: 'use-equipment'; equipmentId: EquipmentId }
   | { type: 'start-batch'; recipeId: string }
+  | { type: 'wait-until-ready'; batchId?: string }
   | { type: 'transfer-batch'; batchId: string }
   | { type: 'start-packaging'; batchId: string }
   | { type: 'ready-batch'; batchId: string }

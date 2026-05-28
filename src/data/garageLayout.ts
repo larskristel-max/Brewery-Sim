@@ -30,6 +30,8 @@ export interface GarageEquipmentInteraction {
 export interface GarageEquipmentVisual {
   stationType: EquipmentStation;
   sprite: GarageEquipmentSpritePath | null;
+  assetStatus?: 'ready' | 'placeholder';
+  artTodo?: string;
   placement: GarageEquipmentPlacement;
   interaction: GarageEquipmentInteraction;
   tapPadding?: GarageEquipmentTapPadding;
@@ -49,6 +51,7 @@ export type GarageEquipmentSlotId =
   | 'milling'
   | 'packaging';
 
+// Runtime URLs resolve from the canonical public/assets tree in local dev and Pages.
 export const garageEquipmentAssetPath = (tier: GarageEquipmentTier, filename: string): GarageEquipmentSpritePath =>
   `assets/garage/equipment/${tier}/${filename}` as GarageEquipmentSpritePath;
 
@@ -71,14 +74,14 @@ const tier1GarageEquipmentLayout: GarageEquipmentSlotLayout = {
 };
 
 const tier2GarageEquipmentLayout: GarageEquipmentSlotLayout = {
-  brewhouse: { x: 24.6, y: 53.1, width: 17 },
-  'fermenter-slot-1': { x: 38.6, y: 45.2, width: 14.5 },
-  'fermenter-slot-2': { x: 49.4, y: 45.2, width: 14.5 },
-  'fermenter-slot-3': { x: 60.2, y: 45.2, width: 14.5 },
-  'fermenter-slot-4': { x: 50.5, y: 65, width: 12 },
-  'fermenter-slot-5': { x: 61.5, y: 65, width: 12 },
-  milling: { x: 18, y: 76.5, width: 10 },
-  packaging: { x: 74.5, y: 62.4, width: 13.1 }
+  brewhouse: { x: 23.2, y: 55.4, width: 20 },
+  'fermenter-slot-1': { x: 41.3, y: 47.4, width: 15.4 },
+  'fermenter-slot-2': { x: 52.9, y: 47.1, width: 15.4 },
+  'fermenter-slot-3': { x: 64.5, y: 47.4, width: 15.4 },
+  'fermenter-slot-4': { x: 51.5, y: 66.2, width: 13.2 },
+  'fermenter-slot-5': { x: 63.6, y: 66.2, width: 13.2 },
+  milling: { x: 16.2, y: 76.8, width: 11.2 },
+  packaging: { x: 77.1, y: 63.8, width: 14.8 }
 };
 
 export const garageEquipmentLayoutByTier: Record<GarageEquipmentLayoutTier, GarageEquipmentSlotLayout> = {
@@ -122,6 +125,8 @@ export const garageEquipmentLayoutByItem: Record<EquipmentItemId, GarageEquipmen
   'three-vessel-60l': {
     stationType: 'brewhouse',
     sprite: null,
+    assetStatus: 'placeholder',
+    artTodo: 'Needs tier 3 brewhouse sprite before this equipment appears as scene art.',
     placement: { x: 24, y: 69, width: 18 },
     interaction: { action: 'toggle-target', equipmentId: 'kettle' },
     tapPadding: defaultTapPadding,
@@ -130,6 +135,8 @@ export const garageEquipmentLayoutByItem: Record<EquipmentItemId, GarageEquipmen
   'nano-biab-150l': {
     stationType: 'brewhouse',
     sprite: null,
+    assetStatus: 'placeholder',
+    artTodo: 'Needs nano brewhouse sprite before this equipment appears as scene art.',
     placement: { x: 24, y: 69, width: 18 },
     interaction: { action: 'toggle-target', equipmentId: 'kettle' },
     tapPadding: defaultTapPadding,
@@ -154,6 +161,8 @@ export const garageEquipmentLayoutByItem: Record<EquipmentItemId, GarageEquipmen
   'unitank-150l': {
     stationType: 'fermentation',
     sprite: null,
+    assetStatus: 'placeholder',
+    artTodo: 'Needs unitank sprite before this equipment appears as scene art.',
     placement: { x: 52, y: 64, width: 14 },
     interaction: { action: 'toggle-target', equipmentId: 'fermenter' },
     tapPadding: defaultTapPadding,
@@ -186,6 +195,8 @@ export const garageEquipmentLayoutByItem: Record<EquipmentItemId, GarageEquipmen
   'small-can-seamer': {
     stationType: 'packaging',
     sprite: null,
+    assetStatus: 'placeholder',
+    artTodo: 'Needs can seamer sprite before this equipment appears as scene art.',
     placement: { x: 76, y: 70, width: 16 },
     interaction: { action: 'toggle-target', equipmentId: 'bottler' },
     tapPadding: defaultTapPadding,

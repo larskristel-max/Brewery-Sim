@@ -19,6 +19,7 @@ export declare const recipeCategories: RecipeCategory[];
 export declare const recipeCategoryFor: (recipeId: string) => RecipeCategory;
 export declare const formatClock: (minute: number) => string;
 export declare const formatCurrency: (amount: number) => string;
+export declare const durationLabel: (minutes: number) => string;
 export declare const formatGameDate: (day: number) => string;
 export declare const ingredientAmountLabel: (ingredientId: IngredientId, amount: number) => string;
 export declare const ingredientUnitCost: (ingredientId: IngredientId) => number;
@@ -71,6 +72,13 @@ export type WorkflowStage = {
 export declare const currentWorkflowStage: (state: GameState) => WorkflowStage;
 export declare const nextSuggestedAction: (state: GameState) => string;
 export declare const visibleRecipes: () => Recipe[];
+export declare const finishedBeerCaseCount: (state: GameState) => number;
 export declare const saleValue: (state: GameState, cases: number) => number;
+export declare const cleaningPlanForEquipment: (state: GameState, equipmentId: EquipmentId) => {
+    cost: number;
+    minutes: number;
+    energyCost: number;
+    duration: string;
+};
 export declare const saleCasesForChannel: (state: GameState, channelId: SalesChannelId, requestedCases?: number) => number;
 export declare const saleValueForChannel: (state: GameState, channelId: SalesChannelId, requestedCases?: number) => number;

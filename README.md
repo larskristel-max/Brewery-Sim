@@ -1,6 +1,6 @@
 # Brewery-Sim
 
-Brewery-Sim is a grounded, game-like brewery simulation about growing from a scrappy garage brewing setup into a fully industrial production brewery. It is inspired by the real Operon brewery operating system, but the current decision is to validate the gameplay loop first as a React, Vite, and TypeScript web/mobile prototype rather than starting in Unity or integrating with Operon immediately.
+Brewery-Sim is a grounded, game-like brewery simulation about growing from a scrappy garage brewing setup into a fully industrial production brewery. It is inspired by the real Operon brewery operating system, but the current decision is to validate the gameplay loop first as a dependency-light TypeScript web/mobile prototype rather than starting in Unity or integrating with Operon immediately.
 
 ## Player Fantasy
 
@@ -130,7 +130,7 @@ This kind of chain is valuable because it turns brewery reality into player-auth
 
 ### Recommendation
 
-Build the first version as a web app prototype using React, Vite, and TypeScript.
+Build the first version as a web app prototype using TypeScript, DOM/CSS scene rendering, and deterministic simulation tests.
 
 This is the right choice for the current stage because the main unknown is not rendering technology; it is whether the brewery gameplay loop is fun. A web prototype lets the team test the loop quickly, keep the simulation logic readable, and avoid investing in a full game-engine workflow before the core mechanics are proven. The first prototype should be a local-only, single-player garage brewery simulation with a game-like scene UI.
 
@@ -138,17 +138,17 @@ It should not feel like a production dashboard, ERP, brewery MES, or Operon admi
 
 ### Advantages
 
-- **Fast iteration:** React and Vite are well suited for quickly changing UI layouts, interaction flows, and game loop rules.
-- **Codex-friendly workflow:** TypeScript simulation logic, componentized UI, and testable state transitions are easy to inspect and modify.
+- **Fast iteration:** Plain TypeScript and CSS keep UI layouts, interaction flows, and game loop rules quick to change.
+- **Codex-friendly workflow:** TypeScript simulation logic, small UI modules, and testable state transitions are easy to inspect and modify.
 - **Lower learning curve:** The team can avoid Unity-specific scene, asset, build, and deployment overhead while evaluating the core idea.
 - **Future Operon compatibility:** A TypeScript domain model can later map to Supabase tables, Operon API resources, or shared business concepts.
 - **Easy playtesting:** A hosted web build can be shared with testers more easily than an early desktop or mobile game build.
 - **Mobile path remains open:** The UI can be designed with responsive/touch-friendly interactions from the beginning.
-- **Simulation-first architecture:** The brewing rules can live outside React components, making them portable to other presentation layers later.
+- **Simulation-first architecture:** The brewing rules live outside the presentation layer, making them portable to other UI or engine layers later.
 
 ### Risks
 
-- **Game feel risk:** A normal React app can easily become a dashboard unless the UI is intentionally scene-first and contextual.
+- **Game feel risk:** A normal web app can easily become a dashboard unless the UI is intentionally scene-first and contextual.
 - **Visual limitation risk:** DOM/CSS can support an early scene, but more advanced animation, pathfinding, or isometric rendering may later require Canvas, PixiJS, Phaser, or Unity.
 - **Over-modeling risk:** Brewing is complex; the prototype must resist becoming a complete brewery management simulator too early.
 - **State complexity risk:** Timers, production steps, inventory, and upgrades can become messy without a small simulation engine boundary.
@@ -185,82 +185,72 @@ This lightweight prototype has no runtime npm dependencies. TypeScript is instal
 
 ## Proposed repo and project structure
 
-Start with a single Vite app and keep the game simulation separate from React UI components.
+Keep the prototype as a small TypeScript web app and keep the game simulation separate from scene/UI modules.
 
 ```text
 Brewery-Sim/
   README.md
   package.json
   index.html
-  vite.config.ts
   tsconfig.json
   src/
-    main.tsx
-    App.tsx
+    main.ts
+    ui/
+      appBoot.ts
+      layoutDebug.ts
+      sceneEquipment.ts
+      types.ts
     styles/
       globals.css
       garage.css
     game/
       schema.ts
       initialState.ts
-      constants.ts
       selectors.ts
       simulation.ts
-      actions.ts
-      random.ts
       persistence.ts
     data/
       equipment.ts
+      garageLayout.ts
+      ingredients.ts
       recipes.ts
       upgrades.ts
-      salesChannels.ts
-    components/
-      layout/
-        GameShell.tsx
-        TopBar.tsx
-      scene/
-        GarageScene.tsx
-        EquipmentNode.tsx
-        BrewerAvatar.tsx
-      panels/
-        ActionPanel.tsx
-        BatchStatusPanel.tsx
-        UpgradeShop.tsx
-        InventoryPanel.tsx
-      feedback/
-        EventLog.tsx
-        Toast.tsx
-    hooks/
-      useGameLoop.ts
-      useGameState.ts
-    tests/
-      simulation.test.ts
-      actions.test.ts
-      persistence.test.ts
+    scripts/
+      run-tests.mjs
+      run-browser-regression.mjs
+      dev-server.mjs
+    public/
+      assets/
 ```
 
 ### Structure principles
 
 - `src/game` contains deterministic simulation logic and type definitions.
 - `src/data` contains tunable content such as starter gear, recipes, upgrades, and sales channels.
-- `src/components` contains scene and UI presentation only.
-- React components should dispatch game actions; they should not calculate brewing outcomes directly.
-- Local save persistence should be handled outside simulation rules, ideally through a small `src/game/persistence.ts` module.
+- `src/ui` contains app boot, scene equipment mapping, layout debug helpers, and UI-only types.
+- UI modules should dispatch game actions; they should not calculate brewing outcomes directly.
+- Local save persistence is handled outside simulation rules through `src/game/persistence.ts`.
+
+### Developer workflows
+
+- `npm run dev` builds the TypeScript files and serves the prototype locally.
+- `npm run test` runs the build and deterministic gameplay checks.
+- `npm run test:browser` runs the Playwright browser regression after browser binaries are installed with `npx playwright install`.
+- Add `?layoutDebug=1` to the local URL to tune garage object placement. Add `&tierPreview=2` to preview tier 2 equipment placement without saving that debug state.
+- Scene art is loaded from the canonical `public/assets` tree. Runtime URLs intentionally use `/assets/...` so the same paths work in local dev and GitHub Pages.
 
 ## Immediate next implementation task
 
-### Local save persistence
+### Foundation cleanup
 
-The next practical prototype task is local save persistence. Refreshing the page should not reset the brewery.
+The current practical prototype task is keeping the first playable loop easy to extend without turning the UI into a single controller file.
 
 Requirements:
 
-- Auto-save the full `GameState` after game state changes.
-- Restore the saved state on startup.
-- Keep the save local only through `localStorage`.
-- Add a clear reset/new game action.
-- Include a save `version` guard so incompatible future state can be ignored or migrated.
+- Keep deterministic tests in CI before deployment.
+- Keep `src/main.ts` focused on app composition while moving boot, layout debug, scene mapping, and future overlays into `src/ui`.
 - Keep persistence outside core simulation logic.
+- Keep the first five minutes centered on Mash -> Ferment -> Package -> Sell before expanding pressure systems.
 - Do not add accounts, cloud saves, Supabase, Operon integration, or backend infrastructure.
 
 ## First milestone implementation plan
@@ -271,7 +261,7 @@ Goal: prove that a simple brew, ferment, package, sell, upgrade loop is understa
 
 #### Step 1: Project foundation
 
-- Create a Vite React TypeScript app.
+- Create a small TypeScript web app.
 - Add a small CSS-driven garage scene.
 - Add a local game state provider or reducer.
 - Add unit tests for core simulation functions.
@@ -655,7 +645,7 @@ The first upgrade shop should be tiny and visual:
 - Add local save persistence now that the first loop exists.
 - Add Supabase only after local state has stabilized.
 - Add Operon integration only after the game has a reason to exchange real brewery data.
-- Consider Canvas, Phaser, PixiJS, or Unity only if the scene interaction needs exceed what React and CSS can support.
+- Consider Canvas, Phaser, PixiJS, or Unity only if the scene interaction needs exceed what DOM and CSS can support.
 
 ## Anti-Goals
 

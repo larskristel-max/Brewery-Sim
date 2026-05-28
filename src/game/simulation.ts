@@ -2,7 +2,7 @@ import { getIngredient } from '../data/ingredients.js';
 import { createOwnedEquipment, getEquipmentCatalogItem, topGarageTier } from '../data/equipment.js';
 import { getRecipe } from '../data/recipes.js';
 import type { Batch, BatchStep, EquipmentId, GameAction, GameState, IngredientId, LocalDemand, Recipe, RecipeIngredient, SalesChannelId, SupplyOrderItem, TimedBatchStep } from './schema.js';
-import { activeOwnedEquipment, availableFermenters, bottlesPerCase, caseCountLabel, equipmentConditionTier, garageSpaceAvailable, litersToCases, orderCost, recipeBatchCapacity, recipeMissingIngredients, recipeOrderItems, saleValue, salesChannels, storageOverflowByArea, totalStorageOverflow } from './selectors.js';
+import { activeOwnedEquipment, availableFermenters, bottlesPerCase, caseCountLabel, cleaningPlanForEquipment, durationLabel, equipmentConditionTier, finishedBeerCaseCount, garageSpaceAvailable, litersToCases, orderCost, recipeBatchCapacity, recipeMissingIngredients, recipeOrderItems, saleValue, salesChannels, storageOverflowByArea, totalStorageOverflow } from './selectors.js';
 
 const orderLeadDays = 3;
 const startOfDayMinute = 7 * 60;
@@ -297,7 +297,7 @@ const completeTimedStep = (state: GameState, batch: Batch, completedStep: TimedB
 };
 
 const advanceBatch = (state: GameState, batch: Batch, minutes: number): void => {
-  if (!isTimedStep(batch.step) || batch.step === 'brewing' || batch.step === 'packaging') return;
+  if (!isTimedStep(batch.step)) return;
   batch.stepProgress += (minutes / durationForStep(state, batch, batch.step)) * 100;
   if (batch.stepProgress >= 100) completeTimedStep(state, batch, batch.step);
 };
@@ -407,12 +407,6 @@ const startBatch = (next: GameState, recipeId: string): GameState => {
     faultEventsTriggered: []
   });
   addEvent(next, `${recipe.name} brew day started in ${brewhouse.name}: ${capacity.reason} Base fault risk ${risk}%.`);
-  const batch = next.batches.find((item) => item.id === batchId);
-  if (batch) {
-    batch.stepProgress = 100;
-    advanceGameTime(next, recipe.stepDurations.brewing, 45);
-    completeTimedStep(next, batch, 'brewing');
-  }
   return next;
 };
 
@@ -447,15 +441,38 @@ const packageAwaitingBatch = (next: GameState, batchId?: string): GameState => {
   const lostCases = Math.max(0, dirtyLoss + Math.round(batch.casesExpected * bottler.lossModifier));
   batch.casesExpected = Math.max(1, batch.casesExpected - lostCases);
   batch.step = 'packaging';
-  batch.stepProgress = 100;
+  batch.stepProgress = 0;
   const fermenter = next.ownedEquipment.find((item) => item.instanceId === batch.fermenterInstanceId);
   if (fermenter) delete fermenter.occupiedBatchId;
-  advanceGameTime(next, getRecipe(batch.recipeId).stepDurations.packaging, 24);
-  completeTimedStep(next, batch, 'packaging');
   if (lostCases > 0) {
-    addEvent(next, `Dirty bottling station lost ${caseCountLabel(lostCases)}. ${caseCountLabel(batch.casesExpected)} are ready on the pallet.`);
+    addEvent(next, `Dirty bottling station lost ${caseCountLabel(lostCases)}. ${caseCountLabel(batch.casesExpected)} should reach the pallet.`);
   } else {
-    addEvent(next, `${caseCountLabel(batch.casesExpected)} of ${batch.recipeName} bottled by hand and moved to the pallet.`);
+    addEvent(next, `${batch.recipeName} packaging started by hand. Wait for the bottling run to finish.`);
+  }
+  return next;
+};
+
+const waitUntilReady = (next: GameState, batchId?: string): GameState => {
+  const batch = next.batches.find((item) => isTimedStep(item.step) && (!batchId || item.id === batchId));
+  if (!batch || !isTimedStep(batch.step)) {
+    addEvent(next, 'Nothing is actively timed right now.');
+    return next;
+  }
+  const duration = durationForStep(next, batch, batch.step);
+  const remainingMinutes = Math.max(1, Math.ceil(duration * (1 - batch.stepProgress / 100)));
+  const energyCost =
+    batch.step === 'brewing'
+      ? Math.min(next.energy, Math.max(8, Math.ceil((remainingMinutes / duration) * 45)))
+      : batch.step === 'packaging'
+        ? Math.min(next.energy, Math.max(6, Math.ceil((remainingMinutes / duration) * 24)))
+        : 0;
+  const stepName = batch.step === 'brewing' ? 'brew day' : batch.step === 'fermenting' ? 'fermentation' : batch.step === 'packaging' ? 'packaging' : 'conditioning';
+  const startingStep = batch.step;
+  const startingFaultCount = batch.faultEventsTriggered.length;
+  addEvent(next, `Waited ${durationLabel(remainingMinutes)} for ${batch.recipeName} ${stepName}.`);
+  advanceGameTime(next, remainingMinutes, energyCost);
+  if (startingStep === 'fermenting' && (batch.step as BatchStep) === 'awaiting-packaging' && batch.faultEventsTriggered.length > startingFaultCount) {
+    addEvent(next, `Contamination or recipe fault checks affected ${batch.recipeName} during fermentation. Check the batch quality before packaging.`);
   }
   return next;
 };
@@ -504,7 +521,6 @@ const orderItems = (next: GameState, items: RecipeIngredient[], label: string): 
 };
 
 const sellCases = (next: GameState, requestedCases: number, channelOverride?: SalesChannelId): GameState => {
-  const lot = next.finishedBeerLots[0];
   const channel = salesChannels[channelOverride ?? next.demand.channelId];
   const invoiceRequired = next.demand.invoiceRequired || (channel.formal && next.visibilityRisk >= channel.invoiceAfter);
   if (invoiceRequired && !next.canInvoice) {
@@ -514,24 +530,36 @@ const sellCases = (next: GameState, requestedCases: number, channelOverride?: Sa
     return next;
   }
   const remainingDemand = channelOverride ? channel.cases : Math.max(0, next.demand.casesRequested - next.demand.casesSold);
-  const cases = Math.min(requestedCases, next.inventory.cases, lot?.cases ?? 0, remainingDemand || requestedCases);
-  if (cases <= 0 || !lot) {
+  const cases = Math.min(requestedCases, next.inventory.cases, finishedBeerCaseCount(next), remainingDemand || requestedCases);
+  if (cases <= 0) {
     addEvent(next, 'No sellable cases or open local demand right now.');
     return next;
   }
   const revenue = saleValue(next, cases);
-  lot.cases -= cases;
+  let casesToRemove = cases;
+  const soldLotNames = new Set<string>();
+  let marketAppealTotal = 0;
+  next.finishedBeerLots.forEach((lot) => {
+    if (casesToRemove <= 0) return;
+    const casesFromLot = Math.min(casesToRemove, lot.cases);
+    soldLotNames.add(lot.recipeName);
+    marketAppealTotal += casesFromLot * lot.marketAppeal;
+    lot.cases -= casesFromLot;
+    casesToRemove -= casesFromLot;
+  });
   next.finishedBeerLots = next.finishedBeerLots.filter((item) => item.cases > 0);
   next.inventory.cases -= cases;
   next.cash += revenue;
   next.demand.casesSold += cases;
   next.salesToday += cases;
-  next.visibilityRisk += Math.max(1, Math.round(cases * lot.marketAppeal * channel.risk));
+  const averageMarketAppeal = marketAppealTotal > 0 ? marketAppealTotal / cases : 1;
+  next.visibilityRisk += Math.max(1, Math.round(cases * averageMarketAppeal * channel.risk));
   next.complianceRisk += channel.formal ? Math.max(1, Math.round(cases / 2)) : cases >= 8 ? 2 : 0;
   next.householdPressure += cases >= 10 ? 2 : 1;
   const repGain = (activeOwnedEquipment(next, 'bottler').tier >= 2 ? 2 : 1) + (next.demand.casesSold >= next.demand.casesRequested ? next.demand.reputationReward : 0);
   next.reputation += repGain;
-  addEvent(next, `Sold ${caseCountLabel(cases)} of ${lot.recipeName} through ${channel.name} for EUR ${revenue}. Reputation +${repGain}.`);
+  const soldLabel = soldLotNames.size === 1 ? [...soldLotNames][0] : 'mixed garage beer';
+  addEvent(next, `Sold ${caseCountLabel(cases)} of ${soldLabel} through ${channel.name} for EUR ${revenue}. Reputation +${repGain}.`);
   if (next.visibilityRisk >= 20) addEvent(next, 'Garage visibility is high. Bars and restaurants may now ask for invoices, traceability, and legal release status.');
   if (next.complianceRisk >= 30) addEvent(next, 'Compliance pressure is severe: pause public sales, prepare paperwork, or risk blocked orders and fines.');
   return next;
@@ -573,6 +601,7 @@ export const reduceGame = (state: GameState, action: GameAction): GameState => {
   }
 
   if (action.type === 'start-batch') return startBatch(next, action.recipeId);
+  if (action.type === 'wait-until-ready') return waitUntilReady(next, action.batchId);
   if (action.type === 'transfer-batch') return transferAwaitingBatch(next, action.batchId);
   if (action.type === 'start-packaging') return packageAwaitingBatch(next, action.batchId);
   if (action.type === 'ready-batch') {
@@ -693,9 +722,7 @@ export const reduceGame = (state: GameState, action: GameAction): GameState => {
 
   if (action.type === 'clean-equipment') {
     const equipment = next.equipment[action.equipmentId];
-    const cost = 18;
-    const minutes = action.equipmentId === 'fermenter' ? (equipment.tier >= 2 ? 105 : 55) : action.equipmentId === 'bottler' ? 75 : 45;
-    const energyCost = action.equipmentId === 'bottler' ? 18 : action.equipmentId === 'fermenter' ? 22 : 16;
+    const { cost, minutes, energyCost, duration } = cleaningPlanForEquipment(next, action.equipmentId);
     if (next.energy < energyCost) {
       addEvent(next, 'Not enough energy to clean properly. End the day first.');
       return next;
@@ -710,7 +737,7 @@ export const reduceGame = (state: GameState, action: GameAction): GameState => {
     const owned = next.ownedEquipment.find((item) => item.instanceId === next.activeEquipment[action.equipmentId]);
     if (owned) owned.condition = equipment.condition;
     const equipmentName = equipment.id === 'bottler' ? 'Bottling station' : equipment.name;
-    addEvent(next, `${equipmentName} cleaned. Lower dirt means better quality and less contamination risk.`);
+    addEvent(next, `${equipmentName} cleaned in ${duration}. Lower dirt means better quality and less contamination risk.`);
     return next;
   }
 

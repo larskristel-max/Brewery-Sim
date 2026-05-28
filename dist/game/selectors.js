@@ -25,6 +25,16 @@ export const formatClock = (minute) => {
     return `${displayHours}:${minutes.toString().padStart(2, '0')} ${suffix}`;
 };
 export const formatCurrency = (amount) => `EUR ${amount}`;
+export const durationLabel = (minutes) => {
+    const rounded = Math.max(0, Math.round(minutes));
+    if (rounded < 60)
+        return `${rounded} min`;
+    const hours = Math.floor(rounded / 60);
+    const remainingMinutes = rounded % 60;
+    if (remainingMinutes === 0)
+        return `${hours} hr`;
+    return `${hours} hr ${remainingMinutes} min`;
+};
 export const formatGameDate = (day) => {
     const date = new Date(gameStartDateUtc + Math.max(0, day - 1) * 24 * 60 * 60 * 1000);
     return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(date);
@@ -208,14 +218,16 @@ export const firstLoopObjective = (state) => {
         return 'Start another batch when supplies arrive.';
     if (!blondeBatch)
         return 'Tap the stock pot to brew Garage Blonde.';
+    if (blondeBatch.step === 'brewing')
+        return 'Tap the stock pot to finish the brew day.';
     if (blondeBatch.step === 'awaiting-transfer')
-        return 'Tap the fermenter to transfer Garage Blonde.';
+        return 'Tap the stock pot to transfer Garage Blonde.';
     if (blondeBatch.step === 'fermenting')
-        return 'Wait for fermentation, then tap the fermenter.';
+        return 'Tap the fermenter to wait through fermentation.';
     if (blondeBatch.step === 'awaiting-packaging')
-        return 'Tap the bottling bench to package Garage Blonde.';
+        return 'Tap the fermenter to transfer Garage Blonde to bottling.';
     if (blondeBatch.step === 'packaging' || blondeBatch.step === 'bottle-conditioning')
-        return 'Tap the bottling bench to package Garage Blonde.';
+        return 'Tap the bottling bench to transfer cases to the pallet.';
     return 'Tap the stock pot to brew Garage Blonde.';
 };
 export const objectiveProgress = (state) => {
@@ -242,16 +254,16 @@ export const currentWorkflowStage = (state) => {
     if (transferBatch) {
         return {
             stage: 'Ferment',
-            tapTarget: 'fermenter',
-            instruction: `Tap Transfer to fermenter for ${transferBatch.recipeName}.`
+            tapTarget: 'kettle',
+            instruction: `Tap the stock pot to transfer ${transferBatch.recipeName} to the fermenter.`
         };
     }
     const packageBatch = state.batches.find((batch) => batch.step === 'awaiting-packaging');
     if (packageBatch) {
         return {
             stage: 'Package',
-            tapTarget: 'bottler',
-            instruction: `Tap Package to bottle ${packageBatch.recipeName}.`
+            tapTarget: 'fermenter',
+            instruction: `Tap the fermenter to transfer ${packageBatch.recipeName} to bottling.`
         };
     }
     if (state.inventory.cases > 0 && state.demand.casesSold < state.demand.casesRequested) {
@@ -273,14 +285,14 @@ export const currentWorkflowStage = (state) => {
         return {
             stage: 'Mash',
             tapTarget: 'kettle',
-            instruction: 'Brew day is underway.'
+            instruction: `Tap the stock pot to wait until ${activeBatch.recipeName} finishes brewing.`
         };
     }
     if (activeBatch.step === 'fermenting') {
         return {
             stage: 'Ferment',
             tapTarget: 'fermenter',
-            instruction: 'Fermentation is running. Tap the fermenter to check contamination risk.'
+            instruction: 'Fermentation is running. Tap the fermenter to wait until it is ready.'
         };
     }
     if (activeBatch.step === 'bottle-conditioning') {
@@ -293,7 +305,7 @@ export const currentWorkflowStage = (state) => {
     return {
         stage: 'Package',
         tapTarget: 'bottler',
-        instruction: 'Packaging is running. Watch the bottling station finish its stage.'
+        instruction: 'Packaging is running. Tap the bottling bench to wait until cases are ready.'
     };
 };
 export const nextSuggestedAction = (state) => {
@@ -303,17 +315,36 @@ export const nextSuggestedAction = (state) => {
     return currentWorkflowStage(state).instruction;
 };
 export const visibleRecipes = () => recipes;
+export const finishedBeerCaseCount = (state) => state.finishedBeerLots.reduce((total, lot) => total + lot.cases, 0);
 export const saleValue = (state, cases) => {
-    const lot = state.finishedBeerLots[0];
-    const recipe = getRecipe(lot?.recipeId ?? 'garage-blonde');
-    const qualityMultiplier = lot ? 0.75 + Math.max(35, lot.quality) / 200 : 1;
+    let remaining = Math.max(0, cases);
+    let value = 0;
     const reputationBonus = 1 + Math.min(state.reputation, 30) / 100;
-    return Math.round(cases * recipe.salePricePerCase * recipe.marketAppeal * qualityMultiplier * reputationBonus);
+    for (const lot of state.finishedBeerLots) {
+        if (remaining <= 0)
+            break;
+        const casesFromLot = Math.min(remaining, lot.cases);
+        const recipe = getRecipe(lot.recipeId);
+        const qualityMultiplier = 0.75 + Math.max(35, lot.quality) / 200;
+        value += casesFromLot * recipe.salePricePerCase * recipe.marketAppeal * qualityMultiplier * reputationBonus;
+        remaining -= casesFromLot;
+    }
+    return Math.round(value);
+};
+export const cleaningPlanForEquipment = (state, equipmentId) => {
+    const equipment = state.equipment[equipmentId];
+    const minutes = equipmentId === 'fermenter' ? (equipment.tier >= 2 ? 105 : 55) : equipmentId === 'bottler' ? 75 : 45;
+    const energyCost = equipmentId === 'bottler' ? 18 : equipmentId === 'fermenter' ? 22 : 16;
+    return {
+        cost: 18,
+        minutes,
+        energyCost,
+        duration: durationLabel(minutes)
+    };
 };
 export const saleCasesForChannel = (state, channelId, requestedCases = salesChannels[channelId].cases) => {
-    const lot = state.finishedBeerLots[0];
     const channel = salesChannels[channelId];
-    return Math.min(requestedCases, state.inventory.cases, lot?.cases ?? 0, channel.cases);
+    return Math.min(requestedCases, state.inventory.cases, finishedBeerCaseCount(state), channel.cases);
 };
 export const saleValueForChannel = (state, channelId, requestedCases = salesChannels[channelId].cases) => saleValue(state, saleCasesForChannel(state, channelId, requestedCases));
 //# sourceMappingURL=selectors.js.map

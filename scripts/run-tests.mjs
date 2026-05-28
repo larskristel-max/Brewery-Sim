@@ -16,6 +16,7 @@ import {
   equipmentConditionTier,
   orderCost,
   firstLoopObjective,
+  finishedBeerCaseCount,
   formatBatchRemainingTime,
   litersToBottles,
   litersToCases,
@@ -86,6 +87,8 @@ const brewThroughFermentation = (recipe, temperatureC) => {
   testState = reduceGame(testState, { type: 'set-fermenter-temperature', temperatureC });
   testState = reduceGame(testState, { type: 'start-batch', recipeId: recipe.id });
   const startingBatch = testState.batches[0];
+  assert.equal(testState.batches[0].step, 'brewing', `${recipe.name} should start with a timed brew day`);
+  testState = reduceGame(testState, { type: 'wait-until-ready', batchId: testState.batches[0].id });
   assert.equal(testState.batches[0].step, 'awaiting-transfer', `${recipe.name} should wait for manual transfer after brew day`);
   testState = reduceGame(testState, { type: 'transfer-batch', batchId: testState.batches[0].id });
   assert.equal(testState.batches[0].step, 'fermenting', `${recipe.name} should reach fermentation in the temperature test`);
@@ -104,6 +107,8 @@ const tickUntilStep = (inputState, step, maxSeconds = 120) => {
       testState = reduceGame(testState, { type: 'transfer-batch', batchId: testState.batches[0].id });
     } else if (testState.batches[0]?.step === 'awaiting-packaging' && step !== 'awaiting-packaging') {
       testState = reduceGame(testState, { type: 'start-packaging', batchId: testState.batches[0].id });
+    } else if (['brewing', 'fermenting', 'packaging', 'bottle-conditioning'].includes(testState.batches[0]?.step ?? '')) {
+      testState = reduceGame(testState, { type: 'wait-until-ready', batchId: testState.batches[0].id });
     } else {
       testState = reduceGame(testState, { type: 'end-day' });
     }
@@ -154,24 +159,32 @@ state = reduceGame(state, { type: 'start-batch', recipeId: 'garage-blonde' });
 assert.equal(state.batches.length, 1, 'starting a batch should create one active batch');
 assert.equal(state.inventory.ingredients['pilsner-malt'].amount, 5.8, 'starting a Blonde consumes named pilsner malt');
 assert.equal(state.inventory.ingredients.bottles.amount, 12, 'starting a Blonde consumes five 12 bottle cases from starter packaging stock');
+assert.equal(state.batches[0].step, 'brewing', 'brew day should be an explicit timed step before transfer');
+assert.equal(firstLoopObjective(state), 'Tap the stock pot to finish the brew day.', 'brewing objective should point at the kettle time skip');
+const brewStartMinute = state.minute;
+state = reduceGame(state, { type: 'wait-until-ready', batchId: state.batches[0].id });
 assert.equal(state.batches[0].step, 'awaiting-transfer', 'brew day should stop at manual transfer');
-assert.equal(currentWorkflowStage(state).tapTarget, 'fermenter', 'started batch should point at manual transfer');
-assert.equal(firstLoopObjective(state), 'Tap the fermenter to transfer Garage Blonde.', 'awaiting-transfer objective should point at the fermenter');
+assert.ok(state.minute > brewStartMinute, 'waiting through brew day should advance the clock');
+assert.equal(currentWorkflowStage(state).tapTarget, 'kettle', 'finished brew should point at the source kettle for manual transfer');
+assert.equal(firstLoopObjective(state), 'Tap the stock pot to transfer Garage Blonde.', 'awaiting-transfer objective should point at the stock pot');
 
 state = tickUntilStep(state, 'fermenting');
 assert.equal(state.batches[0].step, 'fermenting', 'batch should enter fermentation only after manual transfer');
 assert.equal(currentWorkflowStage(state).tapTarget, 'fermenter', 'fermenting stage should point at the fermenter');
-assert.equal(firstLoopObjective(state), 'Wait for fermentation, then tap the fermenter.', 'fermenting objective should point at waiting/fermenter inspection');
+assert.equal(firstLoopObjective(state), 'Tap the fermenter to wait through fermentation.', 'fermenting objective should point at the fermenter time skip');
 assert.doesNotMatch(formatBatchRemainingTime(state, state.batches[0], blonde), /in-game minutes/, 'remaining time should be player-readable');
 
 state = tickUntilStep(state, 'awaiting-packaging');
 assert.equal(state.batches[0].step, 'awaiting-packaging', 'batch should stop for manual packaging after fermentation');
-assert.equal(firstLoopObjective(state), 'Tap the bottling bench to package Garage Blonde.', 'awaiting-packaging objective should point at the bottling bench');
+assert.equal(currentWorkflowStage(state).tapTarget, 'fermenter', 'finished fermentation should point at the source fermenter for bottling transfer');
+assert.equal(firstLoopObjective(state), 'Tap the fermenter to transfer Garage Blonde to bottling.', 'awaiting-packaging objective should point at the fermenter');
 
 const packagingCashBefore = state.cash;
 const expectedCases = state.batches[0].casesExpected;
 state = reduceGame(state, { type: 'start-packaging', batchId: state.batches[0].id });
-assert.equal(state.batches.length, 0, 'packaging should immediately finish the first-loop batch');
+assert.equal(state.batches[0].step, 'packaging', 'packaging should become a timed bottling run');
+state = reduceGame(state, { type: 'wait-until-ready', batchId: state.batches[0].id });
+assert.equal(state.batches.length, 0, 'waiting through packaging should finish the first-loop batch');
 assert.equal(expectedCases, 5, 'first-loop 20 L Garage Blonde should expect five 12 bottle cases');
 assert.equal(state.inventory.cases, expectedCases, 'packaging should add the displayed expected cases to inventory');
 assert.equal(state.finishedBeerLots.length, 1, 'packaging should create a recipe-specific finished lot');
@@ -302,6 +315,41 @@ riskSale = reduceGame(riskSale, { type: 'sell-channel', channelId: 'local-bar', 
 assert.ok(riskSale.visibilityRisk >= 20, 'large bar sales should push visibility risk into invoice-warning territory');
 assert.match(eventMessages(riskSale), /invoice|traceability|visibility/i, 'high visibility sales should surface invoice risk before formal channels exist');
 
+let mixedLots = createInitialState();
+mixedLots.inventory.cases = 9;
+mixedLots.finishedBeerLots = [
+  {
+    id: 'mixed-blonde',
+    recipeId: 'garage-blonde',
+    recipeName: 'Garage Blonde',
+    sourceBatchId: 'mixed-blonde-batch',
+    volumeLiters: 20,
+    cases: 3,
+    quality: 70,
+    marketAppeal: 1,
+    packagingState: 'packaged',
+    saleState: 'available'
+  },
+  {
+    id: 'mixed-ipa',
+    recipeId: 'backyard-ipa',
+    recipeName: 'Backyard IPA',
+    sourceBatchId: 'mixed-ipa-batch',
+    volumeLiters: 22,
+    cases: 6,
+    quality: 74,
+    marketAppeal: 1.08,
+    packagingState: 'packaged',
+    saleState: 'available'
+  }
+];
+const mixedPayout = saleValueForChannel(mixedLots, 'friends-family', 6);
+mixedLots = reduceGame(mixedLots, { type: 'sell-channel', channelId: 'friends-family', cases: 6 });
+assert.equal(finishedBeerCaseCount(mixedLots), 5, 'selling across the pallet should consume cases across multiple finished lots');
+assert.equal(mixedLots.finishedBeerLots.length, 1, 'multi-lot sale should remove the depleted first finished lot');
+assert.equal(mixedLots.inventory.cases, 5, 'multi-lot sale should keep inventory case count aligned with finished lots');
+assert.equal(mixedLots.cash - 180, mixedPayout, 'multi-lot displayed payout should match reducer cash delta');
+
 let overflowState = createInitialState();
 overflowState.cash = 500;
 overflowState = reduceGame(overflowState, { type: 'order-ingredient', ingredientId: 'pilsner-malt', packs: 8 });
@@ -349,27 +397,30 @@ assert.equal(nextDay.day, 2, 'ending the day should roll over to a new game day'
 assert.equal(nextDay.demand.casesSold, 0, 'new day should reset demand fulfillment');
 
 const mainSource = await readFile(new URL('../src/main.ts', import.meta.url), 'utf8');
-assert.match(mainSource, /data-action=\"start-batch\"/, 'UI should render recipe brew buttons');
-assert.match(mainSource, /data-action=\"order-recipe\"/, 'UI should render recipe order buttons');
+const appBootSource = await readFile(new URL('../src/ui/appBoot.ts', import.meta.url), 'utf8');
+const recipePanelSource = await readFile(new URL('../src/ui/recipePanel.ts', import.meta.url), 'utf8');
+const stationPanelSource = await readFile(new URL('../src/ui/stationPanel.ts', import.meta.url), 'utf8');
+assert.match(`${recipePanelSource}\n${stationPanelSource}`, /data-action=\"start-batch\"/, 'UI should render recipe brew buttons');
+assert.match(recipePanelSource, /data-action=\"order-recipe\"/, 'UI should render recipe order buttons');
 assert.match(mainSource, /data-action=\"order-ingredient\"/, 'UI should allow proactive ingredient ordering');
 assert.match(mainSource, /Incoming orders/, 'UI should show pending deliveries');
 assert.match(mainSource, /Mash.*Ferment.*Package.*Sell/s, 'UI should show clear stage labels');
-assert.match(mainSource, /loadSavedGame/, 'UI should load browser-local saves on startup');
+assert.match(appBootSource, /loadSavedGame/, 'UI should load browser-local saves on startup');
 assert.match(mainSource, /saveGameState/, 'UI should save browser-local progress after actions and ticks');
 assert.match(mainSource, /New Game \/ Reset Save/, 'UI should expose a reset save button');
 assert.match(mainSource, /caseDefinitionExplanation/, 'UI should reuse the persistent gameplay case explanation');
-assert.match(mainSource, /caseCountLabel\(readyBatch\.casesExpected\)/, 'bottling bench should show case counts with the 12 bottle definition');
-assert.match(mainSource, /caseCountLabel\(state\.inventory\.cases\)/, 'pallet and inventory surfaces should show gameplay case counts with definition');
+assert.match(stationPanelSource, /caseCountLabel\(readyBatch\.casesExpected\)/, 'bottling bench should show case counts with the 12 bottle definition');
+assert.match(`${mainSource}\n${stationPanelSource}`, /caseCountLabel\(state\.inventory\.cases\)/, 'pallet and inventory surfaces should show gameplay case counts with definition');
 assert.match(mainSource, /caseCountLabel\(lot\.cases\)/, 'finished lot cards should show gameplay case counts with definition');
 
 assert.match(mainSource, /selectedRecipeCategoryId/, 'recipe flow should keep a category-selection state');
-assert.match(mainSource, /data-action="select-recipe-category"/, 'recipe panel should render category-selection actions');
-assert.match(mainSource, /recipeStockBatchCount/, 'recipe panel should show how many batches current stock supports');
+assert.match(recipePanelSource, /data-action="select-recipe-category"/, 'recipe panel should render category-selection actions');
+assert.match(recipePanelSource, /recipeStockBatchCount/, 'recipe panel should show how many batches current stock supports');
 assert.match(mainSource, /<svg class="shop-cart-icon"/, 'shop cart hotspot should render as a recognizable SVG cart icon');
 assert.match(mainSource, /select-shop-section/, 'shop cart should first ask whether to shop supplies or equipment');
 assert.doesNotMatch(mainSource, /\$\{renderSceneSupplyHotspots\(\)\}/, 'garage scene should not render floating inventory alert badges');
-assert.match(mainSource, /recipes-next-page/, 'recipe panel should expose pagination controls');
-assert.match(mainSource, /station-panel recipe-station-panel/, 'recipe selection should use the shared station-panel shell');
+assert.match(recipePanelSource, /recipes-next-page/, 'recipe panel should expose pagination controls');
+assert.match(stationPanelSource, /station-panel recipe-station-panel/, 'recipe selection should use the shared station-panel shell');
 
 const index = await readFile(new URL('../index.html', import.meta.url), 'utf8');
 const garageCss = await readFile(new URL('../src/styles/garage.css', import.meta.url), 'utf8');
