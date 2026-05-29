@@ -254,6 +254,33 @@ Realism traps:
 
 Professional harshness is allowed, but it must be earned by visible warning signs and player ambition.
 
+## Future AI / Cloudflare Guardrail
+
+Brewery Sim currently ships as a static GitHub Pages app and does not use Cloudflare Workers AI. If future work adds Cloudflare Workers, AI-assisted simulation, AI-generated customer text, or an Operon/Cloudflare bridge, do not use the Workers AI models Cloudflare flagged for May 30, 2026 deprecation.
+
+Avoid these deprecated model IDs:
+
+- `@cf/moonshotai/kimi-k2.5`
+- `@hf/meta-llama/meta-llama-3-8b-instruct`
+- `@cf/meta/llama-3-8b-instruct`
+- `@cf/meta/llama-3-8b-instruct-awq`
+- `@cf/meta/llama-3.1-8b-instruct`
+- `@cf/meta/llama-3.1-8b-instruct-awq`
+- `@cf/meta/llama-3.1-70b-instruct`
+- `@cf/meta/llama-2-7b-chat-int8`
+- `@cf/meta/llama-2-7b-chat-fp16`
+- `@cf/mistral/mistral-7b-instruct-v0.1`
+- `@hf/google/gemma-7b-it`
+- `@cf/google/gemma-3-12b-it`
+- `@hf/nousresearch/hermes-2-pro-mistral-7b`
+- `@cf/microsoft/phi-2`
+- `@cf/defog/sqlcoder-7b-2`
+- `@cf/unum/uform-gen2-qwen-500m`
+- `@cf/facebook/bart-large-cnn`
+- `@hf/mistral/mistral-7b-instruct-v0.2`
+
+Before adding any Workers AI model reference, check current Cloudflare docs/changelog and prefer actively supported tool-calling or multimodal models. Treat this as an infrastructure guardrail, not a gameplay direction.
+
 ## Emotional Targets
 
 The game must create:
