@@ -1,7 +1,7 @@
 import { ingredients } from '../data/ingredients.js';
 import { campaignMissionOrder, initialCampaignState } from './campaign.js';
 import { createInitialState } from './initialState.js';
-import type { Batch, CampaignState, Equipment, EquipmentId, FinishedBeerLot, GameState, IngredientId, IngredientStock, Inventory, InventoryMovement, LocalDemand, OwnedEquipment, StorageState, SupplyOrder, Upgrade, UpgradeId } from './schema.js';
+import type { Batch, BatchVerdict, CampaignState, Equipment, EquipmentId, FinishedBeerLot, GameState, IngredientId, IngredientStock, Inventory, InventoryMovement, LocalDemand, OwnedEquipment, StorageState, SupplyOrder, Upgrade, UpgradeId } from './schema.js';
 
 export const SAVE_VERSION = 6;
 export const STORAGE_KEY = 'brewery-sim-save-v6';
@@ -147,6 +147,17 @@ const isCampaignState = (value: unknown): value is CampaignState =>
 
 const isEventLogEntry = (value: unknown): boolean => isRecord(value) && hasString(value, 'id') && hasNumber(value, 'minute') && hasString(value, 'message');
 
+const legacyVerdict = (quality: number, recipeName: string): BatchVerdict => ({
+  qualityBand: quality >= 80 ? 'excellent' : quality >= 62 ? 'solid' : quality >= 45 ? 'flawed' : 'bad',
+  headline: `${recipeName} is packaged.`,
+  sensoryNotes: ['No detailed batch notes were recorded for this older lot.'],
+  likelyCauses: ['Produced before batch verdict tracking was added.'],
+  sellAdvice: quality >= 45 ? 'sell' : 'discount',
+  stabilityRisk: quality >= 62 ? 8 : 18,
+  presentationScore: 68,
+  legacyTags: quality >= 80 ? ['promising flagship'] : []
+});
+
 const isSavedGameState = (value: unknown): value is GameState => {
   if (!isRecord(value)) return false;
   return (
@@ -201,16 +212,46 @@ const parseSavedGame = (rawSave: string): GameState | null => {
       ...initialState.activeEquipment,
       ...savedState.activeEquipment
     },
+    batches: savedState.batches.map((batch) => ({
+      ...batch,
+      brewdayApproach: batch.brewdayApproach ?? 'standard',
+      brewdayNotes: batch.brewdayNotes ?? ['Standard brew day kept the recipe on its expected path.'],
+      substitutions: batch.substitutions ?? [],
+      fermentationReadiness: batch.fermentationReadiness ?? {
+        apparentProgress: batch.step === 'fermenting' ? Math.round(batch.stepProgress) : batch.step === 'awaiting-packaging' || batch.step === 'packaging' ? 100 : 0,
+        fgConfidence: batch.step === 'awaiting-packaging' || batch.step === 'packaging' ? 'stable' : 'unknown',
+        yeastCleanup: batch.step === 'awaiting-packaging' || batch.step === 'packaging' ? 'ready' : 'green',
+        temperatureStress: 0,
+        rushRisk: 0,
+        gravityChecked: false
+      },
+      conditioningState: batch.conditioningState ?? {
+        carbonationProgress: 0,
+        co2Integration: 'rough',
+        refermentationRisk: 0,
+        packagePressureRisk: 0
+      }
+    })),
     finishedBeerLots: savedState.finishedBeerLots.map((lot) => ({
       ...lot,
       sourceBatchId: hasString(lot as unknown as Record<string, unknown>, 'sourceBatchId') ? lot.sourceBatchId : lot.id.replace(/-lot$/, ''),
       volumeLiters: hasNumber(lot as unknown as Record<string, unknown>, 'volumeLiters') ? lot.volumeLiters : lot.cases * 7.92,
       packagingState: lot.packagingState ?? 'packaged',
-      saleState: lot.saleState ?? 'available'
+      saleState: lot.saleState ?? 'available',
+      verdict: lot.verdict ? { ...lot.verdict, presentationScore: lot.verdict.presentationScore ?? 68 } : legacyVerdict(lot.quality, lot.recipeName)
     })),
     inventoryMovements: Array.isArray(savedState.inventoryMovements) ? savedState.inventoryMovements : [],
     fermenterTemperatureC: clampFermenterTemperature(hasNumber(savedState, 'fermenterTemperatureC') ? savedState.fermenterTemperatureC : initialState.fermenterTemperatureC),
-    campaign: isCampaignState(savedState.campaign) ? savedState.campaign : initialCampaignState()
+    campaign: isCampaignState(savedState.campaign) ? savedState.campaign : initialCampaignState(),
+    customerMemory: savedState.customerMemory ?? initialState.customerMemory,
+    breweryIdentityTags: Array.isArray(savedState.breweryIdentityTags) ? savedState.breweryIdentityTags : initialState.breweryIdentityTags,
+    sanitationDebt: isRecord(savedState.sanitationDebt) ? { ...initialState.sanitationDebt, ...savedState.sanitationDebt } : initialState.sanitationDebt,
+    breweryHistory: Array.isArray(savedState.breweryHistory) ? savedState.breweryHistory : initialState.breweryHistory,
+    flagshipRecipeIds: Array.isArray(savedState.flagshipRecipeIds) ? savedState.flagshipRecipeIds : initialState.flagshipRecipeIds,
+    customerPromises: Array.isArray(savedState.customerPromises) ? savedState.customerPromises : initialState.customerPromises,
+    identityScores: isRecord(savedState.identityScores) ? { ...initialState.identityScores, ...savedState.identityScores } : initialState.identityScores,
+    breweryTier: typeof savedState.breweryTier === 'string' ? savedState.breweryTier : initialState.breweryTier,
+    awards: Array.isArray(savedState.awards) ? savedState.awards : initialState.awards
   };
 };
 

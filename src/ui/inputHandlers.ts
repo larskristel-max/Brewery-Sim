@@ -1,4 +1,4 @@
-import type { EquipmentId, EquipmentItemId, GameAction, GameState, IngredientId, RecipeCategoryId, SalesChannelId } from '../game/schema.js';
+import type { BrewdayApproach, BreweryPromiseId, EquipmentId, EquipmentItemId, GameAction, GameState, IngredientId, PackagingMode, RecipeCategoryId, SalesChannelId, TransferMode } from '../game/schema.js';
 import type { FocusOverlay, SceneTarget, ShopSection } from './types.js';
 
 type InputHandlerContext = {
@@ -29,6 +29,9 @@ type InputHandlerContext = {
   getRecipePage: () => number;
   setRecipePage: (page: number) => void;
 };
+
+type CrisisActionId = Extract<GameAction, { type: 'crisis-action' }>['actionId'];
+type RecoveryActionId = Extract<GameAction, { type: 'recovery-action' }>['actionId'];
 
 const resetRecipeSelection = (context: InputHandlerContext) => {
   context.setSelectedRecipeCategoryId(null);
@@ -262,13 +265,22 @@ export const installRootEventHandlers = (root: HTMLElement, context: InputHandle
       context.setRecipePanelOpen(false);
       context.setExpandedTarget('kettle');
       context.setExpandedEquipmentInstanceId(null);
-      context.dispatch({ type: 'start-batch', recipeId: target.dataset.recipeId ?? 'garage-blonde' });
+      context.dispatch({
+        type: 'start-batch',
+        recipeId: target.dataset.recipeId ?? 'garage-blonde',
+        brewdayApproach: (target.dataset.brewdayApproach as BrewdayApproach) ?? 'standard',
+        allowSubstitutions: target.dataset.allowSubstitutions === 'true'
+      });
       return;
     }
 
     if (action === 'wait-until-ready') {
       const batch = context.getState().batches.find((item) => item.id === (target.dataset.batchId ?? ''));
-      if (batch?.step === 'packaging' || batch?.step === 'bottle-conditioning') {
+      if (batch?.step === 'packaging') {
+        context.setExpandedTarget('bottler');
+        context.setExpandedEquipmentInstanceId(null);
+      }
+      if (batch?.step === 'bottle-conditioning') {
         context.setExpandedTarget('cases');
         context.setExpandedEquipmentInstanceId(null);
       }
@@ -291,14 +303,33 @@ export const installRootEventHandlers = (root: HTMLElement, context: InputHandle
       const batch = context.getState().batches.find((item) => item.id === (target.dataset.batchId ?? ''));
       context.setExpandedTarget('fermenter');
       context.setExpandedEquipmentInstanceId(batch?.fermenterInstanceId ?? null);
-      context.dispatch({ type: 'transfer-batch', batchId: target.dataset.batchId ?? '' });
+      context.dispatch({ type: 'transfer-batch', batchId: target.dataset.batchId ?? '', transferMode: (target.dataset.transferMode as TransferMode) ?? 'careful' });
+      return;
+    }
+
+    if (action === 'check-gravity') {
+      context.setExpandedTarget('fermenter');
+      context.dispatch({ type: 'check-gravity', batchId: target.dataset.batchId ?? '' });
+      return;
+    }
+
+    if (action === 'package-early') {
+      context.setExpandedTarget('fermenter');
+      context.dispatch({ type: 'package-early', batchId: target.dataset.batchId ?? '' });
       return;
     }
 
     if (action === 'start-packaging') {
       context.setExpandedTarget('bottler');
       context.setExpandedEquipmentInstanceId(null);
-      context.dispatch({ type: 'start-packaging', batchId: target.dataset.batchId ?? '' });
+      context.dispatch({ type: 'start-packaging', batchId: target.dataset.batchId ?? '', packagingMode: (target.dataset.packagingMode as PackagingMode) ?? 'standard' });
+      return;
+    }
+
+    if (action === 'ready-batch') {
+      context.setExpandedTarget('cases');
+      context.setExpandedEquipmentInstanceId(null);
+      context.dispatch({ type: 'ready-batch', batchId: target.dataset.batchId ?? '' });
       return;
     }
 
@@ -314,6 +345,30 @@ export const installRootEventHandlers = (root: HTMLElement, context: InputHandle
       context.setOpsOpen(false);
       clearExpandedStation(context);
       context.dispatch({ type: 'sell-channel', channelId: target.dataset.channelId as SalesChannelId, cases: Number(target.dataset.cases ?? 0) });
+      return;
+    }
+
+    if (action === 'choose-promise') {
+      context.setMissionsOpen(false);
+      context.dispatch({ type: 'choose-promise', promiseId: target.dataset.promiseId as BreweryPromiseId });
+      return;
+    }
+
+    if (action === 'crisis-action') {
+      context.setOpsOpen(false);
+      context.dispatch({ type: 'crisis-action', actionId: target.dataset.crisisActionId as CrisisActionId });
+      return;
+    }
+
+    if (action === 'recovery-action') {
+      context.setOpsOpen(false);
+      context.dispatch({ type: 'recovery-action', actionId: target.dataset.recoveryActionId as RecoveryActionId, lotId: target.dataset.recoveryLotId });
+      return;
+    }
+
+    if (action === 'competition-entry') {
+      context.setOpsOpen(false);
+      context.dispatch({ type: 'competition-entry', lotId: target.dataset.lotId });
       return;
     }
 

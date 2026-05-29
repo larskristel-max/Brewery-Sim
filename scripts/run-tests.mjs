@@ -4,7 +4,8 @@ import { equipmentCatalog } from '../dist/data/equipment.js';
 import { ingredients } from '../dist/data/ingredients.js';
 import { garageEquipmentLayoutByTier } from '../dist/data/garageLayout.js';
 import { recipes } from '../dist/data/recipes.js';
-import { campaignNextStep, campaignView } from '../dist/game/campaign.js';
+import { brewingRiskRuleSet, brewdayRiskForRecipe, packagingRiskForMode, transferRiskForRecipe } from '../dist/data/brewingRiskRules.js';
+import { campaignMissionOrder, campaignNextStep, campaignView } from '../dist/game/campaign.js';
 import { createInitialState } from '../dist/game/initialState.js';
 import { loadSavedGame, resetSavedGame, saveGameState, STORAGE_KEY } from '../dist/game/persistence.js';
 import { reduceGame } from '../dist/game/simulation.js';
@@ -57,9 +58,22 @@ assert.match(recipeMissingOrderSummary(restockPreview, blonde), /Need 48 bottles
 assert.equal(recipeSupplyBreakdown(restockPreview, blonde).find((item) => item.ingredientId === 'bottles')?.packsToOrder, 4, 'supply breakdown should expose rounded packs to order');
 assert.ok(recipes.some((recipe) => recipe.id === 'custom-recipe' && recipe.enabled === false), 'custom recipe should exist as disabled placeholder');
 assert.ok(ingredients.some((ingredient) => ingredient.id === 'pilsner-malt'), 'ingredient catalog should include named malt');
+assert.equal(brewingRiskRuleSet.validationStatus, 'brewer-approved', 'brewing risk rules should reflect brewer approval for the current prototype pass');
+assert.match(brewingRiskRuleSet.validationSource, /brewing-risk-validation\.md/, 'brewing risk rules should point to the brewer validation sheet');
+assert.equal(brewingRiskRuleSet.brewdayApproach.fastStyleRules.length >= 4, true, 'brewing risk data should include starter style-specific fast brew rules');
+assert.equal(brewdayRiskForRecipe(blonde, 'fast').validationStatus, 'brewer-approved', 'fast Blonde rule should expose brewer-approved validation status');
+assert.match(brewdayRiskForRecipe(pils, 'fast').validationQuestion, /DMS|garage Pils/i, 'fast Pils rule should expose the DMS validation question');
+assert.match(transferRiskForRecipe(ipa, 'rough').validationQuestion, /IPA oxygen|aroma/i, 'rough IPA transfer rule should expose the brewer validation question');
+assert.match(packagingRiskForMode('rush').validationQuestion, /rushed-packaging/i, 'rushed packaging rule should expose the brewer validation question');
 assert.equal(state.fermenterTemperatureC, 18, 'new games should track fermenter temperature');
 assert.equal(state.campaign.missionId, 'barbecue-text', 'new games should start on the barbecue storyline mission');
 assert.equal(campaignView(state).title, 'The Barbecue Text', 'campaign view should expose the first storyline card');
+assert.ok(campaignMissionOrder.includes('first-festival'), 'campaign should include the first festival mission');
+assert.equal(state.customerPromises.length, 1, 'new games should start with Samira promise in the promise ledger');
+assert.equal(state.customerPromises[0].status, 'open', 'Samira promise should start open');
+assert.equal(state.identityScores['event-supplier'], 0, 'event supplier identity should start at zero');
+assert.equal(state.breweryTier, 'garage', 'new breweries should start in the garage tier');
+assert.deepEqual(state.awards, [], 'new breweries should not start with awards');
 assert.deepEqual(
   garageEquipmentLayoutByTier.tier1,
   {
@@ -91,6 +105,43 @@ const stockRecipeIngredients = (targetState, recipe) => {
 };
 
 const eventMessages = (targetState) => targetState.events.map((event) => event.message).join('\n');
+
+const makeFinishedLot = ({ id, qualityBand, sellAdvice = 'sell', stabilityRisk = 8, quality = 86, presentationScore = 82, sensoryNote = 'Clean enough to represent the brewery.' }) => ({
+  id,
+  sourceBatchId: `${id}-batch`,
+  recipeId: 'garage-blonde',
+  recipeName: 'Garage Blonde',
+  cases: 4,
+  volumeLiters: 16,
+  quality,
+  marketAppeal: 1,
+  packagingState: 'packaged',
+  saleState: 'available',
+  verdict: {
+    qualityBand,
+    headline:
+      qualityBand === 'excellent'
+        ? 'Garage Blonde landed clean and memorable.'
+        : qualityBand === 'flawed'
+          ? 'Garage Blonde is sellable with a warning.'
+          : qualityBand === 'unsafe'
+            ? 'Do not sell. Package stability risk is severe.'
+            : 'Garage Blonde is solid and sellable.',
+    sensoryNotes: [sensoryNote],
+    likelyCauses: ['Test fixture verdict.'],
+    sellAdvice,
+    stabilityRisk,
+    presentationScore,
+    legacyTags: qualityBand === 'excellent' ? ['flagship candidate'] : []
+  }
+});
+
+const stateWithFinishedLot = (lot) => {
+  const testState = createInitialState();
+  testState.finishedBeerLots = [lot];
+  testState.inventory.cases = lot.cases;
+  return testState;
+};
 
 const brewThroughFermentation = (recipe, temperatureC) => {
   let testState = createInitialState();
@@ -199,13 +250,102 @@ const packagingCashBefore = state.cash;
 const expectedCases = state.batches[0].casesExpected;
 state = reduceGame(state, { type: 'start-packaging', batchId: state.batches[0].id });
 assert.equal(state.batches[0].step, 'packaging', 'packaging should become a timed bottling run');
-state = reduceGame(state, { type: 'wait-until-ready', batchId: state.batches[0].id });
-assert.equal(state.batches.length, 0, 'waiting through packaging should finish the first-loop batch');
+const conditioningStart = reduceGame(state, { type: 'wait-until-ready', batchId: state.batches[0].id });
+assert.equal(conditioningStart.batches[0].step, 'bottle-conditioning', 'waiting through packaging should move beer into conditioning instead of straight to inventory');
+assert.equal(conditioningStart.inventory.cases, 0, 'packaged beer should not hit the pallet before release or conditioning completion');
+assert.equal(conditioningStart.finishedBeerLots.length, 0, 'packaging alone should not create a finished lot');
+const earlyRelease = reduceGame(conditioningStart, { type: 'ready-batch', batchId: conditioningStart.batches[0].id });
+assert.equal(earlyRelease.batches.length, 0, 'release now should move conditioning beer to the finished pallet');
+assert.ok(earlyRelease.finishedBeerLots[0].verdict.sensoryNotes.some((note) => /carbonation|CO2|young/i.test(note)), 'early release should preserve young conditioning notes');
+state = reduceGame(conditioningStart, { type: 'wait-until-ready', batchId: conditioningStart.batches[0].id });
+assert.equal(state.batches.length, 0, 'waiting through conditioning should finish the first-loop batch');
 assert.equal(expectedCases, 5, 'first-loop 20 L Garage Blonde should expect five 12 bottle cases');
-assert.equal(state.inventory.cases, expectedCases, 'packaging should add the displayed expected cases to inventory');
-assert.equal(state.finishedBeerLots.length, 1, 'packaging should create a recipe-specific finished lot');
+assert.equal(state.inventory.cases, expectedCases, 'conditioning completion should add the displayed expected cases to inventory');
+assert.equal(state.finishedBeerLots.length, 1, 'conditioning completion should create a recipe-specific finished lot');
+assert.ok(state.finishedBeerLots[0].verdict.stabilityRisk <= earlyRelease.finishedBeerLots[0].verdict.stabilityRisk, 'conditioning longer should not make stability worse than early release');
+assert.ok(state.finishedBeerLots[0].verdict, 'packaging should create a sensory batch verdict');
+assert.match(state.finishedBeerLots[0].verdict.headline, /Garage Blonde|Fast but clean|solid|sellable/i, 'batch verdict should explain the outcome in human language');
+assert.ok(state.finishedBeerLots[0].verdict.sensoryNotes.length > 0, 'batch verdict should include sensory notes');
+assert.ok(state.finishedBeerLots[0].verdict.likelyCauses.length > 0, 'batch verdict should include likely causes');
 assert.equal(state.cash, packagingCashBefore, 'packaging should not secretly change cash');
 assert.equal(firstLoopObjective(state), 'Tap the pallet to sell Garage Blonde.', 'cases-available objective should point at the pallet');
+
+let fastBlonde = createInitialState();
+fastBlonde = reduceGame(fastBlonde, { type: 'start-batch', recipeId: 'garage-blonde', brewdayApproach: 'fast' });
+assert.equal(fastBlonde.batches[0].brewdayApproach, 'fast', 'brewday approach should be stored on the batch');
+assert.match(fastBlonde.batches[0].brewdayNotes.join(' '), /forgiving style|Fast brew day/i, 'fast forgiving beer should explain why speed can be valid');
+
+let standardPils = createInitialState();
+stockRecipeIngredients(standardPils, pils);
+standardPils = reduceGame(standardPils, { type: 'start-batch', recipeId: 'basement-pils', brewdayApproach: 'standard' });
+let fastPils = createInitialState();
+stockRecipeIngredients(fastPils, pils);
+fastPils = reduceGame(fastPils, { type: 'start-batch', recipeId: 'basement-pils', brewdayApproach: 'fast' });
+assert.ok(fastPils.batches[0].faultRisk > standardPils.batches[0].faultRisk, 'fast Pils should raise DMS/process risk instead of treating all fast brewing as equal');
+
+let carefulIpaTransfer = createInitialState();
+stockRecipeIngredients(carefulIpaTransfer, ipa);
+carefulIpaTransfer = reduceGame(carefulIpaTransfer, { type: 'start-batch', recipeId: 'backyard-ipa' });
+carefulIpaTransfer = reduceGame(carefulIpaTransfer, { type: 'wait-until-ready', batchId: carefulIpaTransfer.batches[0].id });
+carefulIpaTransfer = reduceGame(carefulIpaTransfer, { type: 'transfer-batch', batchId: carefulIpaTransfer.batches[0].id, transferMode: 'careful' });
+let roughIpaTransfer = createInitialState();
+stockRecipeIngredients(roughIpaTransfer, ipa);
+roughIpaTransfer = reduceGame(roughIpaTransfer, { type: 'start-batch', recipeId: 'backyard-ipa' });
+roughIpaTransfer = reduceGame(roughIpaTransfer, { type: 'wait-until-ready', batchId: roughIpaTransfer.batches[0].id });
+roughIpaTransfer = reduceGame(roughIpaTransfer, { type: 'transfer-batch', batchId: roughIpaTransfer.batches[0].id, transferMode: 'rough' });
+assert.equal(roughIpaTransfer.batches[0].transferMode, 'rough', 'rough transfer choice should be stored on the batch');
+assert.ok(roughIpaTransfer.batches[0].faultRisk > carefulIpaTransfer.batches[0].faultRisk, 'rough IPA transfer should raise oxygen/aroma risk');
+assert.ok(roughIpaTransfer.batches[0].quality < carefulIpaTransfer.batches[0].quality, 'rough IPA transfer should damage aroma/quality compared with careful transfer');
+assert.match(eventMessages(roughIpaTransfer), /hop aroma|oxygen risk/i, 'rough IPA transfer should explain the hop-aroma consequence');
+
+let earlyPackage = createInitialState();
+earlyPackage = reduceGame(earlyPackage, { type: 'start-batch', recipeId: 'garage-blonde' });
+earlyPackage = reduceGame(earlyPackage, { type: 'wait-until-ready', batchId: earlyPackage.batches[0].id });
+earlyPackage = reduceGame(earlyPackage, { type: 'transfer-batch', batchId: earlyPackage.batches[0].id });
+earlyPackage.batches[0].stepProgress = 72;
+const earlyQualityBefore = earlyPackage.batches[0].quality;
+earlyPackage = reduceGame(earlyPackage, { type: 'package-early', batchId: earlyPackage.batches[0].id });
+assert.equal(earlyPackage.batches[0].step, 'awaiting-packaging', 'package early should move an advanced fermentation to packaging decision');
+assert.ok(earlyPackage.batches[0].conditioningState.packagePressureRisk > 0, 'early packaging should carry package pressure risk forward');
+assert.ok(earlyPackage.batches[0].quality < earlyQualityBefore, 'early packaging should damage quality when FG is not stable');
+
+let exactIpa = createInitialState();
+stockRecipeIngredients(exactIpa, ipa);
+exactIpa = reduceGame(exactIpa, { type: 'start-batch', recipeId: 'backyard-ipa' });
+let substitutedIpa = createInitialState();
+stockRecipeIngredients(substitutedIpa, ipa);
+substitutedIpa.inventory.ingredients['ipa-hops'].amount = 0;
+substitutedIpa.inventory.ingredients['styrian-hops'].amount = 220;
+const blockedWithoutSubstitution = reduceGame(substitutedIpa, { type: 'start-batch', recipeId: 'backyard-ipa' });
+assert.equal(blockedWithoutSubstitution.batches.length, 0, 'missing exact recipe supplies should still block normal brewing');
+substitutedIpa = reduceGame(substitutedIpa, { type: 'start-batch', recipeId: 'backyard-ipa', allowSubstitutions: true });
+assert.equal(substitutedIpa.batches.length, 1, 'substitution mode should allow brewing when a believable substitute is stocked');
+assert.equal(substitutedIpa.batches[0].substitutions[0].missingIngredientId, 'ipa-hops', 'substitution should record the missing recipe ingredient');
+assert.equal(substitutedIpa.batches[0].substitutions[0].substituteIngredientId, 'styrian-hops', 'substitution should record the supplier substitute ingredient');
+assert.ok(substitutedIpa.batches[0].quality < exactIpa.batches[0].quality, 'substitution should carry a quality penalty against exact supplies');
+assert.ok(substitutedIpa.batches[0].faultRisk > exactIpa.batches[0].faultRisk, 'substitution should carry extra process risk');
+assert.match(eventMessages(substitutedIpa), /Supplier substitution/i, 'substitution brewing should explain the supplier decision in events');
+
+const packagingBase = brewThroughFermentation(blonde, 18).state;
+const carefulPackaging = reduceGame(packagingBase, { type: 'start-packaging', batchId: packagingBase.batches[0].id, packagingMode: 'careful' });
+const rushPackaging = reduceGame(packagingBase, { type: 'start-packaging', batchId: packagingBase.batches[0].id, packagingMode: 'rush' });
+assert.equal(carefulPackaging.batches[0].packagingMode, 'careful', 'careful packaging mode should be stored on the batch');
+assert.ok(carefulPackaging.batches[0].packagingResult.presentationScore > rushPackaging.batches[0].packagingResult.presentationScore, 'careful packaging should improve presentation over rushed packaging');
+assert.ok(carefulPackaging.batches[0].packagingResult.oxygenPickupRisk < rushPackaging.batches[0].packagingResult.oxygenPickupRisk, 'careful packaging should reduce oxygen pickup risk');
+
+let identityState = createInitialState();
+stockRecipeIngredients(identityState, saison);
+identityState.equipment.kettle.condition = 100;
+identityState.equipment.fermenter.condition = 100;
+identityState.equipment.bottler.condition = 100;
+identityState.ownedEquipment.find((item) => item.instanceId === identityState.activeEquipment.kettle).condition = 100;
+identityState.ownedEquipment.find((item) => item.instanceId === identityState.activeEquipment.fermenter).condition = 100;
+identityState.ownedEquipment.find((item) => item.instanceId === identityState.activeEquipment.bottler).condition = 100;
+identityState.sanitationDebt = { brewhouse: 0, fermentation: 0, packaging: 0, transferPath: 0, generalGarage: 0 };
+identityState = reduceGame(identityState, { type: 'set-fermenter-temperature', temperatureC: 24 });
+identityState = reduceGame(identityState, { type: 'start-batch', recipeId: 'shed-saison', brewdayApproach: 'careful' });
+identityState = tickUntilStep(identityState, undefined, 20);
+assert.ok(identityState.identityScores['farmhouse-saison-brewer'] > 0, 'solid or excellent saison should increase farmhouse/saison identity score');
 
 const casesBeforeSale = state.inventory.cases;
 const cashBeforeSale = state.cash;
@@ -227,6 +367,11 @@ assert.equal(state.complianceRisk - complianceBeforeSale, salePreview.compliance
 assert.equal(state.householdPressure - householdBeforeSale, salePreview.householdPressureDelta, 'sale consequence preview should match reducer household pressure delta');
 assert.ok(state.inventory.cases < casesBeforeSale, 'selling should remove cases from inventory');
 assert.ok(state.demand.casesSold > 0, 'selling should fulfill local demand progress');
+assert.ok(state.customerMemory.samira.notes.some((note) => /Friends and family|happy|excited|noticed|trust/i.test(note)), 'Samira/customer memory should record the first sale reaction');
+const samiraPromises = state.customerPromises.filter((promise) => promise.customerId === 'samira' && promise.requestedCases === 4 && promise.deadlineDay === 42);
+assert.equal(samiraPromises.length, 1, 'selling Samira cases should update the existing promise instead of duplicating it');
+assert.equal(samiraPromises[0].deliveredCases, 4, 'Samira promise ledger should track delivered cases');
+assert.equal(samiraPromises[0].status, 'fulfilled', 'Samira promise should be fulfilled after delivery');
 assert.equal(state.campaign.missionId, 'empty-shelf', 'selling the first four cases should advance to the restock storyline mission');
 assert.match(campaignNextStep(state), /4\.2 kg Pilsner malt[\s\S]*Need 48 bottles[\s\S]*Order 4 x 12 bottle packs/i, 'post-sale campaign guidance should teach exact restock quantities before upgrades');
 assert.ok(['Sell', 'Mash'].includes(currentWorkflowStage(state).stage), 'flow should either keep selling remaining cases or return to brewing after stock sells out');
@@ -236,6 +381,352 @@ assert.equal(firstLoopObjective(state), 'Tap the pallet to sell Garage Blonde.',
 state = reduceGame(state, { type: 'sell-channel', channelId: 'friends-family', cases: state.inventory.cases });
 assert.equal(state.campaign.missionId, 'empty-shelf', 'clearing leftover beer should not skip the restock lesson');
 assert.match(demandProgress(state), /4\/4 cases/, 'completed demand progress should not display overfilled counts');
+assert.ok(state.breweryHistory.some((entry) => /reacted|fulfilled|Garage Blonde/i.test(`${entry.title} ${entry.detail}`)), 'sales should write brewery history entries');
+
+let lockedPromise = createInitialState();
+lockedPromise = reduceGame(lockedPromise, { type: 'end-day' });
+assert.equal(lockedPromise.demand.accountName, "Samira's barbecue", 'locked customer promises should persist across day rollover');
+assert.equal(lockedPromise.demand.casesRequested, 4, 'ambient daily demand should not inflate a locked named promise');
+assert.match(demandProgress(lockedPromise), /by Jun 26/, 'named promises should expose their deadline in demand progress');
+let missedPromise = createInitialState();
+for (let day = 0; day < 43; day += 1) missedPromise = reduceGame(missedPromise, { type: 'end-day' });
+assert.equal(missedPromise.demand.missedPromise, true, 'named promises should mark missed after their deadline passes');
+assert.equal(missedPromise.customerPromises.find((promise) => promise.customerId === 'samira')?.status, 'missed', 'promise ledger should mark missed promises');
+assert.ok(missedPromise.customerMemory.samira.trust < createInitialState().customerMemory.samira.trust, 'missed promise should damage customer trust');
+assert.ok(missedPromise.customerMemory.samira.notes.some((note) => /deadline was missed/i.test(note)), 'late Samira promises should record a distinct missed-deadline reaction');
+
+let sanitationState = createInitialState();
+const startingPackagingDebt = sanitationState.sanitationDebt.packaging;
+sanitationState = reduceGame(sanitationState, { type: 'start-batch', recipeId: 'garage-blonde' });
+assert.ok(sanitationState.sanitationDebt.brewhouse > createInitialState().sanitationDebt.brewhouse, 'brewday should add brewhouse sanitation debt');
+sanitationState = tickUntilStep(sanitationState, 'awaiting-packaging');
+sanitationState = reduceGame(sanitationState, { type: 'start-packaging', batchId: sanitationState.batches[0].id, packagingMode: 'rush' });
+assert.ok(sanitationState.sanitationDebt.packaging > startingPackagingDebt, 'packaging should add packaging sanitation debt');
+const packagingDebtBeforeClean = sanitationState.sanitationDebt.packaging;
+sanitationState = reduceGame(sanitationState, { type: 'wait-until-ready', batchId: sanitationState.batches[0].id });
+sanitationState = reduceGame(sanitationState, { type: 'wait-until-ready', batchId: sanitationState.batches[0].id });
+sanitationState = reduceGame(sanitationState, { type: 'clean-equipment', equipmentId: 'bottler' });
+assert.ok(sanitationState.sanitationDebt.packaging < packagingDebtBeforeClean, 'cleaning bottler should reduce packaging sanitation debt');
+
+let recoveryState = createInitialState();
+recoveryState.finishedBeerLots = [
+  {
+    id: 'risky-lot',
+    sourceBatchId: 'risky-batch',
+    recipeId: 'garage-blonde',
+    recipeName: 'Garage Blonde',
+    cases: 4,
+    volumeLiters: 20,
+    quality: 42,
+    marketAppeal: 1,
+    packagingState: 'packaged',
+    saleState: 'available',
+    verdict: {
+      qualityBand: 'flawed',
+      headline: 'Unstable package. FG confidence was low before bottling.',
+      sensoryNotes: ['Young and unstable.'],
+      likelyCauses: ['Packaged before stable gravity.'],
+      sellAdvice: 'hold',
+      stabilityRisk: 55,
+      presentationScore: 62,
+      legacyTags: []
+    }
+  }
+];
+recoveryState.inventory.cases = 4;
+recoveryState = reduceGame(recoveryState, { type: 'recovery-action', actionId: 'hold-risky-lot' });
+assert.ok(recoveryState.finishedBeerLots[0].verdict.stabilityRisk < 55, 'holding a risky lot should reduce stability risk');
+recoveryState = reduceGame(recoveryState, { type: 'recovery-action', actionId: 'dump-risky-lot' });
+assert.equal(recoveryState.inventory.cases, 0, 'dumping a risky lot should remove cases from inventory');
+assert.ok(recoveryState.breweryHistory.some((entry) => /dumped|held/i.test(`${entry.title} ${entry.detail}`)), 'recovery actions should write brewery history');
+
+let discountRecovery = createInitialState();
+discountRecovery.finishedBeerLots = [
+  {
+    id: 'discount-lot',
+    sourceBatchId: 'discount-batch',
+    recipeId: 'garage-blonde',
+    recipeName: 'Garage Blonde',
+    cases: 3,
+    volumeLiters: 12,
+    quality: 55,
+    marketAppeal: 1,
+    packagingState: 'packaged',
+    saleState: 'available',
+    verdict: {
+      qualityBand: 'flawed',
+      headline: 'Garage Blonde is sellable with a warning.',
+      sensoryNotes: ['A little young.'],
+      likelyCauses: ['Rushed cleanup.'],
+      sellAdvice: 'discount',
+      stabilityRisk: 24,
+      presentationScore: 64,
+      legacyTags: []
+    }
+  }
+];
+discountRecovery.inventory.cases = 3;
+const discountCashBefore = discountRecovery.cash;
+discountRecovery = reduceGame(discountRecovery, { type: 'recovery-action', actionId: 'discount-risky-lot' });
+assert.equal(discountRecovery.inventory.cases, 0, 'discounting a flawed lot should clear cases from inventory');
+assert.ok(discountRecovery.cash > discountCashBefore, 'discounting a flawed lot should recover some cash');
+assert.ok(discountRecovery.breweryHistory.some((entry) => /discounted/i.test(`${entry.title} ${entry.detail}`)), 'discount recovery should write brewery history');
+
+let recallRecovery = createInitialState();
+recallRecovery.cash = 120;
+recallRecovery.finishedBeerLots = [
+  {
+    id: 'unsafe-lot',
+    sourceBatchId: 'unsafe-batch',
+    recipeId: 'garage-blonde',
+    recipeName: 'Garage Blonde',
+    cases: 4,
+    volumeLiters: 16,
+    quality: 25,
+    marketAppeal: 1,
+    packagingState: 'packaged',
+    saleState: 'available',
+    verdict: {
+      qualityBand: 'unsafe',
+      headline: 'Do not sell. Package stability risk is severe.',
+      sensoryNotes: ['Gushing risk.'],
+      likelyCauses: ['Unstable package.'],
+      sellAdvice: 'recall',
+      stabilityRisk: 82,
+      presentationScore: 48,
+      legacyTags: []
+    }
+  }
+];
+recallRecovery.inventory.cases = 4;
+const recallCashBefore = recallRecovery.cash;
+recallRecovery = reduceGame(recallRecovery, { type: 'recovery-action', actionId: 'recall-risky-lot' });
+assert.equal(recallRecovery.inventory.cases, 0, 'recalling an unsafe lot should remove cases from inventory');
+assert.ok(recallRecovery.cash < recallCashBefore, 'recalling an unsafe lot should cost cash');
+assert.ok(recallRecovery.customerMemory.samira.notes.some((note) => /recalled/i.test(note)), 'recalling should record trust-protecting customer memory');
+assert.ok(recallRecovery.breweryHistory.some((entry) => /recalled/i.test(`${entry.title} ${entry.detail}`)), 'recall recovery should write brewery history');
+
+let targetedRecovery = createInitialState();
+targetedRecovery.finishedBeerLots = [
+  {
+    id: 'unsafe-target-a',
+    sourceBatchId: 'unsafe-target-batch',
+    recipeId: 'garage-blonde',
+    recipeName: 'Garage Blonde',
+    cases: 4,
+    volumeLiters: 16,
+    quality: 28,
+    marketAppeal: 1,
+    packagingState: 'packaged',
+    saleState: 'available',
+    verdict: {
+      qualityBand: 'unsafe',
+      headline: 'Do not sell. Package stability risk is severe.',
+      sensoryNotes: ['Package pressure.'],
+      likelyCauses: ['Refermentation risk.'],
+      sellAdvice: 'recall',
+      stabilityRisk: 88,
+      presentationScore: 40,
+      legacyTags: []
+    }
+  },
+  {
+    id: 'flawed-target-b',
+    sourceBatchId: 'flawed-target-batch',
+    recipeId: 'garage-blonde',
+    recipeName: 'Garage Blonde',
+    cases: 2,
+    volumeLiters: 8,
+    quality: 58,
+    marketAppeal: 1,
+    packagingState: 'packaged',
+    saleState: 'available',
+    verdict: {
+      qualityBand: 'flawed',
+      headline: 'Garage Blonde is sellable with a warning.',
+      sensoryNotes: ['A little rough.'],
+      likelyCauses: ['Released young.'],
+      sellAdvice: 'discount',
+      stabilityRisk: 22,
+      presentationScore: 61,
+      legacyTags: []
+    }
+  }
+];
+targetedRecovery.inventory.cases = 6;
+targetedRecovery = reduceGame(targetedRecovery, { type: 'recovery-action', actionId: 'discount-risky-lot', lotId: 'flawed-target-b' });
+assert.ok(targetedRecovery.finishedBeerLots.some((lot) => lot.id === 'unsafe-target-a'), 'targeted discount should not affect the higher-risk recalled lot');
+assert.equal(targetedRecovery.finishedBeerLots.some((lot) => lot.id === 'flawed-target-b'), false, 'targeted discount should clear the selected flawed lot');
+assert.equal(targetedRecovery.inventory.cases, 4, 'targeted discount should remove only selected lot cases');
+
+let blockedNormalSale = createInitialState();
+blockedNormalSale.finishedBeerLots = [recallRecovery.finishedBeerLots[0] ?? {
+  id: 'blocked-unsafe-lot',
+  sourceBatchId: 'blocked-unsafe-batch',
+  recipeId: 'garage-blonde',
+  recipeName: 'Garage Blonde',
+  cases: 4,
+  volumeLiters: 16,
+  quality: 25,
+  marketAppeal: 1,
+  packagingState: 'packaged',
+  saleState: 'available',
+  verdict: {
+    qualityBand: 'unsafe',
+    headline: 'Do not sell. Package stability risk is severe.',
+    sensoryNotes: ['Gushing risk.'],
+    likelyCauses: ['Unstable package.'],
+    sellAdvice: 'recall',
+    stabilityRisk: 82,
+    presentationScore: 48,
+    legacyTags: []
+  }
+}];
+blockedNormalSale.inventory.cases = 4;
+const blockedCashBefore = blockedNormalSale.cash;
+blockedNormalSale = reduceGame(blockedNormalSale, { type: 'sell-channel', channelId: 'friends-family', cases: 4 });
+assert.equal(blockedNormalSale.inventory.cases, 4, 'normal sale should not move recall-advice beer');
+assert.equal(blockedNormalSale.cash, blockedCashBefore, 'normal sale should not pay for recall-advice beer');
+assert.equal(blockedNormalSale.demand.casesSold, 0, 'normal sale should not count recall-advice beer toward promises');
+assert.match(eventMessages(blockedNormalSale), /recovery action before selling/i, 'blocked normal sale should explain the required recovery action');
+assert.ok(blockedNormalSale.customerMemory.samira.notes.some((note) => /not served unsafe beer/i.test(note)), 'unsafe Samira beer should create a distinct safety-blocked reaction');
+
+let excellentSamiraSale = stateWithFinishedLot(makeFinishedLot({ id: 'samira-excellent-lot', qualityBand: 'excellent' }));
+const excellentTrustBefore = excellentSamiraSale.customerMemory.samira.trust;
+excellentSamiraSale = reduceGame(excellentSamiraSale, { type: 'sell-channel', channelId: 'friends-family', cases: 4 });
+assert.ok(excellentSamiraSale.customerMemory.samira.trust > excellentTrustBefore, 'excellent Samira beer should raise trust');
+assert.ok(excellentSamiraSale.customerMemory.samira.notes.some((note) => /excited: Garage Blonde landed clean and memorable/i.test(note)), 'excellent Samira beer should record an excited reaction');
+
+let flagshipRepeat = createInitialState();
+flagshipRepeat.flagshipRecipeIds = ['garage-blonde'];
+flagshipRepeat.demand = {
+  accountName: 'Friends and family',
+  channelId: 'friends-family',
+  channelName: 'Friends and family',
+  casesRequested: 4,
+  casesSold: 0,
+  reputationReward: 1,
+  invoiceRequired: false,
+  formalOrder: false
+};
+flagshipRepeat = reduceGame(flagshipRepeat, { type: 'end-day' });
+assert.equal(flagshipRepeat.demand.flagshipRequest, true, 'a flagship beer should generate a named repeat request on the next open demand day');
+assert.equal(flagshipRepeat.demand.requestedRecipeId, 'garage-blonde', 'flagship repeat demand should ask for the flagship recipe by id');
+assert.match(flagshipRepeat.demand.accountName, /Garage Blonde/, 'flagship repeat demand should name the beer customers remember');
+assert.ok(flagshipRepeat.customerPromises.some((promise) => promise.preferredStyles.includes('Garage Blonde')), 'flagship repeat demand should enter the promise ledger with the beer name');
+const wrongFlagshipLot = {
+  ...makeFinishedLot({ id: 'wrong-flagship-lot', qualityBand: 'excellent' }),
+  recipeId: 'backyard-ipa',
+  recipeName: 'Backyard IPA'
+};
+flagshipRepeat.finishedBeerLots = [wrongFlagshipLot];
+flagshipRepeat.inventory.cases = 4;
+const flagshipCashBeforeWrongSale = flagshipRepeat.cash;
+flagshipRepeat = reduceGame(flagshipRepeat, { type: 'sell-channel', channelId: 'friends-family', cases: 4 });
+assert.equal(flagshipRepeat.inventory.cases, 4, 'substitute beer should not move inventory for a named flagship request');
+assert.equal(flagshipRepeat.cash, flagshipCashBeforeWrongSale, 'substitute beer should not pay cash for a named flagship request');
+assert.equal(flagshipRepeat.demand.casesSold, 0, 'substitute beer should not count toward a named flagship request');
+assert.match(eventMessages(flagshipRepeat), /asked for Garage Blonde, not a substitute batch/i, 'substitute rejection should explain the named flagship request');
+flagshipRepeat.finishedBeerLots = [makeFinishedLot({ id: 'right-flagship-lot', qualityBand: 'solid', quality: 76 })];
+flagshipRepeat.inventory.cases = 4;
+const flagshipCashBeforeRightSale = flagshipRepeat.cash;
+flagshipRepeat = reduceGame(flagshipRepeat, { type: 'sell-channel', channelId: 'friends-family', cases: 4 });
+assert.equal(flagshipRepeat.demand.casesSold, 4, 'requested flagship beer should satisfy the named repeat request');
+assert.ok(flagshipRepeat.cash > flagshipCashBeforeRightSale, 'requested flagship sale should pay normally');
+
+let substitutedFlagship = createInitialState();
+substitutedFlagship.demand = {
+  accountName: 'Samira asks for Garage Blonde again',
+  channelId: 'friends-family',
+  channelName: 'Friends and family',
+  customerId: 'samira',
+  casesRequested: 4,
+  casesSold: 0,
+  reputationReward: 2,
+  invoiceRequired: false,
+  formalOrder: false,
+  deadlineDay: substitutedFlagship.day + 12,
+  minimumQualityBand: 'solid',
+  packagingExpectation: 'any',
+  promiseLocked: true,
+  requestedRecipeId: 'garage-blonde',
+  requestedRecipeName: 'Garage Blonde',
+  flagshipRequest: true
+};
+substitutedFlagship.finishedBeerLots = [
+  {
+    ...makeFinishedLot({ id: 'substituted-flagship-lot', qualityBand: 'solid', quality: 76 }),
+    verdict: {
+      ...makeFinishedLot({ id: 'substituted-flagship-lot', qualityBand: 'solid', quality: 76 }).verdict,
+      likelyCauses: ['Supplier substitution: Styrian hops replaced Saaz hops.']
+    }
+  }
+];
+substitutedFlagship.inventory.cases = 4;
+const substitutedFlagshipCashBefore = substitutedFlagship.cash;
+substitutedFlagship = reduceGame(substitutedFlagship, { type: 'sell-channel', channelId: 'friends-family', cases: 4 });
+assert.equal(substitutedFlagship.inventory.cases, 4, 'substituted flagship repeat should not move inventory');
+assert.equal(substitutedFlagship.cash, substitutedFlagshipCashBefore, 'substituted flagship repeat should not pay cash');
+assert.match(eventMessages(substitutedFlagship), /rejects the substituted batch/i, 'substituted flagship repeat should explain why the named beer did not count');
+
+let competitionState = stateWithFinishedLot(makeFinishedLot({ id: 'competition-gold-lot', qualityBand: 'excellent' }));
+const competitionCashBefore = competitionState.cash;
+const competitionReputationBefore = competitionState.reputation;
+competitionState = reduceGame(competitionState, { type: 'competition-entry', lotId: 'competition-gold-lot' });
+assert.equal(competitionState.inventory.cases, 3, 'competition entry should consume one case as samples');
+assert.equal(competitionState.cash, competitionCashBefore - 25, 'competition entry should charge the judging fee');
+assert.ok(competitionState.reputation > competitionReputationBefore, 'award-worthy competition beer should increase reputation');
+assert.ok(competitionState.awards.some((award) => /Local judges/.test(award.title)), 'award-worthy competition beer should create a judges award');
+assert.ok(competitionState.breweryHistory.some((entry) => /won Local judges/.test(`${entry.title} ${entry.detail}`)), 'competition awards should write brewery history');
+
+let competitionFeedback = stateWithFinishedLot(makeFinishedLot({
+  id: 'competition-feedback-lot',
+  qualityBand: 'flawed',
+  sellAdvice: 'discount',
+  quality: 50,
+  stabilityRisk: 30,
+  presentationScore: 55,
+  sensoryNote: 'Oxidized edge and green finish.'
+}));
+competitionFeedback = reduceGame(competitionFeedback, { type: 'competition-entry', lotId: 'competition-feedback-lot' });
+assert.equal(competitionFeedback.awards.length, 0, 'flawed competition beer should not create an award');
+assert.ok(competitionFeedback.breweryHistory.some((entry) => /judging feedback/.test(`${entry.title} ${entry.detail}`)), 'flawed competition beer should create judge feedback history');
+
+let competitionBlocked = stateWithFinishedLot(makeFinishedLot({ id: 'competition-unsafe-lot', qualityBand: 'unsafe', sellAdvice: 'recall', quality: 24, stabilityRisk: 86 }));
+const competitionBlockedCashBefore = competitionBlocked.cash;
+competitionBlocked = reduceGame(competitionBlocked, { type: 'competition-entry', lotId: 'competition-unsafe-lot' });
+assert.equal(competitionBlocked.inventory.cases, 4, 'unsafe competition beer should not consume samples');
+assert.equal(competitionBlocked.cash, competitionBlockedCashBefore, 'unsafe competition beer should not pay entry fees');
+assert.match(eventMessages(competitionBlocked), /not competition-safe/i, 'unsafe competition beer should explain the public-showing blocker');
+
+let flawedSamiraSale = stateWithFinishedLot(makeFinishedLot({
+  id: 'samira-flawed-lot',
+  qualityBand: 'flawed',
+  sellAdvice: 'discount',
+  quality: 58,
+  stabilityRisk: 26,
+  presentationScore: 64,
+  sensoryNote: 'Green apple note and rough carbonation.'
+}));
+const flawedTrustBefore = flawedSamiraSale.customerMemory.samira.trust;
+flawedSamiraSale = reduceGame(flawedSamiraSale, { type: 'sell-channel', channelId: 'friends-family', cases: 4 });
+assert.ok(flawedSamiraSale.customerMemory.samira.trust < flawedTrustBefore, 'flawed Samira beer should reduce trust');
+assert.ok(flawedSamiraSale.customerMemory.samira.notes.some((note) => /noticed the flaw: Green apple note/i.test(note)), 'flawed Samira beer should record a distinct sensory complaint');
+
+const firstNinetyStoryText = [
+  ...excellentSamiraSale.customerMemory.samira.notes,
+  ...excellentSamiraSale.breweryHistory.map((entry) => `${entry.title} ${entry.detail}`),
+  eventMessages(excellentSamiraSale)
+].join('\n');
+assert.match(firstNinetyStoryText, /Samira|Friends and family|Garage Blonde landed clean/i, 'first 90 minutes should produce a human-readable Samira success story');
+const firstNinetyTradeoffText = await Promise.all([
+  readFile(new URL('../src/ui/stationPanel.ts', import.meta.url), 'utf8'),
+  readFile(new URL('../src/ui/overlays.ts', import.meta.url), 'utf8')
+]).then((parts) => parts.join('\n'));
+assert.match(firstNinetyTradeoffText, /Package early[\s\S]*Save time, keep the risk/i, 'first 90 minutes should expose package-early as an explicit time-vs-risk tradeoff');
+assert.match(firstNinetyTradeoffText, /Careful transfer[\s\S]*Rough transfer/i, 'first 90 minutes should expose careful-vs-rough transfer as an explicit effort-vs-aroma tradeoff');
+assert.match(firstNinetyTradeoffText, /Package carefully[\s\S]*Rush packaging/i, 'first 90 minutes should expose careful-vs-rushed packaging as an explicit quality-vs-speed tradeoff');
+assert.match(firstNinetyTradeoffText, /Release now[\s\S]*Condition longer/i, 'first 90 minutes should expose young-release-vs-conditioning as an explicit deadline-vs-quality tradeoff');
 
 const storage = createMemoryStorage();
 saveGameState(state, storage);
@@ -263,6 +754,22 @@ resetSavedGame(storage);
 assert.equal(storage.getItem(STORAGE_KEY), null, 'reset should clear browser-local save data');
 
 let campaignState = createInitialState();
+let nicoState = createInitialState();
+nicoState.cash = 100;
+nicoState.campaign = { missionId: 'bucket-empire', completedMissionIds: ['barbecue-text', 'empty-shelf'], seenMissionIds: [] };
+nicoState = reduceGame(nicoState, { type: 'buy-equipment', equipmentItemId: 'plastic-bucket' });
+assert.equal(nicoState.campaign.missionId, 'uncle-nico-wedding', 'buying the second fermenter should unlock Uncle Nico as the first bigger promise');
+assert.equal(nicoState.demand.customerId, 'nico', 'Uncle Nico promise should be tied to Nico customer memory');
+assert.equal(nicoState.demand.promiseLocked, true, 'Uncle Nico order should persist as a locked promise');
+assert.equal(nicoState.demand.minimumQualityBand, 'solid', 'Uncle Nico order should require at least solid beer');
+assert.ok((nicoState.demand.deadlineDay ?? 0) > nicoState.day, 'Uncle Nico order should have a deadline');
+const nicoPromise = nicoState.customerPromises.find((promise) => promise.customerId === 'nico');
+assert.ok(nicoPromise, 'Uncle Nico order should be added to the promise ledger');
+assert.equal(nicoPromise.requestedCases, 10, 'Nico promise should request 10 cases');
+assert.equal(nicoPromise.minimumQualityBand, 'solid', 'Nico promise should require solid beer');
+assert.equal(nicoPromise.packagingExpectation, 'presentable', 'Nico promise should require presentable packaging');
+assert.equal(nicoPromise.status, 'open', 'Nico promise should start open');
+
 campaignState.campaign = { missionId: 'warm-garage-week', completedMissionIds: ['barbecue-text', 'empty-shelf', 'bucket-empire', 'uncle-nico-wedding'], seenMissionIds: [] };
 campaignState = reduceGame(campaignState, { type: 'set-fermenter-temperature', temperatureC: 19 });
 assert.equal(campaignState.campaign.missionId, 'sticky-bucket', 'temperature adjustment should advance the warm-garage tutorial mission');
@@ -285,8 +792,52 @@ campaignState.finishedBeerLots = [
   }
 ];
 campaignState = reduceGame(campaignState, { type: 'sell-channel', channelId: 'private-event', cases: 8 });
-assert.equal(campaignState.campaign.missionId, 'first-bar-account', 'private event sale should unlock the bar-account tutorial mission');
+assert.equal(campaignState.campaign.missionId, 'first-festival', 'private event sale should unlock the festival tutorial mission');
+assert.equal(campaignState.demand.customerId, 'festival', 'festival mission should create a festival promise');
+assert.equal(campaignState.awards.length, 0, 'the setup private event should not create the festival award before the festival mission');
+const eventSupplierBeforeFestival = campaignState.identityScores['event-supplier'];
+campaignState.inventory.cases = 8;
+campaignState.finishedBeerLots = [
+  {
+    id: 'campaign-flawed-festival-lot',
+    sourceBatchId: 'campaign-flawed-festival-batch',
+    recipeId: 'garage-blonde',
+    recipeName: 'Garage Blonde',
+    cases: 8,
+    volumeLiters: 32,
+    quality: 50,
+    marketAppeal: 1,
+    packagingState: 'packaged',
+    saleState: 'available'
+  }
+];
+const rejectedFestivalCashBefore = campaignState.cash;
+const rejectedFestivalInventoryBefore = campaignState.inventory.cases;
+campaignState = reduceGame(campaignState, { type: 'sell-channel', channelId: 'private-event', cases: 8 });
+assert.equal(campaignState.campaign.missionId, 'first-festival', 'flawed festival beer should not advance the festival promise');
+assert.equal(campaignState.demand.casesSold, 0, 'rejected festival beer should not count toward the locked promise');
+assert.equal(campaignState.cash, rejectedFestivalCashBefore, 'rejected festival beer should not pay cash before the buyer accepts it');
+assert.equal(campaignState.inventory.cases, rejectedFestivalInventoryBefore, 'rejected festival beer should stay in inventory');
+campaignState.inventory.cases = 8;
+campaignState.finishedBeerLots = [
+  {
+    id: 'campaign-festival-lot',
+    sourceBatchId: 'campaign-festival-batch',
+    recipeId: 'garage-blonde',
+    recipeName: 'Garage Blonde',
+    cases: 8,
+    volumeLiters: 32,
+    quality: 84,
+    marketAppeal: 1,
+    packagingState: 'packaged',
+    saleState: 'available'
+  }
+];
+campaignState = reduceGame(campaignState, { type: 'sell-channel', channelId: 'private-event', cases: 8 });
+assert.equal(campaignState.campaign.missionId, 'first-bar-account', 'festival sale should unlock the bar-account tutorial mission');
 assert.equal(campaignState.demand.channelId, 'local-bar', 'bar-account mission should create a local bar demand');
+assert.ok(campaignState.awards.some((award) => award.title === 'Festival table buzz'), 'successful festival beer should create an award record');
+assert.ok(campaignState.identityScores['event-supplier'] > eventSupplierBeforeFestival, 'successful festival beer should increase event-supplier identity score');
 campaignState.inventory.cases = 12;
 campaignState.finishedBeerLots = [
   {
@@ -299,13 +850,88 @@ campaignState.finishedBeerLots = [
     quality: 82,
     marketAppeal: 1,
     packagingState: 'packaged',
-    saleState: 'available'
+    saleState: 'available',
+    verdict: {
+      qualityBand: 'excellent',
+      headline: 'Garage Blonde landed clean and memorable.',
+      sensoryNotes: ['Clean enough to represent the brewery.', 'Bottles look intentional instead of garage-random.'],
+      likelyCauses: ['Good process discipline across brewday, fermentation and packaging.'],
+      sellAdvice: 'sell',
+      stabilityRisk: 8,
+      presentationScore: 84,
+      legacyTags: ['flagship candidate']
+    }
   }
 ];
 campaignState = reduceGame(campaignState, { type: 'sell-channel', channelId: 'local-bar', cases: 12 });
 assert.equal(campaignState.campaign.missionId, 'household-summit', 'first bar sale should unlock the household-pressure tutorial mission');
 campaignState = reduceGame(campaignState, { type: 'crisis-action', actionId: 'pause-public-sales' });
 assert.equal(campaignState.campaign.missionId, 'sandbox-unlocked', 'household-pressure action should unlock the normal sandbox');
+
+let promiseBoardState = createInitialState();
+promiseBoardState.campaign = { missionId: 'sandbox-unlocked', completedMissionIds: campaignMissionOrder.filter((missionId) => missionId !== 'sandbox-unlocked'), seenMissionIds: [] };
+promiseBoardState.demand = {
+  accountName: 'Friends and family',
+  channelId: 'friends-family',
+  channelName: 'Friends and family',
+  casesRequested: 4,
+  casesSold: 0,
+  reputationReward: 1,
+  invoiceRequired: false,
+  formalOrder: false
+};
+promiseBoardState = reduceGame(promiseBoardState, { type: 'choose-promise', promiseId: 'mira-regular-tap' });
+assert.equal(promiseBoardState.demand.accountName, 'Mira regular tap', 'open promise board should create a named post-sandbox promise');
+assert.equal(promiseBoardState.demand.promiseLocked, true, 'chosen identity promises should stay locked across days');
+assert.equal(promiseBoardState.demand.minimumQualityBand, 'solid', 'Mira regular tap should require solid beer');
+assert.equal(promiseBoardState.demand.packagingExpectation, 'clean-label', 'Mira regular tap should require clean-label packaging');
+assert.ok(promiseBoardState.customerPromises.some((promise) => promise.customerId === 'mira' && promise.status === 'open'), 'chosen promise should enter the promise ledger');
+assert.ok(promiseBoardState.identityScores['local-pub-workhorse'] > 0, 'choosing a regular tap should push local-pub identity');
+const blockedSecondPromise = reduceGame(promiseBoardState, { type: 'choose-promise', promiseId: 'festival-saison-slot' });
+assert.equal(blockedSecondPromise.demand.accountName, 'Mira regular tap', 'open promise board should block stacking named promises');
+assert.match(eventMessages(blockedSecondPromise), /still open/i, 'blocked promise choice should explain the active promise');
+
+let restaurantPromiseState = createInitialState();
+restaurantPromiseState.campaign = { missionId: 'sandbox-unlocked', completedMissionIds: [], seenMissionIds: [] };
+restaurantPromiseState.demand = {
+  accountName: 'Friends and family',
+  channelId: 'friends-family',
+  channelName: 'Friends and family',
+  casesRequested: 4,
+  casesSold: 0,
+  reputationReward: 1,
+  invoiceRequired: false,
+  formalOrder: false
+};
+restaurantPromiseState = reduceGame(restaurantPromiseState, { type: 'choose-promise', promiseId: 'restaurant-clean-lager' });
+assert.notEqual(restaurantPromiseState.demand.accountName, 'Restaurant clean lager trial', 'restaurant promise should be blocked before paperwork');
+assert.match(eventMessages(restaurantPromiseState), /invoice and traceability/i, 'restaurant promise block should explain paperwork');
+restaurantPromiseState.cash = 400;
+restaurantPromiseState = reduceGame(restaurantPromiseState, { type: 'crisis-action', actionId: 'paperwork-prep' });
+restaurantPromiseState = reduceGame(restaurantPromiseState, { type: 'choose-promise', promiseId: 'restaurant-clean-lager' });
+assert.equal(restaurantPromiseState.demand.accountName, 'Restaurant clean lager trial', 'paperwork should unlock restaurant clean lager promise');
+assert.equal(restaurantPromiseState.demand.minimumQualityBand, 'excellent', 'restaurant clean lager should demand excellent quality');
+
+let regionalPromiseState = createInitialState();
+regionalPromiseState.campaign = { missionId: 'sandbox-unlocked', completedMissionIds: [], seenMissionIds: [] };
+regionalPromiseState.demand = {
+  accountName: 'Friends and family',
+  channelId: 'friends-family',
+  channelName: 'Friends and family',
+  casesRequested: 4,
+  casesSold: 0,
+  reputationReward: 1,
+  invoiceRequired: false,
+  formalOrder: false
+};
+regionalPromiseState.canInvoice = true;
+regionalPromiseState.breweryTier = 'nano';
+regionalPromiseState = reduceGame(regionalPromiseState, { type: 'choose-promise', promiseId: 'regional-consistency-contract' });
+assert.notEqual(regionalPromiseState.demand.accountName, 'Regional consistency contract', 'regional contract should require craft tier');
+regionalPromiseState.breweryTier = 'craft';
+regionalPromiseState = reduceGame(regionalPromiseState, { type: 'choose-promise', promiseId: 'regional-consistency-contract' });
+assert.equal(regionalPromiseState.demand.accountName, 'Regional consistency contract', 'craft tier plus paperwork should unlock regional consistency contract');
+assert.equal(regionalPromiseState.demand.casesRequested, 24, 'regional consistency contract should create a larger production responsibility');
 
 assert.equal(equipmentConditionTier(92), 'clean', 'high condition should be clean');
 assert.equal(equipmentConditionTier(70), 'worn', 'mid condition should be worn');
@@ -468,7 +1094,8 @@ dirtyBottler.ownedEquipment.find((item) => item.instanceId === dirtyBottler.acti
 dirtyBottler = reduceGame(dirtyBottler, { type: 'start-batch', recipeId: 'garage-blonde' });
 dirtyBottler = tickUntilStep(dirtyBottler, undefined, 20);
 assert.ok(dirtyBottler.inventory.cases > 0, 'dirty bottler should still package some cases');
-assert.match(eventMessages(dirtyBottler), /Dirty bottling station lost \d+ cases? \(12 . 33 cl bottles\)/, 'dirty packaging should produce a plain-language warning with the case definition');
+assert.match(eventMessages(dirtyBottler), /Packaging standard lost \d+ cases? \(12 . 33 cl bottles\)/, 'dirty packaging should produce a plain-language warning with the case definition');
+assert.ok(dirtyBottler.finishedBeerLots[0].verdict.stabilityRisk > 0, 'dirty packaging should feed into batch stability verdicts');
 
 let nextDay = createInitialState();
 nextDay = reduceGame(nextDay, { type: 'end-day' });
@@ -496,6 +1123,17 @@ assert.match(overlaysSource, /caseDefinitionExplanation/, 'UI should reuse the p
 assert.match(stationPanelSource, /caseCountLabel\(readyBatch\.casesExpected\)/, 'bottling bench should show case counts with the 12 bottle definition');
 assert.match(`${mainSource}\n${stationPanelSource}\n${overlaysSource}`, /caseCountLabel\(state\.inventory\.cases\)/, 'pallet and inventory surfaces should show case counts with definition');
 assert.match(overlaysSource, /caseCountLabel\(lot\.cases\)/, 'finished lot cards should show case counts with definition');
+assert.match(`${stationPanelSource}\n${overlaysSource}`, /data-recovery-lot-id/, 'recovery buttons should target the selected finished lot');
+assert.match(`${stationPanelSource}\n${overlaysSource}`, /discount-risky-lot/, 'UI should expose explicit discount recovery');
+assert.match(`${stationPanelSource}\n${overlaysSource}`, /recall-risky-lot/, 'UI should expose explicit recall recovery');
+assert.match(inputHandlersSource, /recoveryLotId/, 'input routing should pass the target lot into recovery actions');
+assert.match(storyPanelsSource, /Promise board/, 'mission notebook should expose the post-sandbox promise board');
+assert.match(storyPanelsSource, /data-action=\"choose-promise\"/, 'promise board should render choose-promise actions');
+assert.match(inputHandlersSource, /choose-promise/, 'input routing should dispatch chosen brewery promises');
+assert.match(recipePanelSource, /data-allow-substitutions=\"true\"/, 'recipe panel should expose substitution brewing when viable');
+assert.match(inputHandlersSource, /allowSubstitutions/, 'input routing should dispatch substitution brewing intent');
+assert.match(`${stationPanelSource}\n${overlaysSource}`, /competition-entry/, 'finished-lot UI should expose competition judging');
+assert.match(inputHandlersSource, /competition-entry/, 'input routing should dispatch competition judging');
 
 assert.match(mainSource, /selectedRecipeCategoryId/, 'recipe flow should keep a category-selection state');
 assert.match(recipePanelSource, /data-action="select-recipe-category"/, 'recipe panel should render category-selection actions');

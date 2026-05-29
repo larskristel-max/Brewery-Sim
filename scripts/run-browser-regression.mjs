@@ -83,6 +83,14 @@ const assertFinishedPallet = async (page, expectedLevel, message) => {
     new RegExp(expectedFilename.replace('.', '\\.')),
     `${message}: finished beer pallet should show ${expectedFilename}`
   );
+  await page.waitForFunction(
+    () => {
+      const node = document.querySelector('.sell-point-sprite');
+      return node instanceof HTMLImageElement && node.complete && node.naturalWidth > 0;
+    },
+    null,
+    { timeout: 5000 }
+  );
   assert.equal(
     await page.locator('.sell-point-sprite').evaluate((node) => node instanceof HTMLImageElement && node.complete && node.naturalWidth > 0 && !node.hidden),
     true,
@@ -191,7 +199,7 @@ try {
 
   await page.locator('.hotspot-kettle').click();
   assert.equal(await page.getByRole('dialog', { name: 'Recipe / Brew' }).count(), 0, 'kettle tap should not open the full recipe overlay');
-  await assert.doesNotReject(page.getByRole('button', { name: /Brew Garage Blonde/ }).waitFor({ state: 'visible', timeout: 5000 }));
+  await assert.doesNotReject(page.getByRole('button', { name: /Standard brew/ }).waitFor({ state: 'visible', timeout: 5000 }));
   await page.getByRole('button', { name: /Other recipes/ }).click();
   await assert.doesNotReject(page.locator('.recipe-category-card').filter({ hasText: 'Starter' }).waitFor({ state: 'visible', timeout: 5000 }));
   assert.match(await page.locator('.recipe-category-card').filter({ hasText: 'Starter' }).innerText(), /Stock: \d+ batch(?:es)? in stock/i, 'recipe category cards should show how many batches stock supports');
@@ -207,14 +215,14 @@ try {
   );
   await page.locator('.station-panel-close').click();
   await page.locator('.hotspot-kettle').click();
-  await page.getByRole('button', { name: /Brew Garage Blonde/ }).click();
+  await page.getByRole('button', { name: /Standard brew/ }).click();
   await waitForBatchStep(page, 'brewing');
   assert.match(await visibleText(page), /Tap the stock pot to finish the brew day/i, 'started brew should ask the player to wait through the brew day');
   assert.equal(await page.locator('.station-panel').count(), 1, 'station panel should stay open after starting a batch');
   await assert.doesNotReject(page.getByRole('button', { name: /Skip ahead.*transfer/ }).waitFor({ state: 'visible', timeout: 5000 }));
   await page.getByRole('button', { name: /Skip ahead.*transfer/ }).click();
   await waitForBatchStep(page, 'awaiting-transfer');
-  await assert.doesNotReject(page.getByRole('button', { name: /Transfer to fermenter/ }).waitFor({ state: 'visible', timeout: 5000 }), 'kettle panel should stay open and offer Transfer to fermenter');
+  await assert.doesNotReject(page.getByRole('button', { name: /Careful transfer/ }).waitFor({ state: 'visible', timeout: 5000 }), 'kettle panel should stay open and offer transfer choices');
   assert.match(await page.locator('.station-panel').innerText(), /Brew day notes[\s\S]*Gravity[\s\S]*1\.045[\s\S]*4\.6%/i, 'finished brew day should explain wort, gravity, and expected ABV');
   assert.equal(await page.locator('.equipment-object-toggle.next-tap').count(), 1, 'the source station should pulse when transfer is waiting');
   assert.equal(
@@ -225,7 +233,7 @@ try {
   await assertFinishedPallet(page, 'empty', 'brewing beer not yet sellable');
   assert.match(await visibleText(page), /Tap the stock pot to transfer Garage Blonde/i);
 
-  await page.getByRole('button', { name: /Transfer to fermenter/ }).click();
+  await page.getByRole('button', { name: /Careful transfer/ }).click();
   await waitForBatchStep(page, 'fermenting');
   assert.equal(await page.locator('.equipment-object-toggle.active.next-tap').count(), 0, 'actively fermenting equipment should not keep a ready-to-click pulse');
   await assert.doesNotReject(page.locator('.station-panel').filter({ hasText: /Fermenting/ }).waitFor({ state: 'visible', timeout: 5000 }));
@@ -238,11 +246,14 @@ try {
   await waitForBatchStep(page, 'awaiting-packaging');
   await assertFinishedPallet(page, 'empty', 'packaging waiting');
 
-  await assert.doesNotReject(page.getByRole('button', { name: /Move to bottling bench/ }).waitFor({ state: 'visible', timeout: 5000 }));
-  await page.getByRole('button', { name: /Move to bottling bench/ }).click();
+  await assert.doesNotReject(page.getByRole('button', { name: /Package standard/ }).waitFor({ state: 'visible', timeout: 5000 }));
+  await page.getByRole('button', { name: /Package standard/ }).click();
   await waitForBatchStep(page, 'packaging');
-  await assert.doesNotReject(page.getByRole('button', { name: /Skip ahead.*pallet/ }).waitFor({ state: 'visible', timeout: 5000 }));
-  await page.getByRole('button', { name: /Skip ahead.*pallet/ }).click();
+  await assert.doesNotReject(page.getByRole('button', { name: /Finish packaging.*conditioning/ }).waitFor({ state: 'visible', timeout: 5000 }));
+  await page.getByRole('button', { name: /Finish packaging.*conditioning/ }).click();
+  await waitForBatchStep(page, 'bottle-conditioning');
+  await assert.doesNotReject(page.getByRole('button', { name: /Condition longer.*stable pallet/ }).waitFor({ state: 'visible', timeout: 5000 }));
+  await page.getByRole('button', { name: /Condition longer.*stable pallet/ }).click();
   await page.locator('.scene-payoff-pallet').waitFor({ state: 'visible', timeout: 5000 });
   assert.match(
     await page.locator('.scene-payoff-pallet').innerText(),
@@ -261,11 +272,21 @@ try {
   );
   const sellableCases = await finishedCases(page);
   await assertFinishedPallet(page, finishedPalletLevelName(sellableCases), 'finished packaged beer');
+  assert.match(await page.locator('.station-panel').innerText(), /EXCELLENT|SOLID|FLAWED|BAD|Advice:|Stability/i, 'pallet should show the batch verdict before sale');
   await assert.doesNotReject(page.getByRole('button', { name: /Friends and family/ }).waitFor({ state: 'visible', timeout: 5000 }));
   assert.match(await page.getByRole('button', { name: /Friends and family/ }).innerText(), /preview:\s*Cash \+EUR\s+\d+\s+-\s+Rep \+\d+/i, 'buyer offer should preview cash and reputation before sale');
   assert.equal(await page.getByRole('button', { name: /Private event/ }).count(), 0, 'first story sale should hide private event offers');
   assert.equal(await page.getByRole('button', { name: /Local bar/ }).count(), 0, 'first story sale should hide formal bar offers');
   await page.getByRole('button', { name: /Friends and family/ }).click();
+  assert.ok(
+    await page.evaluate((storageKey) => {
+      const raw = localStorage.getItem(storageKey);
+      if (!raw) return false;
+      const state = JSON.parse(raw).state;
+      return (state.customerMemory?.samira?.notes ?? []).some((note) => /happy enough|excited|noticed|damages trust|reacted/i.test(note));
+    }, storageKey),
+    'first sale should store a customer reaction'
+  );
 
   assert.ok(
     await page.evaluate((storageKey) => {

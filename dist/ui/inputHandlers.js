@@ -194,12 +194,21 @@ export const installRootEventHandlers = (root, context) => {
             context.setRecipePanelOpen(false);
             context.setExpandedTarget('kettle');
             context.setExpandedEquipmentInstanceId(null);
-            context.dispatch({ type: 'start-batch', recipeId: target.dataset.recipeId ?? 'garage-blonde' });
+            context.dispatch({
+                type: 'start-batch',
+                recipeId: target.dataset.recipeId ?? 'garage-blonde',
+                brewdayApproach: target.dataset.brewdayApproach ?? 'standard',
+                allowSubstitutions: target.dataset.allowSubstitutions === 'true'
+            });
             return;
         }
         if (action === 'wait-until-ready') {
             const batch = context.getState().batches.find((item) => item.id === (target.dataset.batchId ?? ''));
-            if (batch?.step === 'packaging' || batch?.step === 'bottle-conditioning') {
+            if (batch?.step === 'packaging') {
+                context.setExpandedTarget('bottler');
+                context.setExpandedEquipmentInstanceId(null);
+            }
+            if (batch?.step === 'bottle-conditioning') {
                 context.setExpandedTarget('cases');
                 context.setExpandedEquipmentInstanceId(null);
             }
@@ -219,13 +228,29 @@ export const installRootEventHandlers = (root, context) => {
             const batch = context.getState().batches.find((item) => item.id === (target.dataset.batchId ?? ''));
             context.setExpandedTarget('fermenter');
             context.setExpandedEquipmentInstanceId(batch?.fermenterInstanceId ?? null);
-            context.dispatch({ type: 'transfer-batch', batchId: target.dataset.batchId ?? '' });
+            context.dispatch({ type: 'transfer-batch', batchId: target.dataset.batchId ?? '', transferMode: target.dataset.transferMode ?? 'careful' });
+            return;
+        }
+        if (action === 'check-gravity') {
+            context.setExpandedTarget('fermenter');
+            context.dispatch({ type: 'check-gravity', batchId: target.dataset.batchId ?? '' });
+            return;
+        }
+        if (action === 'package-early') {
+            context.setExpandedTarget('fermenter');
+            context.dispatch({ type: 'package-early', batchId: target.dataset.batchId ?? '' });
             return;
         }
         if (action === 'start-packaging') {
             context.setExpandedTarget('bottler');
             context.setExpandedEquipmentInstanceId(null);
-            context.dispatch({ type: 'start-packaging', batchId: target.dataset.batchId ?? '' });
+            context.dispatch({ type: 'start-packaging', batchId: target.dataset.batchId ?? '', packagingMode: target.dataset.packagingMode ?? 'standard' });
+            return;
+        }
+        if (action === 'ready-batch') {
+            context.setExpandedTarget('cases');
+            context.setExpandedEquipmentInstanceId(null);
+            context.dispatch({ type: 'ready-batch', batchId: target.dataset.batchId ?? '' });
             return;
         }
         if (action === 'sell-cases') {
@@ -239,6 +264,26 @@ export const installRootEventHandlers = (root, context) => {
             context.setOpsOpen(false);
             clearExpandedStation(context);
             context.dispatch({ type: 'sell-channel', channelId: target.dataset.channelId, cases: Number(target.dataset.cases ?? 0) });
+            return;
+        }
+        if (action === 'choose-promise') {
+            context.setMissionsOpen(false);
+            context.dispatch({ type: 'choose-promise', promiseId: target.dataset.promiseId });
+            return;
+        }
+        if (action === 'crisis-action') {
+            context.setOpsOpen(false);
+            context.dispatch({ type: 'crisis-action', actionId: target.dataset.crisisActionId });
+            return;
+        }
+        if (action === 'recovery-action') {
+            context.setOpsOpen(false);
+            context.dispatch({ type: 'recovery-action', actionId: target.dataset.recoveryActionId, lotId: target.dataset.recoveryLotId });
+            return;
+        }
+        if (action === 'competition-entry') {
+            context.setOpsOpen(false);
+            context.dispatch({ type: 'competition-entry', lotId: target.dataset.lotId });
             return;
         }
         if (action === 'buy-equipment')

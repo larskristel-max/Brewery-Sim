@@ -212,17 +212,17 @@ export const createStationViewModel = (context: StationViewModelContext) => {
           toneClass: tier === 'dirty' || tier === 'critical' ? 'risk-high' : 'risk-low'
         };
       }
-      if (packagingBatch) {
+      if (conditioningBatch) {
         return {
-          label: 'Bottling',
-          detail: `${packagingBatch.recipeName} - ${batchRemainingLabel(packagingBatch)} - ${caseCountLabel(packagingBatch.casesExpected)} headed to the pallet`,
+          label: 'Bottle conditioning',
+          detail: `${conditioningBatch.recipeName} - ${batchRemainingLabel(conditioningBatch)} - CO2 ${conditioningBatch.conditioningState.co2Integration}`,
           toneClass: 'risk-low'
         };
       }
-      if (conditioningBatch) {
+      if (packagingBatch) {
         return {
-          label: 'Packaging / conditioning complete',
-          detail: `${conditioningBatch.recipeName} - ${batchRemainingLabel(conditioningBatch)}`,
+          label: 'Bottling',
+          detail: `${packagingBatch.recipeName} - ${batchRemainingLabel(packagingBatch)} - ${caseCountLabel(packagingBatch.casesExpected)} headed to conditioning`,
           toneClass: 'risk-low'
         };
       }

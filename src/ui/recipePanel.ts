@@ -113,6 +113,26 @@ const renderRecipeCategoryCards = (state: GameState): string => {
     .join('');
 };
 
+const substitutionCandidates: Partial<Record<IngredientId, IngredientId[]>> = {
+  'pilsner-malt': ['pale-malt', 'wheat-malt'],
+  'pale-malt': ['pilsner-malt', 'wheat-malt'],
+  'wheat-malt': ['pilsner-malt', 'pale-malt'],
+  'saaz-hops': ['styrian-hops', 'fuggles-hops', 'ipa-hops'],
+  'styrian-hops': ['saaz-hops', 'fuggles-hops', 'ipa-hops'],
+  'fuggles-hops': ['styrian-hops', 'saaz-hops', 'ipa-hops'],
+  'ipa-hops': ['styrian-hops', 'saaz-hops'],
+  'ale-yeast': ['wheat-yeast', 'stout-yeast', 'saison-yeast'],
+  'wheat-yeast': ['ale-yeast', 'saison-yeast'],
+  'saison-yeast': ['ale-yeast', 'wheat-yeast', 'kveik-yeast'],
+  'stout-yeast': ['ale-yeast'],
+  'kveik-yeast': ['saison-yeast', 'ale-yeast']
+};
+
+const canShowSubstitutionButton = (state: GameState, missing: RecipeIngredient[], startBlocker: string): boolean =>
+  missing.length > 0 &&
+  startBlocker === '' &&
+  missing.every((item) => (substitutionCandidates[item.ingredientId] ?? []).some((candidateId) => (state.inventory.ingredients[candidateId]?.amount ?? 0) >= item.amount));
+
 const renderRecipeCard = ({ state, recipeStartBlocker }: RecipePanelContext, recipe: Recipe): string => {
   const missing = recipeMissingIngredients(state, recipe);
   const incomingMissing = missingOrderStatus(state, missing);
@@ -136,7 +156,10 @@ const renderRecipeCard = ({ state, recipeStartBlocker }: RecipePanelContext, rec
           : formatGameDate(estimatedArrivalDay);
 
   const riskLine = campaignAllowsCleaning(state) ? `<span>${recipe.riskTags.slice(0, 2).join(', ') || 'Low risk'}</span>` : '';
-  return `<article class="batch-card recipe-card compact-recipe-card"><div class="recipe-card-title"><strong>${recipe.name}</strong><em class="recipe-stock-badge">${brewStockLabel(stockBatchCount)}</em><span>${batchLiters} L - ${caseCountLabel(litersToCases(batchLiters))}</span></div>${renderRecipeIngredientRows(state, recipe)}${renderBrewExplainer(recipe)}<div class="recipe-decision-lines"><span>${canStart ? 'Can brew now' : startBlocker || 'Blocked'}</span><span>${expectedValue} expected value</span><span>${missing.length > 0 ? `${missing.length} missing item${missing.length === 1 ? '' : 's'}` : 'All recipe supplies stocked'}${incomingMissing.label ? ` - ${incomingMissing.label}` : ''}</span>${riskLine}</div><div class="hotspot-actions recipe-actions"><button data-action="start-batch" data-recipe-id="${recipe.id}" type="button" ${canStart ? '' : `disabled title="${startBlocker || 'Blocked'}"`}>${canStart ? 'Brew' : 'Blocked'}</button><button data-action="order-recipe" data-order-mode="missing" data-recipe-id="${recipe.id}" type="button" ${missingOrderDisabled ? 'disabled' : ''}>${missingOrderLabel}<small>${missingOrderNote}</small></button><button data-action="order-recipe" data-order-mode="extra" data-recipe-id="${recipe.id}" type="button" ${recipe.enabled && state.cash >= extraCost ? '' : 'disabled'}>Order 1 batch ${formatCurrency(extraCost)}<small>${state.cash < extraCost ? 'Need cash' : `${recipe.name} x1 - ${formatGameDate(estimatedArrivalDay)}`}</small></button></div></article>`;
+  const substituteButton = canShowSubstitutionButton(state, missing, startBlocker)
+    ? `<button data-action="start-batch" data-recipe-id="${recipe.id}" data-brewday-approach="fast" data-allow-substitutions="true" type="button">Brew with substitutions<small>Fast deadline play, quality risk</small></button>`
+    : '';
+  return `<article class="batch-card recipe-card compact-recipe-card"><div class="recipe-card-title"><strong>${recipe.name}</strong><em class="recipe-stock-badge">${brewStockLabel(stockBatchCount)}</em><span>${batchLiters} L - ${caseCountLabel(litersToCases(batchLiters))}</span></div>${renderRecipeIngredientRows(state, recipe)}${renderBrewExplainer(recipe)}<div class="recipe-decision-lines"><span>${canStart ? 'Can brew now' : startBlocker || 'Blocked'}</span><span>${expectedValue} expected value</span><span>${missing.length > 0 ? `${missing.length} missing item${missing.length === 1 ? '' : 's'}` : 'All recipe supplies stocked'}${incomingMissing.label ? ` - ${incomingMissing.label}` : ''}</span>${riskLine}</div><div class="hotspot-actions recipe-actions"><button data-action="start-batch" data-recipe-id="${recipe.id}" data-brewday-approach="careful" type="button" ${canStart ? '' : `disabled title="${startBlocker || 'Blocked'}"`}>Careful<small>Slower, safer</small></button><button data-action="start-batch" data-recipe-id="${recipe.id}" data-brewday-approach="standard" type="button" ${canStart ? '' : `disabled title="${startBlocker || 'Blocked'}"`}>Standard<small>Recipe path</small></button><button data-action="start-batch" data-recipe-id="${recipe.id}" data-brewday-approach="fast" type="button" ${canStart ? '' : `disabled title="${startBlocker || 'Blocked'}"`}>Fast<small>Style-dependent</small></button>${substituteButton}<button data-action="order-recipe" data-order-mode="missing" data-recipe-id="${recipe.id}" type="button" ${missingOrderDisabled ? 'disabled' : ''}>${missingOrderLabel}<small>${missingOrderNote}</small></button><button data-action="order-recipe" data-order-mode="extra" data-recipe-id="${recipe.id}" type="button" ${recipe.enabled && state.cash >= extraCost ? '' : 'disabled'}>Order 1 batch ${formatCurrency(extraCost)}<small>${state.cash < extraCost ? 'Need cash' : `${recipe.name} x1 - ${formatGameDate(estimatedArrivalDay)}`}</small></button></div></article>`;
 };
 
 export const renderRecipeSelectionPanel = (context: RecipePanelContext): RecipePanelRenderResult => {

@@ -286,8 +286,10 @@ export const firstLoopObjective = (state) => {
         return 'Tap the fermenter to fast-forward fermentation.';
     if (blondeBatch.step === 'awaiting-packaging')
         return 'Tap the fermenter to transfer Garage Blonde to bottling.';
-    if (blondeBatch.step === 'packaging' || blondeBatch.step === 'bottle-conditioning')
+    if (blondeBatch.step === 'packaging')
         return 'Tap the bottling bench to bottle the beer.';
+    if (blondeBatch.step === 'bottle-conditioning')
+        return 'Tap the bottling bench to release or condition the beer.';
     return 'Tap the stock pot to brew Garage Blonde.';
 };
 export const objectiveProgress = (state) => {
@@ -308,7 +310,7 @@ export const objectiveProgress = (state) => {
         complete: soldFirstCases
     };
 };
-export const demandProgress = (state) => `${state.demand.accountName}: ${Math.min(state.demand.casesSold, state.demand.casesRequested)}/${state.demand.casesRequested} cases`;
+export const demandProgress = (state) => `${state.demand.accountName}: ${Math.min(state.demand.casesSold, state.demand.casesRequested)}/${state.demand.casesRequested} cases${state.demand.deadlineDay ? ` by ${formatGameDate(state.demand.deadlineDay)}` : ''}`;
 export const currentWorkflowStage = (state) => {
     const transferBatch = state.batches.find((batch) => batch.step === 'awaiting-transfer');
     if (transferBatch) {
@@ -359,7 +361,7 @@ export const currentWorkflowStage = (state) => {
         return {
             stage: 'Package',
             tapTarget: 'bottler',
-            instruction: 'Packaging is finishing. Tap the bottling bench to check cases.'
+            instruction: 'Bottle conditioning is running. Tap the bottling bench to release now or condition longer.'
         };
     }
     return {
@@ -386,7 +388,8 @@ export const saleValue = (state, cases) => {
         const casesFromLot = Math.min(remaining, lot.cases);
         const recipe = getRecipe(lot.recipeId);
         const qualityMultiplier = 0.75 + Math.max(35, lot.quality) / 200;
-        value += casesFromLot * recipe.salePricePerCase * recipe.marketAppeal * qualityMultiplier * reputationBonus;
+        const recoveryMultiplier = lot.verdict?.sellAdvice === 'discount' ? 0.55 : lot.verdict?.sellAdvice === 'hold' ? 0.7 : 1;
+        value += casesFromLot * recipe.salePricePerCase * recipe.marketAppeal * qualityMultiplier * reputationBonus * recoveryMultiplier;
         remaining -= casesFromLot;
     }
     return Math.round(value);
