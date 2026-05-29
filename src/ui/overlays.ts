@@ -51,6 +51,32 @@ const incomingForIngredient = (state: GameState, ingredientId: IngredientId): { 
 
 const garageBlondeRecipe = () => visibleRecipes().find((recipe) => recipe.id === 'garage-blonde') ?? visibleRecipes()[0];
 
+const renderVerdictLine = (verdict: GameState['finishedBeerLots'][number]['verdict']) =>
+  `<small><strong>${verdict.qualityBand.toUpperCase()}</strong> - ${verdict.headline} Advice: ${verdict.sellAdvice}. Stability ${verdict.stabilityRisk}/100.</small><small>${verdict.sensoryNotes.slice(0, 2).join(' ')}</small><small>${verdict.likelyCauses.slice(0, 2).join(' ')}</small>`;
+
+const renderLotRecoveryActions = (lot: GameState['finishedBeerLots'][number]) => {
+  const competitionButton =
+    lot.verdict.sellAdvice !== 'recall' && lot.verdict.sellAdvice !== 'dump' && lot.verdict.qualityBand !== 'unsafe'
+      ? `<button data-action="competition-entry" data-lot-id="${lot.id}" type="button">Enter judging</button>`
+      : '';
+  if (lot.verdict.sellAdvice === 'sell' && lot.verdict.stabilityRisk < 30) return competitionButton ? `<div class="hotspot-actions">${competitionButton}</div>` : '';
+  const discountButton =
+    lot.verdict.sellAdvice === 'discount' || lot.verdict.qualityBand === 'flawed'
+      ? `<button data-action="recovery-action" data-recovery-action-id="discount-risky-lot" data-recovery-lot-id="${lot.id}" type="button">Discount lot</button>`
+      : '';
+  const recallButton =
+    lot.verdict.sellAdvice === 'recall' || lot.verdict.qualityBand === 'unsafe' || lot.verdict.stabilityRisk >= 70
+      ? `<button data-action="recovery-action" data-recovery-action-id="recall-risky-lot" data-recovery-lot-id="${lot.id}" type="button">Recall lot</button>`
+      : '';
+  return `<div class="hotspot-actions">${competitionButton}<button data-action="recovery-action" data-recovery-action-id="hold-risky-lot" data-recovery-lot-id="${lot.id}" type="button">Hold & recheck</button>${discountButton}<button data-action="recovery-action" data-recovery-action-id="dump-risky-lot" data-recovery-lot-id="${lot.id}" type="button">Dump lot</button>${recallButton}<button data-action="recovery-action" data-recovery-action-id="replacement-gesture" data-recovery-lot-id="${lot.id}" type="button">Replacement gesture</button></div>`;
+};
+
+const renderPackagingButtons = (batch: GameState['batches'][number]) => `
+  <button data-action="start-packaging" data-batch-id="${batch.id}" data-packaging-mode="careful" type="button">Package carefully</button>
+  <button data-action="start-packaging" data-batch-id="${batch.id}" data-packaging-mode="standard" type="button">Package standard</button>
+  <button data-action="start-packaging" data-batch-id="${batch.id}" data-packaging-mode="rush" type="button">Rush packaging</button>
+`;
+
 const renderBatchBoard = ({ state, batchRemainingLabel, stepLabel }: OverlayContext) => {
   const batchCards =
     state.batches.length === 0
@@ -63,12 +89,16 @@ const renderBatchBoard = ({ state, batchRemainingLabel, stepLabel }: OverlayCont
               <article class="batch-card">
                 <div><strong>${batch.recipeName}</strong><span>${stepLabel(batch.step)} - Q${batch.quality}</span></div>
                 <small>${caseCountLabel(batch.casesExpected)} expected - ${remainingLabel}${campaignAllowsCleaning(state) ? ` - infection chance ${batch.contaminationRisk}%` : ''}</small>
+                ${batch.fermentationReadiness ? `<small>FG ${batch.fermentationReadiness.fgConfidence} - cleanup ${batch.fermentationReadiness.yeastCleanup} - rush risk ${batch.fermentationReadiness.rushRisk}</small>` : ''}
+                ${batch.packagingResult ? `<small>Packaging ${batch.packagingMode}: presentation ${batch.packagingResult.presentationScore}, stability ${batch.packagingResult.packageStability}${batch.packagingResult.missedCriticalItem ? `, missed ${batch.packagingResult.missedCriticalItem}` : ''}</small>` : ''}
                 <progress value="${progress}" max="100"></progress>
                 ${
                   batch.step === 'awaiting-transfer'
-                    ? `<button data-action="transfer-batch" data-batch-id="${batch.id}" type="button">Transfer to fermenter</button>`
+                    ? `<button data-action="transfer-batch" data-batch-id="${batch.id}" data-transfer-mode="careful" type="button">Careful transfer</button><button data-action="transfer-batch" data-batch-id="${batch.id}" data-transfer-mode="rough" type="button">Rough transfer</button>`
                     : batch.step === 'awaiting-packaging'
-                      ? `<button data-action="start-packaging" data-batch-id="${batch.id}" type="button">Package</button>`
+                      ? renderPackagingButtons(batch)
+                      : batch.step === 'bottle-conditioning'
+                        ? `<button data-action="ready-batch" data-batch-id="${batch.id}" type="button">Release now</button><button data-action="wait-until-ready" data-batch-id="${batch.id}" type="button">Condition longer</button><small>Conditioning ${batch.conditioningState.carbonationProgress}% - CO2 ${batch.conditioningState.co2Integration} - pressure ${batch.conditioningState.packagePressureRisk}</small>`
                       : ''
                 }
               </article>
@@ -77,13 +107,22 @@ const renderBatchBoard = ({ state, batchRemainingLabel, stepLabel }: OverlayCont
           .join('');
   const lotCards =
     state.finishedBeerLots.length > 0
-      ? `${state.finishedBeerLots.map((lot) => `<article class="batch-card"><div><strong>${lot.recipeName}</strong><span>${caseCountLabel(lot.cases)} - Q${lot.quality}</span></div><small>Market appeal ${Math.round(lot.marketAppeal * 100)}%</small></article>`).join('')}${renderSalesOffers(state)}`
+      ? `${state.finishedBeerLots.map((lot) => `<article class="batch-card"><div><strong>${lot.recipeName}</strong><span>${caseCountLabel(lot.cases)} - Q${lot.quality}</span></div>${renderVerdictLine(lot.verdict)}${lot.verdict.legacyTags.length > 0 ? `<small>Legacy: ${lot.verdict.legacyTags.join(', ')}</small>` : ''}<small>Market appeal ${Math.round(lot.marketAppeal * 100)}%</small>${renderLotRecoveryActions(lot)}</article>`).join('')}${renderSalesOffers(state)}`
       : '';
+  const historyCards =
+    state.breweryHistory.length > 0
+      ? `<div class="inventory-list"><div><span>Brewery tier</span><strong>${state.breweryTier}</strong></div><div><span>Brewery identity</span><strong>${state.breweryIdentityTags.length > 0 ? state.breweryIdentityTags.join(', ') : 'Still forming'}</strong></div><div><span>Identity scores</span><strong>${Object.entries(state.identityScores).filter(([, score]) => score > 0).map(([path, score]) => `${path}: ${score}`).join(' / ') || 'No strong path yet'}</strong></div><div><span>Flagships</span><strong>${state.flagshipRecipeIds.length > 0 ? state.flagshipRecipeIds.join(', ') : 'None yet'}</strong></div>${state.awards.length > 0 ? `<div><span>Awards</span><strong>${state.awards.map((award) => award.title).join(', ')}</strong></div>` : ''}${state.customerPromises.slice(0, 4).map((promise) => `<div><span>${promise.customerName} promise</span><strong>${promise.deliveredCases}/${promise.requestedCases} cases - ${promise.status}</strong></div>`).join('')}${state.breweryHistory.slice(0, 4).map((entry) => `<div><span>${entry.title}</span><strong>${entry.detail}</strong></div>`).join('')}</div>`
+      : '';
+  const sanitationCards = campaignAllowsCleaning(state)
+    ? `<div class="inventory-list"><div><span>Sanitation debt</span><strong>Brewhouse ${state.sanitationDebt.brewhouse} / Ferm ${state.sanitationDebt.fermentation} / Pack ${state.sanitationDebt.packaging}</strong></div><div><span>Transfer path</span><strong>${state.sanitationDebt.transferPath} / Garage ${state.sanitationDebt.generalGarage}</strong></div></div>`
+    : '';
   return `
     <section class="overlay-section">
       <div class="panel-heading"><span class="eyebrow gold">Production</span><h2>Production flow</h2><p>${caseDefinitionExplanation}</p></div>
       ${batchCards}
       ${lotCards}
+      ${sanitationCards}
+      ${historyCards}
     </section>
   `;
 };
@@ -193,6 +232,17 @@ const renderCampaignSupplyHint = (state: GameState) => {
       <span>${recipeMissingOrderSummary(state, recipe)}</span>
       <em>${breakdown.map((item) => item.orderLabel).join(' + ')} - ${formatCurrency(orderCost(missing))}</em>
     </button>
+`;
+};
+
+const renderCampaignEquipmentHint = (state: GameState) => {
+  if (state.campaign.missionId !== 'bucket-empire') return '';
+  return `
+    <button class="campaign-shop-hint action campaign-equipment-hint" data-action="buy-equipment" data-equipment-item-id="plastic-bucket" type="button">
+      <strong>Add a second plastic fermenter</strong>
+      <span>One bucket cannot overlap Uncle Nico-sized promises. This adds another active batch slot.</span>
+      <em>Plastic fermentation bucket - ${formatCurrency(45)}</em>
+    </button>
   `;
 };
 
@@ -274,6 +324,7 @@ const renderEquipmentStore = ({ state, selectedShopSection }: OverlayContext) =>
                       <small>${equipmentCapacityLabel(state.equipment[station])} - ${state.equipment[station].spaceUsed} space</small>
                     </div>
                     <div class="equipment-store-grid">
+                      ${station === 'fermenter' ? renderCampaignEquipmentHint(state) : ''}
                       ${equipmentByStation(station).map((item) => renderEquipmentStoreCard(state, item)).join('')}
                     </div>
                   </section>

@@ -41,6 +41,7 @@ export const campaignMissionOrder: CampaignMissionId[] = [
   'warm-garage-week',
   'sticky-bucket',
   'labels-at-midnight',
+  'first-festival',
   'first-bar-account',
   'household-summit',
   'sandbox-unlocked'
@@ -173,6 +174,23 @@ export const campaignMissions: Record<CampaignMissionId, CampaignMission> = {
     replyText: 'Make it look presentable.',
     goal: 'Package a presentable event batch.',
     reward: 'Packaging presentation and reputation pressure.'
+  },
+  'first-festival': {
+    id: 'first-festival',
+    title: 'First Festival Table',
+    character: 'Festival organizer',
+    characterId: 'festival',
+    act: 'Public Pour',
+    message:
+      'A small summer beer table has one open spot. Eight cases, presentable bottles, no weird package surprises. If people talk, bars listen.',
+    phoneThread: [
+      'We have one open spot at the summer beer table.',
+      'Eight cases. Presentable bottles. No weird package surprises.',
+      'If people talk, bars listen.'
+    ],
+    replyText: 'I can bring a clean event batch.',
+    goal: 'Deliver 8 solid cases to the festival table.',
+    reward: 'A first award-style public success and an event-supplier identity boost.'
   },
   'first-bar-account': {
     id: 'first-bar-account',
@@ -358,6 +376,12 @@ export const campaignView = (state: GameState): CampaignView => {
     progressLabel = 'Private event presentation';
     nextStep = state.inventory.cases > 0 ? 'Tap the pallet and sell to the private event.' : 'Package a clean batch for the private event.';
     primaryTarget = state.inventory.cases > 0 ? 'cases' : 'bottler';
+  } else if (mission.id === 'first-festival') {
+    const sold = Math.min(state.demand.casesSold, 8);
+    progress = Math.round((sold / 8) * 100);
+    progressLabel = `${sold}/8 festival cases delivered`;
+    nextStep = state.inventory.cases > 0 ? 'Tap the pallet and deliver the festival cases.' : 'Brew and package a solid event batch for the festival table.';
+    primaryTarget = state.inventory.cases > 0 ? 'cases' : 'kettle';
   } else if (mission.id === 'first-bar-account') {
     progress = state.visibilityRisk > 0 ? 70 : 20;
     progressLabel = 'Bar account unlocked';
@@ -416,11 +440,16 @@ export const syncCampaignAfterAction = (state: GameState, actionType: string): s
       accountName: "Uncle Nico's wedding",
       channelId: 'private-event',
       channelName: 'Private event',
+      customerId: 'nico',
       casesRequested: 10,
       casesSold: 0,
       reputationReward: 3,
       invoiceRequired: false,
-      formalOrder: false
+      formalOrder: false,
+      deadlineDay: state.day + 16,
+      minimumQualityBand: 'solid',
+      packagingExpectation: 'presentable',
+      promiseLocked: true
     };
     return 'Second bucket installed. Uncle Nico immediately made this your problem.';
   }
@@ -438,27 +467,56 @@ export const syncCampaignAfterAction = (state: GameState, actionType: string): s
       accountName: 'Private event',
       channelId: 'private-event',
       channelName: 'Private event',
+      customerId: 'festival',
       casesRequested: 8,
       casesSold: 0,
       reputationReward: 2,
       invoiceRequired: false,
-      formalOrder: false
+      formalOrder: false,
+      deadlineDay: state.day + 10,
+      minimumQualityBand: 'solid',
+      packagingExpectation: 'presentable',
+      promiseLocked: true
     };
     return 'The bucket is clean enough to stop having a personality. Samira found a private event that wants nicer bottles.';
   }
   if (missionId === 'labels-at-midnight' && actionType === 'sell-channel' && state.demand.casesSold >= 8) {
     completeCampaignMission(state, missionId);
     state.demand = {
+      accountName: 'Summer beer table',
+      channelId: 'private-event',
+      channelName: 'Private event',
+      customerId: 'festival',
+      casesRequested: 8,
+      casesSold: 0,
+      reputationReward: 2,
+      invoiceRequired: false,
+      formalOrder: false,
+      deadlineDay: state.day + 10,
+      minimumQualityBand: 'solid',
+      packagingExpectation: 'presentable',
+      promiseLocked: true
+    };
+    return 'The private event called the bottles rustic. A summer festival table has one open spot.';
+  }
+  if (missionId === 'first-festival' && actionType === 'sell-channel' && state.demand.casesSold >= 8) {
+    completeCampaignMission(state, missionId);
+    state.demand = {
       accountName: 'Mira at the local bar',
       channelId: 'local-bar',
       channelName: 'Local bar',
+      customerId: 'mira',
       casesRequested: 12,
       casesSold: 0,
       reputationReward: 3,
       invoiceRequired: false,
-      formalOrder: true
+      formalOrder: true,
+      deadlineDay: state.day + 14,
+      minimumQualityBand: 'solid',
+      packagingExpectation: 'clean-label',
+      promiseLocked: true
     };
-    return 'The private event called the bottles rustic. Mira at the bar wants a sample and said the word invoice.';
+    return 'The festival table made people talk. Mira at the bar wants a sample and said the word invoice.';
   }
   if (missionId === 'first-bar-account' && actionType === 'sell-channel' && state.demand.casesSold > 0) {
     completeCampaignMission(state, missionId);

@@ -15,7 +15,7 @@ export const recipes = [
         marketAppeal: 1,
         batchSizeCases: 5,
         targetBatchLiters: 20,
-        qualityBase: 68,
+        qualityBase: 82,
         difficulty: 8,
         storageSensitivity: 0.8,
         riskTags: ['young beer', 'rushed fermentation', 'low body'],
@@ -30,14 +30,14 @@ export const recipes = [
             {
                 id: 'blonde-acetaldehyde',
                 stage: 'fermenting',
-                minRisk: 20,
+                minRisk: 34,
                 qualityPenalty: 6,
                 message: 'The Blonde tasted too young and unfinished. Give future batches more stable fermentation time. Quality -6.'
             },
             {
                 id: 'blonde-diacetyl',
                 stage: 'fermenting',
-                minRisk: 28,
+                minRisk: 42,
                 qualityPenalty: 7,
                 message: 'The Blonde picked up a soft slick note from rushed fermentation. Quality -7.'
             }

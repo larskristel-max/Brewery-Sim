@@ -65,6 +65,82 @@ const renderSaleConsequencePreview = (state: GameState, channelId: ReturnType<ty
   return `${simple} - Visibility +${preview.visibilityDelta} - Compliance +${preview.complianceDelta} - Household +${preview.householdPressureDelta}`;
 };
 
+const renderBrewdayChoiceButtons = (recipeId: string, canBrew: boolean, blocker: string) => `
+  <button data-action="start-batch" data-recipe-id="${recipeId}" data-brewday-approach="careful" type="button" ${canBrew ? '' : `disabled title="${blocker || 'Blocked'}"`}>Careful brew<small>${canBrew ? 'Slower, cleaner process' : blocker}</small></button>
+  <button data-action="start-batch" data-recipe-id="${recipeId}" data-brewday-approach="standard" type="button" ${canBrew ? '' : `disabled title="${blocker || 'Blocked'}"`}>Standard brew<small>${canBrew ? 'Expected recipe path' : blocker}</small></button>
+  <button data-action="start-batch" data-recipe-id="${recipeId}" data-brewday-approach="fast" type="button" ${canBrew ? '' : `disabled title="${blocker || 'Blocked'}"`}>Fast brew<small>${canBrew ? 'Saves time, style-dependent risk' : blocker}</small></button>
+`;
+
+const readinessSummary = (batch: Batch): string => {
+  const readiness = batch.fermentationReadiness;
+  if (!readiness) return 'Readiness unknown';
+  return `FG ${readiness.fgConfidence} - cleanup ${readiness.yeastCleanup} - rush risk ${readiness.rushRisk}`;
+};
+
+const renderPackagingChoiceButtons = (batch: Batch) => `
+  <button data-action="start-packaging" data-batch-id="${batch.id}" data-packaging-mode="careful" type="button">Package carefully<small>Slower, less oxygen, better presentation</small></button>
+  <button data-action="start-packaging" data-batch-id="${batch.id}" data-packaging-mode="standard" type="button">Package standard<small>${batch.recipeName} - ${caseCountLabel(batch.casesExpected)}</small></button>
+  <button data-action="start-packaging" data-batch-id="${batch.id}" data-packaging-mode="rush" type="button">Rush packaging<small>Faster, more fill/cap/oxygen risk</small></button>
+`;
+
+const renderTransferChoiceButtons = (batch: Batch) => `
+  <button data-action="transfer-batch" data-batch-id="${batch.id}" data-transfer-mode="careful" type="button">Careful transfer<small>Slower, less oxygen and sanitation risk</small></button>
+  <button data-action="transfer-batch" data-batch-id="${batch.id}" data-transfer-mode="rough" type="button">Rough transfer<small>Faster, more oxygen and aroma risk</small></button>
+`;
+
+const conditioningSummary = (batch: Batch): string =>
+  `Carbonation ${batch.conditioningState.carbonationProgress}% - CO2 ${batch.conditioningState.co2Integration} - pressure ${batch.conditioningState.packagePressureRisk} - refermentation ${batch.conditioningState.refermentationRisk}`;
+
+const renderPromiseNote = (state: GameState): string =>
+  state.demand.deadlineDay
+    ? `<div class="temperature-note"><strong>${state.demand.accountName}</strong><span>${state.demand.casesRequested - state.demand.casesSold} cases left by ${formatGameDate(state.demand.deadlineDay)}${state.demand.minimumQualityBand ? ` - needs ${state.demand.minimumQualityBand}+` : ''}${state.demand.requestedRecipeName ? ` - requested ${state.demand.requestedRecipeName}` : ''}</span></div>`
+    : '';
+
+const renderRecoveryActions = (state: GameState): string => {
+  const lot = state.finishedBeerLots.find((item) => item.verdict.sellAdvice !== 'sell' || item.verdict.stabilityRisk >= 30);
+  if (!lot) return '';
+  const discountButton =
+    lot.verdict.sellAdvice === 'discount' || lot.verdict.qualityBand === 'flawed'
+      ? `<button data-action="recovery-action" data-recovery-action-id="discount-risky-lot" data-recovery-lot-id="${lot.id}" type="button">Discount lot<small>Clear flawed beer without promise credit</small></button>`
+      : '';
+  const recallButton =
+    lot.verdict.sellAdvice === 'recall' || lot.verdict.qualityBand === 'unsafe' || lot.verdict.stabilityRisk >= 70
+      ? `<button data-action="recovery-action" data-recovery-action-id="recall-risky-lot" data-recovery-lot-id="${lot.id}" type="button">Recall lot<small>Costly, protects trust</small></button>`
+      : '';
+  return `
+    <button data-action="recovery-action" data-recovery-action-id="hold-risky-lot" data-recovery-lot-id="${lot.id}" type="button">Hold & recheck<small>${lot.recipeName} - lower stability risk</small></button>
+    ${discountButton}
+    <button data-action="recovery-action" data-recovery-action-id="dump-risky-lot" data-recovery-lot-id="${lot.id}" type="button">Dump risky lot<small>Protect trust, lose cases</small></button>
+    ${recallButton}
+    <button data-action="recovery-action" data-recovery-action-id="replacement-gesture" data-recovery-lot-id="${lot.id}" type="button">Replacement gesture<small>Spend cash to repair trust</small></button>
+  `;
+};
+
+const renderCompetitionActions = (state: GameState): string => {
+  const lot = state.finishedBeerLots.find((item) => item.cases > 0 && item.verdict.sellAdvice !== 'recall' && item.verdict.sellAdvice !== 'dump' && item.verdict.qualityBand !== 'unsafe');
+  if (!lot) return '';
+  return `<button data-action="competition-entry" data-lot-id="${lot.id}" type="button">Enter judging<small>${lot.recipeName} - costs EUR 25 and 1 case</small></button>`;
+};
+
+const renderLeadLotStory = (state: GameState): string => {
+  const lot = state.finishedBeerLots.find((item) => item.cases > 0);
+  const latestMemory = state.demand.customerId ? state.customerMemory[state.demand.customerId]?.notes[0] : undefined;
+  if (!lot && !latestMemory) return '';
+  return `
+    <section class="station-panel-body">
+      ${
+        lot
+          ? `<p><strong>${lot.verdict.qualityBand.toUpperCase()}</strong> - ${lot.verdict.headline}</p><p>${lot.verdict.sensoryNotes.slice(0, 2).join(' ')}</p><p>Advice: ${lot.verdict.sellAdvice}. Stability ${lot.verdict.stabilityRisk}/100.</p>`
+          : ''
+      }
+      ${latestMemory ? `<p>Customer memory: ${latestMemory}</p>` : ''}
+      <p>Brewery tier: ${state.breweryTier}</p>
+      ${state.flagshipRecipeIds.length > 0 ? `<p>Flagship candidates: ${state.flagshipRecipeIds.map((recipeId) => getRecipe(recipeId).name).join(', ')}</p>` : ''}
+      ${state.awards.length > 0 ? `<p>Awards: ${state.awards.map((award) => award.title).join(', ')}</p>` : ''}
+    </section>
+  `;
+};
+
 export const renderSalesOffers = (state: GameState) => `
   <div class="hotspot-actions sales-offers">
     ${salesOfferModels(state)
@@ -76,9 +152,12 @@ export const renderSalesOffers = (state: GameState) => `
         const margin = payout - costBasis;
         const consequencePreview = renderSaleConsequencePreview(state, offer.id, cases);
         const invoiceBlocked = (state.demand.invoiceRequired || (channel.formal && state.visibilityRisk >= channel.invoiceAfter)) && !state.canInvoice;
-        const disabled = cases <= 0 || invoiceBlocked;
+        const leadVerdict = state.finishedBeerLots.find((lot) => lot.cases > 0)?.verdict;
+        const recoveryBlocked = Boolean(leadVerdict && (leadVerdict.sellAdvice === 'dump' || leadVerdict.sellAdvice === 'recall' || leadVerdict.qualityBand === 'bad' || leadVerdict.qualityBand === 'unsafe'));
+        const disabled = cases <= 0 || invoiceBlocked || recoveryBlocked;
+        const verdictLine = leadVerdict ? ` - beer: ${leadVerdict.qualityBand}, ${leadVerdict.sellAdvice}` : '';
         return `<button data-action="sell-channel" data-channel-id="${offer.id}" data-cases="${cases}" type="button" ${disabled ? 'disabled' : ''}>
-          ${channel.name}<small>${caseCountLabel(cases)} - payout ${formatCurrency(payout)} - ingredients about ${formatCurrency(costBasis)} - margin about ${formatCurrency(margin)} - preview: ${invoiceBlocked ? 'Invoice blocked' : consequencePreview} - ${offer.invoice}</small>
+          ${channel.name}<small>${caseCountLabel(cases)} - payout ${formatCurrency(payout)} - ingredients about ${formatCurrency(costBasis)} - margin about ${formatCurrency(margin)} - preview: ${invoiceBlocked ? 'Invoice blocked' : recoveryBlocked ? 'Recovery needed' : consequencePreview}${verdictLine} - ${offer.invoice}</small>
         </button>`;
       })
       .join('')}
@@ -119,7 +198,7 @@ export const renderEquipmentActions = (context: StationPanelContext, equipmentId
       return `
         <div class="hotspot-actions">
           ${renderBrewDayNotes(waitingRecipe)}
-          <button data-action="transfer-batch" data-batch-id="${waitingTransfer.id}" type="button">Transfer to fermenter<small>${waitingTransfer.recipeName}</small></button>
+          ${renderTransferChoiceButtons(waitingTransfer)}
           <button data-action="open-overlay" data-overlay="recipes" type="button">Other recipes</button>
           ${cleanButton}
         </div>
@@ -137,7 +216,7 @@ export const renderEquipmentActions = (context: StationPanelContext, equipmentId
     return `
       <div class="hotspot-actions">
         ${recipe ? renderBrewExplainer(recipe) : ''}
-        <button data-action="start-batch" data-recipe-id="garage-blonde" type="button" ${canBrew ? '' : `disabled title="${blocker || 'Blocked'}"`}>Brew Garage Blonde${canBrew ? '<small>First batch</small>' : `<small>${blocker}</small>`}</button>
+        ${renderBrewdayChoiceButtons('garage-blonde', canBrew, blocker)}
         <button data-action="open-overlay" data-overlay="recipes" type="button">Other recipes</button>
         ${cleanButton}
       </div>
@@ -152,6 +231,7 @@ export const renderEquipmentActions = (context: StationPanelContext, equipmentId
       return `
         <div class="hotspot-actions">
           <button type="button" disabled>Ready at kettle<small>Use stock pot</small></button>
+          ${renderTransferChoiceButtons(waitingTransfer)}
           ${temperatureButtons}
           ${cleanButton}
         </div>
@@ -161,16 +241,20 @@ export const renderEquipmentActions = (context: StationPanelContext, equipmentId
       return `
         <div class="hotspot-actions">
           <button data-action="wait-until-ready" data-batch-id="${batch.id}" type="button">Skip ahead<small>${context.batchRemainingLabel(batch)} to bottling</small></button>
+          <button data-action="check-gravity" data-batch-id="${batch.id}" type="button">Check gravity<small>${readinessSummary(batch)}</small></button>
+          <button data-action="package-early" data-batch-id="${batch.id}" type="button">Package early<small>Save time, keep the risk</small></button>
           ${temperatureButtons}
           ${cleanButton}
           ${campaignAllowsTemperature(state) ? `<div class="temperature-note"><strong>${state.fermenterTemperatureC} C - ${context.fermenterTemperatureHint()}</strong><span>Temperature affects flavor when you skip time.</span></div>` : ''}
+          <div class="temperature-note"><strong>Fermentation readiness</strong><span>${readinessSummary(batch)}</span></div>
         </div>
       `;
     }
     if (batch?.step === 'awaiting-packaging') {
       return `
         <div class="hotspot-actions">
-          <button data-action="start-packaging" data-batch-id="${batch.id}" type="button">Move to bottling bench<small>${batch.recipeName} - ${caseCountLabel(batch.casesExpected)}</small></button>
+          ${renderPackagingChoiceButtons(batch)}
+          <div class="temperature-note"><strong>Before packaging</strong><span>${readinessSummary(batch)}</span></div>
           ${cleanButton}
         </div>
       `;
@@ -208,9 +292,21 @@ export const renderEquipmentActions = (context: StationPanelContext, equipmentId
     `;
   }
   if (packagingBatch) {
+    const isConditioning = packagingBatch.step === 'bottle-conditioning';
     return `
       <div class="hotspot-actions">
-        <button data-action="wait-until-ready" data-batch-id="${packagingBatch.id}" type="button">Skip ahead<small>${context.batchRemainingLabel(packagingBatch)} to pallet</small></button>
+        ${
+          isConditioning
+            ? `<button data-action="ready-batch" data-batch-id="${packagingBatch.id}" type="button">Release now<small>Sell young, keep conditioning risk</small></button>
+               <button data-action="wait-until-ready" data-batch-id="${packagingBatch.id}" type="button">Condition longer<small>${context.batchRemainingLabel(packagingBatch)} to stable pallet</small></button>`
+            : `<button data-action="wait-until-ready" data-batch-id="${packagingBatch.id}" type="button">Finish packaging<small>${context.batchRemainingLabel(packagingBatch)} to conditioning</small></button>`
+        }
+        ${
+          packagingBatch.packagingResult
+            ? `<div class="temperature-note"><strong>${packagingBatch.packagingMode ?? 'standard'} packaging</strong><span>Presentation ${packagingBatch.packagingResult.presentationScore} - oxygen ${packagingBatch.packagingResult.oxygenPickupRisk} - caps ${packagingBatch.packagingResult.fillOrCapRisk} - stability ${packagingBatch.packagingResult.packageStability}${packagingBatch.packagingResult.missedCriticalItem ? ` - missed ${packagingBatch.packagingResult.missedCriticalItem}` : ''}</span></div>`
+            : ''
+        }
+        ${isConditioning ? `<div class="temperature-note"><strong>Conditioning / CO2</strong><span>${conditioningSummary(packagingBatch)}</span></div>` : ''}
         ${cleanButton}
       </div>
     `;
@@ -255,7 +351,10 @@ export const renderStationPanel = (context: StationPanelContext) => {
           <button class="station-panel-close" data-action="close-station-panel" type="button" aria-label="Close station panel"></button>
           <header class="station-panel-header"><span class="eyebrow gold">Pallet</span><h2>Finished beer pallet</h2><p>${caseCountLabel(state.inventory.cases)} ready</p></header>
           <section class="station-panel-body"><p>${caseDefinitionExplanation}</p><p>${state.inventory.cases > 0 ? 'Select an offer to sell cases.' : 'Package beer to fill the pallet.'}</p></section>
+          ${renderPromiseNote(state)}
+          ${renderLeadLotStory(state)}
           ${renderSalesOffers(state)}
+          <div class="hotspot-actions">${renderCompetitionActions(state)}${renderRecoveryActions(state)}</div>
         </aside>
       </div>
     `;

@@ -15,7 +15,23 @@ export type OrderMode = 'missing' | 'extra';
 export type RecipeCategoryId = 'starter' | 'hop-forward' | 'cool-fermentation' | 'farmhouse-wheat' | 'dark' | 'experimental';
 export type PackagingState = 'packaged';
 export type SaleState = 'available' | 'partially-sold' | 'sold-out';
-export type CampaignMissionId = 'barbecue-text' | 'empty-shelf' | 'bucket-empire' | 'uncle-nico-wedding' | 'warm-garage-week' | 'sticky-bucket' | 'labels-at-midnight' | 'first-bar-account' | 'household-summit' | 'sandbox-unlocked';
+export type BrewdayApproach = 'careful' | 'standard' | 'fast';
+export type TransferMode = 'careful' | 'rough';
+export type PackagingMode = 'careful' | 'standard' | 'rush';
+export type FgConfidence = 'unknown' | 'moving' | 'nearly-stable' | 'stable';
+export type YeastCleanup = 'green' | 'cleaning-up' | 'ready';
+export type Co2Integration = 'rough' | 'improving' | 'integrated';
+export type QualityBand = 'excellent' | 'solid' | 'flawed' | 'bad' | 'unsafe';
+export type SellAdvice = 'sell' | 'discount' | 'hold' | 'dump' | 'recall';
+export type CustomerId = 'samira' | 'rudy' | 'nico' | 'mira' | 'festival' | 'restaurant';
+export type PackagingExpectation = 'any' | 'presentable' | 'clean-label' | 'cans' | 'kegs';
+export type SanitationArea = 'brewhouse' | 'fermentation' | 'packaging' | 'transferPath' | 'generalGarage';
+export type BreweryHistoryKind = 'promise' | 'verdict' | 'customer' | 'recovery' | 'award' | 'flagship' | 'identity';
+export type CustomerPromiseStatus = 'open' | 'fulfilled' | 'missed' | 'replaced' | 'lost';
+export type IdentityPathId = 'clean-lager-specialist' | 'farmhouse-saison-brewer' | 'hype-ipa-brewery' | 'event-supplier' | 'local-pub-workhorse' | 'experimental-belgian' | 'regional-consistency';
+export type BreweryTier = 'garage' | 'nano' | 'craft' | 'regional';
+export type BreweryPromiseId = 'mira-regular-tap' | 'festival-saison-slot' | 'restaurant-clean-lager' | 'regional-consistency-contract';
+export type CampaignMissionId = 'barbecue-text' | 'empty-shelf' | 'bucket-empire' | 'uncle-nico-wedding' | 'warm-garage-week' | 'sticky-bucket' | 'labels-at-midnight' | 'first-festival' | 'first-bar-account' | 'household-summit' | 'sandbox-unlocked';
 export type InventoryMovementType = 'order-created' | 'order-received' | 'ingredients-consumed' | 'beer-packaged' | 'cases-sold' | 'loss-recorded';
 export type IngredientId = 'pilsner-malt' | 'pale-malt' | 'wheat-malt' | 'crystal-malt' | 'black-malt' | 'saaz-hops' | 'ipa-hops' | 'styrian-hops' | 'fuggles-hops' | 'ale-yeast' | 'lager-yeast' | 'wheat-yeast' | 'saison-yeast' | 'kveik-yeast' | 'stout-yeast' | 'bottles' | 'cleaner';
 export interface Ingredient {
@@ -72,6 +88,46 @@ export interface Inventory {
     cases: number;
     ingredients: Record<IngredientId, IngredientStock>;
 }
+export interface FermentationReadiness {
+    apparentProgress: number;
+    fgConfidence: FgConfidence;
+    yeastCleanup: YeastCleanup;
+    temperatureStress: number;
+    rushRisk: number;
+    gravityChecked: boolean;
+}
+export interface ConditioningState {
+    carbonationProgress: number;
+    co2Integration: Co2Integration;
+    refermentationRisk: number;
+    packagePressureRisk: number;
+}
+export interface PackagingResult {
+    oxygenPickupRisk: number;
+    sanitationRisk: number;
+    fillOrCapRisk: number;
+    presentationScore: number;
+    packageStability: number;
+    missedCriticalItem?: string;
+}
+export interface BatchVerdict {
+    qualityBand: QualityBand;
+    headline: string;
+    sensoryNotes: string[];
+    likelyCauses: string[];
+    sellAdvice: SellAdvice;
+    stabilityRisk: number;
+    presentationScore: number;
+    legacyTags: string[];
+}
+export interface BatchSubstitution {
+    missingIngredientId: IngredientId;
+    substituteIngredientId: IngredientId;
+    amount: number;
+    qualityPenalty: number;
+    riskPenalty: number;
+    note: string;
+}
 export interface Batch {
     id: string;
     recipeId: string;
@@ -82,6 +138,14 @@ export interface Batch {
     casesExpected: number;
     volumeLiters: number;
     fermenterInstanceId: string;
+    brewdayApproach: BrewdayApproach;
+    brewdayNotes: string[];
+    transferMode?: TransferMode;
+    substitutions: BatchSubstitution[];
+    fermentationReadiness: FermentationReadiness;
+    conditioningState: ConditioningState;
+    packagingMode?: PackagingMode;
+    packagingResult?: PackagingResult;
     contaminationRisk: number;
     faultRisk: number;
     storagePenalty: number;
@@ -98,6 +162,46 @@ export interface FinishedBeerLot {
     marketAppeal: number;
     packagingState: PackagingState;
     saleState: SaleState;
+    verdict: BatchVerdict;
+    customerReaction?: string;
+}
+export interface CustomerMemory {
+    customerId: CustomerId;
+    trust: number;
+    notes: string[];
+}
+export interface CustomerPromise {
+    id: string;
+    customerId: CustomerId;
+    customerName: string;
+    requestedCases: number;
+    deliveredCases: number;
+    preferredStyles: string[];
+    deadlineDay: number;
+    minimumQualityBand: QualityBand;
+    packagingExpectation: PackagingExpectation;
+    status: CustomerPromiseStatus;
+    trustAtStake: number;
+    bestDeliveredQualityBand?: QualityBand;
+    bestPresentationScore?: number;
+}
+export interface BreweryAward {
+    id: string;
+    day: number;
+    title: string;
+    recipeId: string;
+    customerId?: CustomerId;
+    reputationDelta: number;
+    identityPath: IdentityPathId;
+}
+export interface BreweryHistoryEntry {
+    id: string;
+    day: number;
+    kind: BreweryHistoryKind;
+    title: string;
+    detail: string;
+    recipeId?: string;
+    customerId?: CustomerId;
 }
 export interface InventoryMovement {
     id: string;
@@ -223,11 +327,20 @@ export interface LocalDemand {
     accountName: string;
     channelId: SalesChannelId;
     channelName: string;
+    customerId?: CustomerId;
     casesRequested: number;
     casesSold: number;
     reputationReward: number;
     invoiceRequired: boolean;
     formalOrder: boolean;
+    deadlineDay?: number;
+    minimumQualityBand?: QualityBand;
+    packagingExpectation?: PackagingExpectation;
+    promiseLocked?: boolean;
+    missedPromise?: boolean;
+    requestedRecipeId?: string;
+    requestedRecipeName?: string;
+    flagshipRequest?: boolean;
 }
 export interface CampaignState {
     missionId: CampaignMissionId;
@@ -268,6 +381,15 @@ export interface GameState {
     canInvoice: boolean;
     fermenterTemperatureC: number;
     campaign: CampaignState;
+    customerMemory: Record<CustomerId, CustomerMemory>;
+    breweryIdentityTags: string[];
+    sanitationDebt: Record<SanitationArea, number>;
+    breweryHistory: BreweryHistoryEntry[];
+    flagshipRecipeIds: string[];
+    customerPromises: CustomerPromise[];
+    identityScores: Record<IdentityPathId, number>;
+    breweryTier: BreweryTier;
+    awards: BreweryAward[];
 }
 export type GameAction = {
     type: 'tick';
@@ -283,15 +405,25 @@ export type GameAction = {
 } | {
     type: 'start-batch';
     recipeId: string;
+    brewdayApproach?: BrewdayApproach;
+    allowSubstitutions?: boolean;
 } | {
     type: 'wait-until-ready';
     batchId?: string;
 } | {
     type: 'transfer-batch';
     batchId: string;
+    transferMode?: TransferMode;
+} | {
+    type: 'check-gravity';
+    batchId: string;
+} | {
+    type: 'package-early';
+    batchId: string;
 } | {
     type: 'start-packaging';
     batchId: string;
+    packagingMode?: PackagingMode;
 } | {
     type: 'ready-batch';
     batchId: string;
@@ -314,14 +446,24 @@ export type GameAction = {
     channelId: SalesChannelId;
     cases: number;
 } | {
+    type: 'choose-promise';
+    promiseId: BreweryPromiseId;
+} | {
     type: 'buy-upgrade';
     upgradeId: UpgradeId;
 } | {
     type: 'buy-equipment';
     equipmentItemId: EquipmentItemId;
 } | {
+    type: 'competition-entry';
+    lotId?: string;
+} | {
     type: 'crisis-action';
     actionId: 'pause-public-sales' | 'discount-informal' | 'paperwork-prep';
+} | {
+    type: 'recovery-action';
+    actionId: 'hold-risky-lot' | 'discount-risky-lot' | 'dump-risky-lot' | 'recall-risky-lot' | 'replacement-gesture';
+    lotId?: string;
 } | {
     type: 'set-fermenter-temperature';
     temperatureC: number;

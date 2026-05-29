@@ -1,5 +1,5 @@
 import { campaignNextStep, campaignView, isMissionSeen } from '../game/campaign.js';
-import { formatClock, formatCurrency, objectiveProgress, orderCost, recipeMissingIngredients, recipeMissingOrderSummary, recipeRequirementSummary, recipeSupplyBreakdown, visibleRecipes } from '../game/selectors.js';
+import { formatClock, formatCurrency, formatGameDate, objectiveProgress, orderCost, recipeMissingIngredients, recipeMissingOrderSummary, recipeRequirementSummary, recipeSupplyBreakdown, visibleRecipes } from '../game/selectors.js';
 import { renderPhoneEconomyCard } from './tutorialGuidance.js';
 export const renderFirstLoopObjective = (state, guidanceDismissed) => guidanceDismissed
     ? ''
@@ -45,6 +45,52 @@ const renderPhoneSupplyCard = (state) => {
     </div>
   `;
 };
+const renderPromiseCard = (state) => {
+    if (!state.demand.promiseLocked && !state.demand.deadlineDay)
+        return '';
+    const activePromise = state.customerPromises.find((promise) => promise.status === 'open') ?? state.customerPromises[0];
+    return `
+    <div class="phone-recipe-card">
+      <strong>${state.demand.accountName}</strong>
+      <span>${Math.max(0, state.demand.casesRequested - state.demand.casesSold)} cases remaining${state.demand.deadlineDay ? ` by ${formatGameDate(state.demand.deadlineDay)}` : ''}</span>
+      ${state.demand.requestedRecipeName ? `<span>Requested beer: ${state.demand.requestedRecipeName}${state.demand.flagshipRequest ? ' (flagship repeat)' : ''}</span>` : ''}
+      <span>${state.demand.minimumQualityBand ? `Minimum quality: ${state.demand.minimumQualityBand}. ` : ''}${state.demand.packagingExpectation ? `Packaging: ${state.demand.packagingExpectation}.` : ''}</span>
+      ${activePromise ? `<span>Promise ledger: ${activePromise.deliveredCases}/${activePromise.requestedCases} cases - ${activePromise.status}</span>` : ''}
+      ${state.demand.missedPromise ? '<em>Deadline missed. Trust is damaged until you recover.</em>' : '<em>Named promises stay open across days.</em>'}
+    </div>
+  `;
+};
+const renderCrisisActions = (state) => {
+    if (state.campaign.missionId !== 'household-summit')
+        return '';
+    return `
+    <div class="hotspot-actions">
+      <button data-action="crisis-action" data-crisis-action-id="pause-public-sales" type="button">Pause public sales<small>Cool visibility</small></button>
+      <button data-action="crisis-action" data-crisis-action-id="discount-informal" type="button">Discount informally<small>Clear cases quietly</small></button>
+      <button data-action="crisis-action" data-crisis-action-id="paperwork-prep" type="button">Prep paperwork<small>Unlock safer formal orders</small></button>
+    </div>
+  `;
+};
+const renderOpenPromiseBoard = (state) => {
+    if (state.campaign.missionId !== 'sandbox-unlocked')
+        return '';
+    if (state.demand.promiseLocked && !state.demand.missedPromise && state.demand.casesSold < state.demand.casesRequested) {
+        return '<div class="phone-recipe-card"><strong>Promise board</strong><span>Finish the active promise before taking another one.</span></div>';
+    }
+    const regionalLocked = !(state.canInvoice && (state.breweryTier === 'craft' || state.breweryTier === 'regional'));
+    return `
+    <div class="phone-recipe-card">
+      <strong>Promise board</strong>
+      <span>Choose the next responsibility for ${state.breweryTier} tier.</span>
+      <div class="hotspot-actions">
+        <button data-action="choose-promise" data-promise-id="mira-regular-tap" type="button">Mira regular tap<small>12 clean-label solid cases</small></button>
+        <button data-action="choose-promise" data-promise-id="festival-saison-slot" type="button">Farmhouse festival slot<small>10 presentable event cases</small></button>
+        <button data-action="choose-promise" data-promise-id="restaurant-clean-lager" type="button" ${state.canInvoice ? '' : 'disabled title="Prep paperwork first"'}>Restaurant lager trial<small>16 excellent clean-label cases</small></button>
+        <button data-action="choose-promise" data-promise-id="regional-consistency-contract" type="button" ${regionalLocked ? 'disabled title="Needs craft tier and paperwork"' : ''}>Regional consistency contract<small>24 clean-label cases</small></button>
+      </div>
+    </div>
+  `;
+};
 export const renderStoryIntroCard = (state) => {
     const mission = campaignView(state);
     if (isMissionSeen(state))
@@ -67,6 +113,7 @@ export const renderStoryIntroCard = (state) => {
           ${mission.phoneThread.map((message) => `<p class="phone-bubble incoming">${message}</p>`).join('')}
           ${renderPhoneEconomyCard(state)}
           ${renderPhoneSupplyCard(state)}
+          ${renderPromiseCard(state)}
           <div class="phone-task-card">
             <strong>Task</strong>
             <span>${mission.goal}</span>
@@ -101,10 +148,13 @@ export const renderMissionsControl = (state, missionsOpen) => {
               <div class="story-goal compact"><strong>Goal</strong><span>${mission.goal}</span></div>
               <div class="objective-demand">
                 <span>${mission.progressLabel}</span>
-                <span>${Math.min(state.demand.casesSold, state.demand.casesRequested)}/${state.demand.casesRequested}</span>
+                <span>${Math.min(state.demand.casesSold, state.demand.casesRequested)}/${state.demand.casesRequested}${state.demand.deadlineDay ? ` by ${formatGameDate(state.demand.deadlineDay)}` : ''}</span>
               </div>
               <progress value="${mission.progress}" max="100"></progress>
               <small>${objective.label}</small>
+              ${renderPromiseCard(state)}
+              ${renderOpenPromiseBoard(state)}
+              ${renderCrisisActions(state)}
             </aside>
           `
         : ''}
