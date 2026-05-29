@@ -83,6 +83,27 @@ const assertFinishedPallet = async (page, expectedLevel, message) => {
     new RegExp(expectedFilename.replace('.', '\\.')),
     `${message}: finished beer pallet should show ${expectedFilename}`
   );
+  assert.equal(
+    await page.locator('.sell-point-sprite').evaluate((node) => node instanceof HTMLImageElement && node.complete && node.naturalWidth > 0 && !node.hidden),
+    true,
+    `${message}: finished beer pallet image should load and remain visible`
+  );
+};
+
+const assertEquipmentSpritesLoaded = async (page, message) => {
+  const loaded = await page.locator('.equipment-sprite').evaluateAll((nodes) =>
+    nodes.map((node) => ({
+      src: node instanceof HTMLImageElement ? node.getAttribute('src') : '',
+      complete: node instanceof HTMLImageElement ? node.complete : false,
+      naturalWidth: node instanceof HTMLImageElement ? node.naturalWidth : 0,
+      hidden: node instanceof HTMLImageElement ? node.hidden : true
+    }))
+  );
+  assert.ok(loaded.length >= 3, `${message}: equipment sprites should be present`);
+  for (const sprite of loaded) {
+    assert.match(sprite.src ?? '', /public\/assets\/garage\/equipment\//, `${message}: equipment sprite should use the public/assets runtime path`);
+    assert.equal(sprite.complete && sprite.naturalWidth > 0 && !sprite.hidden, true, `${message}: equipment sprite should load and remain visible`);
+  }
 };
 
 const boxesOverlap = (a, b) =>
@@ -130,6 +151,7 @@ try {
   await page.reload();
 
   await assert.doesNotReject(page.locator('.garage-scene').waitFor({ state: 'visible', timeout: 5000 }));
+  await assertEquipmentSpritesLoaded(page, 'fresh game');
   assert.match(await visibleText(page), /May 16/i);
   assert.equal(await page.locator('[data-tutorial-card="intro"][data-tutorial-mission-id="barbecue-text"]').count(), 1, 'fresh game should open with the first phone story');
   assert.match(await page.locator('.story-phone').innerText(), /Samira[\s\S]*4 cases[\s\S]*Garage Blonde[\s\S]*I can do 4 cases/i, 'first phone story should frame the barbecue order and reply');
@@ -240,6 +262,7 @@ try {
   const sellableCases = await finishedCases(page);
   await assertFinishedPallet(page, finishedPalletLevelName(sellableCases), 'finished packaged beer');
   await assert.doesNotReject(page.getByRole('button', { name: /Friends and family/ }).waitFor({ state: 'visible', timeout: 5000 }));
+  assert.match(await page.getByRole('button', { name: /Friends and family/ }).innerText(), /preview:\s*Cash \+EUR\s+\d+\s+-\s+Rep \+\d+/i, 'buyer offer should preview cash and reputation before sale');
   assert.equal(await page.getByRole('button', { name: /Private event/ }).count(), 0, 'first story sale should hide private event offers');
   assert.equal(await page.getByRole('button', { name: /Local bar/ }).count(), 0, 'first story sale should hide formal bar offers');
   await page.getByRole('button', { name: /Friends and family/ }).click();
@@ -401,6 +424,13 @@ try {
     '667x375 shop overlay should not need horizontal scrolling'
   );
   await narrowPage.close();
+
+  const portraitPage = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  await portraitPage.goto(baseUrl);
+  await assert.doesNotReject(portraitPage.getByRole('dialog', { name: 'Rotate device' }).waitFor({ state: 'visible', timeout: 5000 }));
+  assert.equal(await portraitPage.locator('.garage-scene').isVisible(), false, 'portrait phone layout should keep the garage hidden behind the rotate blocker');
+  assert.match(await portraitPage.locator('.rotate-blocker').innerText(), /landscape mode[\s\S]*Rotate your device/i, 'portrait phone layout should clearly explain the landscape-only policy');
+  await portraitPage.close();
 
   await browser.close();
   console.log('Browser regression passed: direct hotspot garage loop works.');

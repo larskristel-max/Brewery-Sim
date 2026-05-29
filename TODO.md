@@ -4,101 +4,109 @@ This file tracks actionable development work. Keep the README focused on project
 
 ## Current Rijn Review Status
 
-Verdict: **🟡 Fix foundation first**.
+Verdict: **Green for the Rijn foundation pass; resume new mechanics only after this cleanup is reviewed and merged**.
 
-The prototype has a working first loop: start batch, transfer manually, ferment, package manually, and sell. The deterministic simulation layer is a good MVP base and already includes useful brewing pressures such as contamination risk, ingredient condition decay, storage overflow, fermenter temperature impact, and sales feedback.
+The prototype has a working first loop: start batch, transfer manually, ferment, package manually, sell, and restock. The deterministic simulation layer is a good MVP base and already includes useful brewing pressures such as contamination risk, ingredient condition decay, storage overflow, fermenter temperature impact, sales feedback, browser-local persistence, and campaign-gated onboarding.
 
-Do **not** add more gameplay systems until the foundation cleanup below is complete.
+Do **not** add more gameplay systems until this cleanup is reviewed and merged.
 
-## P0 — Must fix before new mechanics
+## P0 - Must fix before new mechanics
 
-### 1. Add CI test enforcement before deploy
+### 1. Keep deploy tests honest
 
-- [ ] Update `.github/workflows/pages.yml` so `npm test` runs before Pages artifact upload/deploy.
-- [ ] Keep browser regression tests separate until Playwright browser installation is reliable in CI.
-- [ ] Ensure gameplay regressions cannot deploy just because TypeScript builds.
+- [x] Run `npm test` in `.github/workflows/pages.yml` before Pages artifact upload/deploy.
+- [x] Ensure deterministic gameplay regressions cannot deploy just because TypeScript builds.
+- [x] Run `npm run test:browser` in CI with an explicit Chromium install.
 
 ### 2. Refactor `src/main.ts` into focused UI modules
 
-- [ ] Keep `src/main.ts` as a thin entry point/orchestrator.
-- [ ] Move scene rendering into a focused UI module.
-- [ ] Move overlay rendering/state helpers into a focused UI module.
-- [ ] Move input/interaction dispatch into a focused UI module.
-- [ ] Move layout debug behavior into a focused UI module.
-- [ ] Keep deterministic rules in `src/game/simulation.ts`.
-- [ ] Preserve current gameplay behavior.
-- [ ] Confirm `npm run build` passes.
-- [ ] Confirm `npm run test` passes.
+- [x] Keep `src/main.ts` as a thin entry point/orchestrator.
+- [x] Move scene rendering into a focused UI module.
+- [x] Move overlay rendering/state helpers into a focused UI module.
+- [x] Move input/interaction dispatch into a focused UI module.
+- [x] Move HUD and story/tutorial rendering into focused UI modules.
+- [x] Move layout debug behavior into a focused UI module.
+- [x] Keep deterministic rules in `src/game/simulation.ts`.
+- [x] Preserve current gameplay behavior for the extracted modules.
+- [x] Confirm `npm run build` passes.
+- [x] Confirm `npm run test` passes.
 
 Suggested module names:
 
 ```text
 src/ui/appShell.ts
-src/ui/sceneRenderer.ts
-src/ui/overlays.ts
+src/ui/garageScene.ts
+src/ui/hud.ts
 src/ui/inputHandlers.ts
+src/ui/overlays.ts
+src/ui/stationViewModel.ts
+src/ui/storyPanels.ts
+src/ui/tutorialGuidance.ts
 src/ui/layoutDebug.ts
 src/ui/renderHelpers.ts
 ```
 
 ### 3. Canonicalize asset paths
 
-- [ ] Use `public/assets/` as the canonical runtime asset root.
-- [ ] Remove, document, or clearly mark any duplicate non-runtime `assets/` tree.
-- [ ] Keep scene backgrounds under `public/assets/garage/backgrounds/`.
-- [ ] Keep equipment sprites under `public/assets/garage/equipment/`.
-- [ ] Use tier subfolders such as `tier1/` and `tier2/` only where useful.
+- [x] Use `public/assets/` as the canonical runtime asset root.
+- [x] Remove, document, or clearly mark any duplicate non-runtime `assets/` tree.
+- [x] Keep scene backgrounds under `public/assets/garage/backgrounds/`.
+- [x] Keep equipment sprites under `public/assets/garage/equipment/`.
+- [x] Use tier subfolders such as `tier1/` and `tier2/` only where useful.
+- [x] Mark `sprite: null` equipment visuals with explicit TODO/status metadata.
 
-## P1 — Fix next
+## P1 - Fix next
 
-### 1. Reduce early-game complexity exposure
+### 1. Protect first-loop clarity
 
-- [ ] Keep the first five minutes focused on: Mash → Ferment → Package → Sell.
-- [ ] Delay, soften, or hide non-core pressure feedback until after the first successful sale.
-- [ ] Make sure compliance, household pressure, demand variants, storage overflow, and temperature do not overwhelm first-loop clarity.
+- [x] Keep the first five minutes focused on: Mash -> Ferment -> Package -> Sell.
+- [x] Delay, soften, or hide non-core pressure feedback until after the first successful sale.
+- [x] Make sure compliance, household pressure, demand variants, storage overflow, and temperature do not overwhelm first-loop clarity.
+- [x] Keep auditing the first five minutes after each new UI/system addition.
 
 ### 2. Validate portrait mobile readability
 
-- [ ] Reduce top HUD density on narrow screens.
-- [ ] Keep overlays subordinate to the garage scene.
-- [ ] Confirm tap targets remain usable on iPhone-sized screens.
-- [ ] Confirm object discovery remains clear in portrait.
+- [x] Decide that portrait phone play stays blocked until the garage floor has a portrait-specific layout.
+- [x] Keep the portrait rotate blocker tested so the HUD, overlays, tap targets, and object discovery do not render in an unsupported layout.
+- [x] Keep narrow landscape HUD and overlays subordinate to the garage scene.
+- [x] Confirm landscape phone tap targets remain usable on 667x375.
 
 ### 3. Clarify tier layout data
 
-- [ ] If tier 1 and tier 2 layouts are identical, collapse the abstraction for now or make intended differences explicit.
-- [ ] Keep slot-based percentage positioning as the responsive layout foundation.
+- [x] Keep slot-based percentage positioning as the responsive layout foundation.
+- [x] Keep tier 1 and tier 2 layout differences explicit through `garageLayout.ts`.
+- [x] Continue validating tier 2 preview before adding more physical equipment.
 
-## P2 — Cleanup and polish
+### 4. Improve sale consequence readability
 
-- [ ] Align stack wording with the actual current architecture: dependency-light TypeScript DOM prototype compiled with `tsc`, not React/Vite-first if that is no longer true in code.
-- [ ] Add concise developer notes for `npm install`, `npm run build`, `npm run test`, and `npm run test:browser`.
-- [ ] Document the Playwright browser installation requirement for browser regression tests.
-- [ ] Document `layoutDebug=1`.
-- [ ] Document `tierPreview=2` if supported.
-- [ ] Mark `sprite: null` equipment visuals with explicit TODO/status metadata.
-- [ ] Keep browser regression setup documented even if it is not yet a required deploy gate.
+- [x] Preview cash, reputation, visibility, compliance, and household pressure changes before a buyer offer is accepted.
+- [x] Keep first-sale offers simple; introduce the full consequence preview only when the extra risks are visible.
+
+## P2 - Cleanup and polish
+
+- [x] Align stack wording with the actual current architecture: dependency-light TypeScript DOM prototype compiled with `tsc`.
+- [x] Add concise developer notes for `npm install`, `npm run build`, `npm run test`, and `npm run test:browser`.
+- [x] Document the Playwright browser installation requirement for browser regression tests.
+- [x] Document `layoutDebug=1`.
+- [x] Document `tierPreview=2`.
+- [x] Keep browser regression setup documented even if it is not yet a required deploy gate.
+- [x] Split `src/styles/garage.css` into clearer scene, overlay, control, story/station, and responsive sections once the UI module split starts.
 
 ## Recommended PR sequence
 
-1. CI test gate PR.
-2. `src/main.ts` modular split PR.
-3. Asset-path canonicalization and developer docs PR.
-4. Mobile portrait readability pass PR.
-5. Resume gameplay expansion only after the foundation cleanup is merged.
+1. Review and merge the Rijn foundation cleanup.
+2. Resume gameplay expansion only after the cleanup is merged.
 
-## Deferred
+## Completed Rijn Items
 
 ### Local save persistence
 
-Local save persistence remains useful, but it is no longer the immediate next task after the Rijn review. Do this after foundation cleanup.
+Implemented. Keep future save changes versioned and outside core simulation logic.
 
-Requirements:
-
-- [ ] Auto-save the full `GameState` after game state changes.
-- [ ] Restore the saved state on startup.
-- [ ] Keep the save local only through `localStorage`.
-- [ ] Add a clear reset/new game action.
-- [ ] Include a save `version` guard so incompatible future state can be ignored or migrated.
-- [ ] Keep persistence outside core simulation logic.
-- [ ] Do not add accounts, cloud saves, Supabase, Operon integration, or backend infrastructure.
+- [x] Auto-save the full `GameState` after game state changes.
+- [x] Restore the saved state on startup.
+- [x] Keep the save local only through `localStorage`.
+- [x] Add a clear reset/new game action.
+- [x] Include a save `version` guard so incompatible future state can be ignored or migrated.
+- [x] Keep persistence outside core simulation logic.
+- [x] Do not add accounts, cloud saves, Supabase, Operon integration, or backend infrastructure.

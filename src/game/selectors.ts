@@ -448,6 +448,40 @@ export const saleValue = (state: GameState, cases: number): number => {
   return Math.round(value);
 };
 
+const soldLotsMarketAppeal = (state: GameState, cases: number): number => {
+  let casesToPreview = cases;
+  let marketAppealTotal = 0;
+  state.finishedBeerLots.forEach((lot) => {
+    if (casesToPreview <= 0) return;
+    const casesFromLot = Math.min(casesToPreview, lot.cases);
+    marketAppealTotal += casesFromLot * lot.marketAppeal;
+    casesToPreview -= casesFromLot;
+  });
+  return cases > 0 ? marketAppealTotal / cases : 1;
+};
+
+export type SaleConsequencePreview = {
+  cases: number;
+  cashDelta: number;
+  reputationDelta: number;
+  visibilityDelta: number;
+  complianceDelta: number;
+  householdPressureDelta: number;
+};
+
+export const saleConsequencePreview = (state: GameState, channelId: SalesChannelId, cases: number): SaleConsequencePreview => {
+  const channel = salesChannels[channelId];
+  const sellableCases = Math.min(Math.max(0, cases), state.inventory.cases, finishedBeerCaseCount(state), channel.cases);
+  return {
+    cases: sellableCases,
+    cashDelta: saleValue(state, sellableCases),
+    reputationDelta: (activeOwnedEquipment(state, 'bottler').tier >= 2 ? 2 : 1) + (state.demand.casesSold + sellableCases >= state.demand.casesRequested ? state.demand.reputationReward : 0),
+    visibilityDelta: sellableCases > 0 ? Math.max(1, Math.round(sellableCases * soldLotsMarketAppeal(state, sellableCases) * channel.risk)) : 0,
+    complianceDelta: sellableCases > 0 ? (channel.formal ? Math.max(1, Math.round(sellableCases / 2)) : sellableCases >= 8 ? 2 : 0) : 0,
+    householdPressureDelta: sellableCases > 0 ? (sellableCases >= 10 ? 2 : 1) : 0
+  };
+};
+
 export const cleaningPlanForEquipment = (state: GameState, equipmentId: EquipmentId): { cost: number; minutes: number; energyCost: number; duration: string } => {
   const equipment = state.equipment[equipmentId];
   const minutes = equipmentId === 'fermenter' ? (equipment.tier >= 2 ? 105 : 55) : equipmentId === 'bottler' ? 75 : 45;

@@ -13,7 +13,7 @@ export interface GarageEquipmentTapPadding {
 
 export type GarageSellPointId = 'finished-beer-pallet';
 
-export type GarageSellPointSpritePath = `assets/garage/sell-point/${string}`;
+export type GarageSellPointSpritePath = `public/assets/garage/sell-point/${string}`;
 
 export interface GarageSellPointVisual {
   spriteByLevel: Record<0 | 1 | 2 | 3, GarageSellPointSpritePath>;
@@ -40,7 +40,7 @@ export interface GarageEquipmentVisual {
 
 export type GarageEquipmentTier = 'tier1' | 'tier2';
 export type GarageEquipmentLayoutTier = GarageEquipmentTier;
-export type GarageEquipmentSpritePath = `assets/garage/equipment/tier1/${string}` | `assets/garage/equipment/tier2/${string}`;
+export type GarageEquipmentSpritePath = `public/assets/garage/equipment/tier1/${string}` | `public/assets/garage/equipment/tier2/${string}`;
 export type GarageEquipmentSlotId =
   | 'brewhouse'
   | 'fermenter-slot-1'
@@ -51,12 +51,12 @@ export type GarageEquipmentSlotId =
   | 'milling'
   | 'packaging';
 
-// Runtime URLs resolve from the canonical public/assets tree in local dev and Pages.
+// Runtime URLs resolve from the canonical public/assets tree when served or opened from the repo root.
 export const garageEquipmentAssetPath = (tier: GarageEquipmentTier, filename: string): GarageEquipmentSpritePath =>
-  `assets/garage/equipment/${tier}/${filename}` as GarageEquipmentSpritePath;
+  `public/assets/garage/equipment/${tier}/${filename}` as GarageEquipmentSpritePath;
 
 export const garageSellPointAssetPath = (filename: string): GarageSellPointSpritePath =>
-  `assets/garage/sell-point/${filename}` as GarageSellPointSpritePath;
+  `public/assets/garage/sell-point/${filename}` as GarageSellPointSpritePath;
 
 export type GarageEquipmentSlotLayout = Record<GarageEquipmentSlotId, GarageEquipmentPlacement>;
 

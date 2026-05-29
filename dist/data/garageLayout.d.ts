@@ -9,7 +9,7 @@ export interface GarageEquipmentTapPadding {
     y: number;
 }
 export type GarageSellPointId = 'finished-beer-pallet';
-export type GarageSellPointSpritePath = `assets/garage/sell-point/${string}`;
+export type GarageSellPointSpritePath = `public/assets/garage/sell-point/${string}`;
 export interface GarageSellPointVisual {
     spriteByLevel: Record<0 | 1 | 2 | 3, GarageSellPointSpritePath>;
     placement: GarageEquipmentPlacement;
@@ -32,7 +32,7 @@ export interface GarageEquipmentVisual {
 }
 export type GarageEquipmentTier = 'tier1' | 'tier2';
 export type GarageEquipmentLayoutTier = GarageEquipmentTier;
-export type GarageEquipmentSpritePath = `assets/garage/equipment/tier1/${string}` | `assets/garage/equipment/tier2/${string}`;
+export type GarageEquipmentSpritePath = `public/assets/garage/equipment/tier1/${string}` | `public/assets/garage/equipment/tier2/${string}`;
 export type GarageEquipmentSlotId = 'brewhouse' | 'fermenter-slot-1' | 'fermenter-slot-2' | 'fermenter-slot-3' | 'fermenter-slot-4' | 'fermenter-slot-5' | 'milling' | 'packaging';
 export declare const garageEquipmentAssetPath: (tier: GarageEquipmentTier, filename: string) => GarageEquipmentSpritePath;
 export declare const garageSellPointAssetPath: (filename: string) => GarageSellPointSpritePath;

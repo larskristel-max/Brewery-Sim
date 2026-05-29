@@ -91,6 +91,15 @@ export declare const nextSuggestedAction: (state: GameState) => string;
 export declare const visibleRecipes: () => Recipe[];
 export declare const finishedBeerCaseCount: (state: GameState) => number;
 export declare const saleValue: (state: GameState, cases: number) => number;
+export type SaleConsequencePreview = {
+    cases: number;
+    cashDelta: number;
+    reputationDelta: number;
+    visibilityDelta: number;
+    complianceDelta: number;
+    householdPressureDelta: number;
+};
+export declare const saleConsequencePreview: (state: GameState, channelId: SalesChannelId, cases: number) => SaleConsequencePreview;
 export declare const cleaningPlanForEquipment: (state: GameState, equipmentId: EquipmentId) => {
     cost: number;
     minutes: number;

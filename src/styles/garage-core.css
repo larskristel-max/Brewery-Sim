@@ -1,0 +1,117 @@
+/* Core shell, HUD, and shared panel primitives. */
+
+.game-shell {
+  min-height: 100dvh;
+  padding: max(0.55rem, var(--safe-top)) 0.75rem max(0.65rem, var(--safe-bottom));
+  color: var(--text-primary);
+}
+
+.glass-panel,
+.top-hud,
+.side-nav,
+.workflow-dock {
+  border: 1px solid var(--border);
+  background: linear-gradient(135deg, rgba(17, 22, 27, 0.94), rgba(7, 10, 13, 0.9));
+  box-shadow: 0 14px 38px rgba(0, 0, 0, 0.46), inset 0 1px rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(18px);
+}
+
+.top-hud {
+  position: fixed;
+  top: max(0.55rem, var(--safe-top));
+  left: 0.75rem;
+  right: 0.75rem;
+  z-index: 20;
+  display: grid;
+  grid-template-columns: minmax(12rem, 1.2fr) 0.7fr 0.8fr 0.7fr minmax(8rem, 0.8fr);
+  min-height: 4.8rem;
+  overflow: hidden;
+  border-radius: 20px;
+}
+
+.brand-lockup,
+.hud-stat,
+.hud-save {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.7rem 1rem;
+  border-right: 1px solid var(--divider);
+}
+
+.brand-mark {
+  display: grid;
+  width: 2.6rem;
+  height: 2.6rem;
+  place-items: center;
+  border: 1px solid rgba(226, 179, 84, 0.5);
+  border-radius: 50%;
+  color: var(--gold);
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+
+.brand-lockup strong {
+  display: block;
+  color: #f6efe2;
+  font-size: clamp(1.25rem, 2.6vw, 1.95rem);
+  letter-spacing: 0.08em;
+}
+
+.brand-lockup span:last-child,
+.hud-save span {
+  display: block;
+  color: var(--text-secondary);
+  font-size: 0.74rem;
+}
+
+.hud-stat {
+  display: grid;
+  align-content: center;
+  gap: 0.18rem;
+}
+
+.hud-stat strong {
+  color: #fff8ea;
+  font-size: clamp(1rem, 2vw, 1.35rem);
+}
+
+.rep-stat {
+  grid-template-columns: auto 1fr;
+}
+
+.rep-stat .eyebrow {
+  grid-column: 1 / -1;
+}
+
+.mini-meter {
+  display: block;
+  height: 0.38rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.11);
+}
+
+.mini-meter i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #6ecf78, var(--gold));
+}
+
+.hud-save {
+  border-right: 0;
+  justify-content: space-between;
+}
+
+.reset-save-button {
+  min-height: 2.2rem;
+  padding: 0 0.7rem;
+  border-radius: 12px;
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: none;
+  font-size: 0.68rem;
+  text-align: center;
+}
+

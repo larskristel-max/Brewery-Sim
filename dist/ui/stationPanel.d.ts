@@ -1,11 +1,11 @@
 import type { Batch, EquipmentId, GameState, Recipe } from '../game/schema.js';
 import type { GarageSceneEquipmentInstance, SceneTarget } from './types.js';
-type EquipmentStatus = {
+export type EquipmentStatus = {
     label: string;
     detail: string;
     toneClass: string;
 };
-type StationPanelContext = {
+export type StationPanelContext = {
     state: GameState;
     recipePanelOpen: boolean;
     selectedRecipeCategoryId: string | null;
@@ -22,4 +22,3 @@ type StationPanelContext = {
 export declare const renderSalesOffers: (state: GameState) => string;
 export declare const renderEquipmentActions: (context: StationPanelContext, equipmentId: EquipmentId, instance?: GarageSceneEquipmentInstance) => string;
 export declare const renderStationPanel: (context: StationPanelContext) => string;
-export {};

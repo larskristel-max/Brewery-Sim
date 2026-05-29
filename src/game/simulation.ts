@@ -3,7 +3,7 @@ import { createOwnedEquipment, getEquipmentCatalogItem, topGarageTier } from '..
 import { getRecipe } from '../data/recipes.js';
 import { markCampaignMissionSeen, syncCampaignAfterAction } from './campaign.js';
 import type { Batch, BatchStep, EquipmentId, GameAction, GameState, IngredientId, LocalDemand, Recipe, RecipeIngredient, SalesChannelId, SupplyOrderItem, TimedBatchStep } from './schema.js';
-import { activeOwnedEquipment, availableFermenters, bottlesPerCase, caseCountLabel, cleaningPlanForEquipment, durationLabel, equipmentConditionTier, finishedBeerCaseCount, garageSpaceAvailable, litersToCases, orderCost, recipeBatchCapacity, recipeMissingIngredients, recipeOrderItems, saleValue, salesChannels, storageOverflowByArea, totalStorageOverflow } from './selectors.js';
+import { activeOwnedEquipment, availableFermenters, bottlesPerCase, caseCountLabel, cleaningPlanForEquipment, durationLabel, equipmentConditionTier, finishedBeerCaseCount, garageSpaceAvailable, litersToCases, orderCost, recipeBatchCapacity, recipeMissingIngredients, recipeOrderItems, saleConsequencePreview, salesChannels, storageOverflowByArea, totalStorageOverflow } from './selectors.js';
 
 const orderLeadDays = 3;
 const startOfDayMinute = 7 * 60;
@@ -553,15 +553,14 @@ const sellCases = (next: GameState, requestedCases: number, channelOverride?: Sa
     addEvent(next, 'No sellable cases or open local demand right now.');
     return next;
   }
-  const revenue = saleValue(next, cases);
+  const consequence = saleConsequencePreview(next, channelOverride ?? next.demand.channelId, cases);
+  const revenue = consequence.cashDelta;
   let casesToRemove = cases;
   const soldLotNames = new Set<string>();
-  let marketAppealTotal = 0;
   next.finishedBeerLots.forEach((lot) => {
     if (casesToRemove <= 0) return;
     const casesFromLot = Math.min(casesToRemove, lot.cases);
     soldLotNames.add(lot.recipeName);
-    marketAppealTotal += casesFromLot * lot.marketAppeal;
     lot.cases -= casesFromLot;
     casesToRemove -= casesFromLot;
   });
@@ -570,11 +569,10 @@ const sellCases = (next: GameState, requestedCases: number, channelOverride?: Sa
   next.cash += revenue;
   next.demand.casesSold += cases;
   next.salesToday += cases;
-  const averageMarketAppeal = marketAppealTotal > 0 ? marketAppealTotal / cases : 1;
-  next.visibilityRisk += Math.max(1, Math.round(cases * averageMarketAppeal * channel.risk));
-  next.complianceRisk += channel.formal ? Math.max(1, Math.round(cases / 2)) : cases >= 8 ? 2 : 0;
-  next.householdPressure += cases >= 10 ? 2 : 1;
-  const repGain = (activeOwnedEquipment(next, 'bottler').tier >= 2 ? 2 : 1) + (next.demand.casesSold >= next.demand.casesRequested ? next.demand.reputationReward : 0);
+  next.visibilityRisk += consequence.visibilityDelta;
+  next.complianceRisk += consequence.complianceDelta;
+  next.householdPressure += consequence.householdPressureDelta;
+  const repGain = consequence.reputationDelta;
   next.reputation += repGain;
   const soldLabel = soldLotNames.size === 1 ? [...soldLotNames][0] : 'mixed garage beer';
   addEvent(next, `Sold ${caseCountLabel(cases)} of ${soldLabel} through ${channel.name} for EUR ${revenue}. Reputation +${repGain}.`);

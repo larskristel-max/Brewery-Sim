@@ -34,6 +34,12 @@ jobs:
       - name: Run deterministic gameplay tests
         run: npm test
 
+      - name: Install browser regression dependencies
+        run: npx playwright install --with-deps chromium
+
+      - name: Run browser regression tests
+        run: npm run test:browser
+
       - name: Build app
         run: npm run build
 
@@ -45,7 +51,7 @@ jobs:
           cp index.html _site/index.html
           cp -R dist _site/dist
           cp -R src/styles _site/src/styles
-          cp -R public/assets _site/assets
+          cp -R public _site/public
           touch _site/.nojekyll
 
       - name: Upload Pages artifact

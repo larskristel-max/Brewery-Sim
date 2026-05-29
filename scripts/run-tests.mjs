@@ -26,6 +26,7 @@ import {
   recipeMissingIngredients,
   recipeRequirementSummary,
   recipeSupplyBreakdown,
+  saleConsequencePreview,
   saleValueForChannel,
   storageOverflowByArea
 } from '../dist/game/selectors.js';
@@ -208,9 +209,22 @@ assert.equal(firstLoopObjective(state), 'Tap the pallet to sell Garage Blonde.',
 
 const casesBeforeSale = state.inventory.cases;
 const cashBeforeSale = state.cash;
+const reputationBeforeSale = state.reputation;
+const visibilityBeforeSale = state.visibilityRisk;
+const complianceBeforeSale = state.complianceRisk;
+const householdBeforeSale = state.householdPressure;
 const displayedPayout = saleValueForChannel(state, 'friends-family');
+const salePreview = saleConsequencePreview(state, 'friends-family', 4);
+const oversizedSalePreview = saleConsequencePreview(state, 'friends-family', 999);
+assert.equal(oversizedSalePreview.cases, 4, 'sale preview should clamp oversized requests to the channel offer size');
+assert.equal(saleConsequencePreview(state, 'friends-family', 0).cashDelta, 0, 'sale preview should not invent cash for zero-case offers');
 state = reduceGame(state, { type: 'sell-channel', channelId: 'friends-family', cases: 4 });
 assert.equal(state.cash - cashBeforeSale, displayedPayout, 'displayed sale payout helper should match the reducer cash delta');
+assert.equal(state.cash - cashBeforeSale, salePreview.cashDelta, 'sale consequence preview should match reducer cash delta');
+assert.equal(state.reputation - reputationBeforeSale, salePreview.reputationDelta, 'sale consequence preview should match reducer reputation delta');
+assert.equal(state.visibilityRisk - visibilityBeforeSale, salePreview.visibilityDelta, 'sale consequence preview should match reducer visibility delta');
+assert.equal(state.complianceRisk - complianceBeforeSale, salePreview.complianceDelta, 'sale consequence preview should match reducer compliance delta');
+assert.equal(state.householdPressure - householdBeforeSale, salePreview.householdPressureDelta, 'sale consequence preview should match reducer household pressure delta');
 assert.ok(state.inventory.cases < casesBeforeSale, 'selling should remove cases from inventory');
 assert.ok(state.demand.casesSold > 0, 'selling should fulfill local demand progress');
 assert.equal(state.campaign.missionId, 'empty-shelf', 'selling the first four cases should advance to the restock storyline mission');
@@ -463,37 +477,64 @@ assert.equal(nextDay.demand.casesSold, 0, 'new day should reset demand fulfillme
 
 const mainSource = await readFile(new URL('../src/main.ts', import.meta.url), 'utf8');
 const appBootSource = await readFile(new URL('../src/ui/appBoot.ts', import.meta.url), 'utf8');
+const garageSceneSource = await readFile(new URL('../src/ui/garageScene.ts', import.meta.url), 'utf8');
+const inputHandlersSource = await readFile(new URL('../src/ui/inputHandlers.ts', import.meta.url), 'utf8');
+const overlaysSource = await readFile(new URL('../src/ui/overlays.ts', import.meta.url), 'utf8');
 const recipePanelSource = await readFile(new URL('../src/ui/recipePanel.ts', import.meta.url), 'utf8');
 const stationPanelSource = await readFile(new URL('../src/ui/stationPanel.ts', import.meta.url), 'utf8');
+const stationViewModelSource = await readFile(new URL('../src/ui/stationViewModel.ts', import.meta.url), 'utf8');
+const storyPanelsSource = await readFile(new URL('../src/ui/storyPanels.ts', import.meta.url), 'utf8');
 assert.match(`${recipePanelSource}\n${stationPanelSource}`, /data-action=\"start-batch\"/, 'UI should render recipe brew buttons');
 assert.match(recipePanelSource, /data-action=\"order-recipe\"/, 'UI should render recipe order buttons');
-assert.match(mainSource, /data-action=\"order-ingredient\"/, 'UI should allow proactive ingredient ordering');
-assert.match(mainSource, /Incoming orders/, 'UI should show pending deliveries');
-assert.match(mainSource, /Mash.*Ferment.*Package.*Sell/s, 'UI should show clear stage labels');
+assert.match(overlaysSource, /data-action=\"order-ingredient\"/, 'UI should allow proactive ingredient ordering');
+assert.match(overlaysSource, /Incoming orders/, 'UI should show pending deliveries');
+assert.match(garageSceneSource, /Mash.*Ferment.*Package.*Sell/s, 'UI should show clear stage labels');
 assert.match(appBootSource, /loadSavedGame/, 'UI should load browser-local saves on startup');
 assert.match(mainSource, /saveGameState/, 'UI should save browser-local progress after actions and ticks');
-assert.match(mainSource, /New Game \/ Reset Save/, 'UI should expose a reset save button');
-assert.match(mainSource, /caseDefinitionExplanation/, 'UI should reuse the persistent case explanation');
+assert.match(garageSceneSource, /New Game \/ Reset Save/, 'UI should expose a reset save button');
+assert.match(overlaysSource, /caseDefinitionExplanation/, 'UI should reuse the persistent case explanation');
 assert.match(stationPanelSource, /caseCountLabel\(readyBatch\.casesExpected\)/, 'bottling bench should show case counts with the 12 bottle definition');
-assert.match(`${mainSource}\n${stationPanelSource}`, /caseCountLabel\(state\.inventory\.cases\)/, 'pallet and inventory surfaces should show case counts with definition');
-assert.match(mainSource, /caseCountLabel\(lot\.cases\)/, 'finished lot cards should show case counts with definition');
+assert.match(`${mainSource}\n${stationPanelSource}\n${overlaysSource}`, /caseCountLabel\(state\.inventory\.cases\)/, 'pallet and inventory surfaces should show case counts with definition');
+assert.match(overlaysSource, /caseCountLabel\(lot\.cases\)/, 'finished lot cards should show case counts with definition');
 
 assert.match(mainSource, /selectedRecipeCategoryId/, 'recipe flow should keep a category-selection state');
 assert.match(recipePanelSource, /data-action="select-recipe-category"/, 'recipe panel should render category-selection actions');
 assert.match(recipePanelSource, /recipeStockBatchCount/, 'recipe panel should show how many batches current stock supports');
-assert.match(mainSource, /story-phone/, 'mission intros should render as a phone screen');
-assert.match(mainSource, /phone-reply-button/, 'mission phone should use a reply button');
-assert.doesNotMatch(mainSource, /Start the shift/, 'mission intro should not use shift wording');
+assert.match(storyPanelsSource, /story-phone/, 'mission intros should render as a phone screen');
+assert.match(storyPanelsSource, /phone-reply-button/, 'mission phone should use a reply button');
+assert.doesNotMatch(storyPanelsSource, /Start the shift/, 'mission intro should not use shift wording');
 assert.match(recipePanelSource, /renderBrewExplainer/, 'recipe panel should explain mash, boil and transfer before brewing');
 assert.match(stationPanelSource, /renderBrewDayNotes/, 'kettle panel should show brew day notes after brewing');
-assert.match(mainSource, /<svg class="shop-cart-icon"/, 'shop cart hotspot should render as a recognizable SVG cart icon');
-assert.match(mainSource, /select-shop-section/, 'shop cart should first ask whether to shop supplies or equipment');
-assert.doesNotMatch(mainSource, /\$\{renderSceneSupplyHotspots\(\)\}/, 'garage scene should not render floating inventory alert badges');
+assert.match(garageSceneSource, /<svg class="shop-cart-icon"/, 'shop cart hotspot should render as a recognizable SVG cart icon');
+assert.match(overlaysSource, /select-shop-section/, 'shop cart should first ask whether to shop supplies or equipment');
+assert.doesNotMatch(`${mainSource}\n${garageSceneSource}`, /\$\{renderSceneSupplyHotspots\(/, 'garage scene should not render floating inventory alert badges');
 assert.match(recipePanelSource, /recipes-next-page/, 'recipe panel should expose pagination controls');
 assert.match(stationPanelSource, /station-panel recipe-station-panel/, 'recipe selection should use the shared station-panel shell');
+assert.match(garageSceneSource, /export const renderGarage/, 'garage scene rendering should live outside main');
+assert.match(overlaysSource, /export const renderFocusOverlay/, 'focus overlay rendering should live outside main');
+assert.match(inputHandlersSource, /root\.addEventListener\('click'/, 'root click routing should live outside main');
+assert.doesNotMatch(mainSource, /root\.addEventListener\('click'/, 'main should not own root click routing');
+assert.match(stationViewModelSource, /export const createStationViewModel/, 'station view-model helpers should live outside main');
+assert.match(stationViewModelSource, /export const equipmentCapacityLabel/, 'equipment capacity copy should be shared from station view-models');
+assert.match(overlaysSource, /import \{ equipmentCapacityLabel \} from '\.\/stationViewModel\.js'/, 'overlays should reuse the shared equipment capacity label');
+assert.doesNotMatch(mainSource, /const (equipmentCapacityLabel|equipmentSceneStatus|stationPanelContext|renderRecipePanelContent)/, 'main should not own station view-model helpers');
+assert.ok(mainSource.split('\n').length < 350, 'main should stay a thin app orchestrator');
 
 const index = await readFile(new URL('../index.html', import.meta.url), 'utf8');
-const garageCss = await readFile(new URL('../src/styles/garage.css', import.meta.url), 'utf8');
+const garageLayoutSource = await readFile(new URL('../src/data/garageLayout.ts', import.meta.url), 'utf8');
+const garageCssManifest = await readFile(new URL('../src/styles/garage.css', import.meta.url), 'utf8');
+const garageCss = (
+  await Promise.all(
+    [
+      '../src/styles/garage-core.css',
+      '../src/styles/garage-scene.css',
+      '../src/styles/garage-overlays.css',
+      '../src/styles/garage-controls.css',
+      '../src/styles/garage-story-stations.css',
+      '../src/styles/garage-responsive.css'
+    ].map((path) => readFile(new URL(path, import.meta.url), 'utf8'))
+  )
+).join('\n');
 const hasLowOpacityInSelectorBlocks = (cssSource, selectorPatterns, maxOpacityExclusive = 0.9) => {
   const selectorGroup = selectorPatterns.map((pattern) => pattern.source).join('|');
   const blockRegex = new RegExp(`(?:${selectorGroup})[\\s\\S]*?\\{([\\s\\S]*?)\\}`, 'g');
@@ -515,6 +556,10 @@ assert.match(index, /src="\.\/dist\/main\.js"/, 'index should load compiled Type
 assert.match(index, /href="\.\/src\/styles\/globals\.css"/, 'index should load global CSS with a relative path');
 assert.match(index, /href="\.\/src\/styles\/garage\.css"/, 'index should load garage CSS with a relative path');
 assert.doesNotMatch(index, /(?:href|src)="\//, 'index asset references should not use root-relative paths');
+assert.match(garageCssManifest, /garage-scene\.css[\s\S]*garage-overlays\.css[\s\S]*garage-controls\.css[\s\S]*garage-responsive\.css/, 'garage CSS should be split into scene, overlay, control, and responsive sections');
+assert.match(garageCss, /public\/assets\/garage\/backgrounds\/garage-background\.png/, 'garage background should load from public/assets for simple static previews');
+assert.match(garageLayoutSource, /public\/assets\/garage\/equipment/, 'equipment sprites should load from public/assets for simple static previews');
+assert.doesNotMatch(`${garageCss}\n${garageLayoutSource}`, /(?<!public\/)assets\/garage/, 'garage art should not depend on a custom /assets server alias');
 assert.equal(
   hasLowOpacityInSelectorBlocks(garageCss, [/\.mode-idle\b/, /\.mode-fermentation\b/, /\.mode-packaging\b/]),
   false,

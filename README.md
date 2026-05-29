@@ -197,12 +197,27 @@ Brewery-Sim/
     main.ts
     ui/
       appBoot.ts
+      garageScene.ts
+      hud.ts
+      inputHandlers.ts
       layoutDebug.ts
+      overlays.ts
+      recipePanel.ts
       sceneEquipment.ts
+      stationPanel.ts
+      stationViewModel.ts
+      storyPanels.ts
+      tutorialGuidance.ts
       types.ts
     styles/
       globals.css
       garage.css
+      garage-core.css
+      garage-scene.css
+      garage-overlays.css
+      garage-controls.css
+      garage-story-stations.css
+      garage-responsive.css
     game/
       schema.ts
       initialState.ts
@@ -215,12 +230,12 @@ Brewery-Sim/
       ingredients.ts
       recipes.ts
       upgrades.ts
-    scripts/
-      run-tests.mjs
-      run-browser-regression.mjs
-      dev-server.mjs
-    public/
-      assets/
+  scripts/
+    run-tests.mjs
+    run-browser-regression.mjs
+    dev-server.mjs
+  public/
+    assets/
 ```
 
 ### Structure principles
@@ -235,9 +250,10 @@ Brewery-Sim/
 
 - `npm run dev` builds the TypeScript files and serves the prototype locally.
 - `npm run test` runs the build and deterministic gameplay checks.
-- `npm run test:browser` runs the Playwright browser regression after browser binaries are installed with `npx playwright install`.
+- `npm run test:browser` runs the Playwright browser regression after browser binaries are installed with `npx playwright install chromium`.
 - Add `?layoutDebug=1` to the local URL to tune garage object placement. Add `&tierPreview=2` to preview tier 2 equipment placement without saving that debug state.
-- Scene art is loaded from the canonical `public/assets` tree. Runtime URLs intentionally use `/assets/...` so the same paths work in local dev and GitHub Pages.
+- Scene art is loaded from the canonical `public/assets` tree. Runtime URLs intentionally use `public/assets/...` so the same paths work in local dev, GitHub Pages, and simple static previews from the repo root.
+- Phone portrait play is intentionally blocked by the rotate screen for now; the tested mobile target is narrow landscape.
 
 ## Immediate next implementation task
 
@@ -247,8 +263,8 @@ The current practical prototype task is keeping the first playable loop easy to 
 
 Requirements:
 
-- Keep deterministic tests in CI before deployment.
-- Keep `src/main.ts` focused on app composition while moving boot, layout debug, scene mapping, and future overlays into `src/ui`.
+- Keep deterministic and browser regression tests in CI before deployment.
+- Keep `src/main.ts` as a thin app orchestrator while new UI work goes into focused `src/ui` modules.
 - Keep persistence outside core simulation logic.
 - Keep the first five minutes centered on Mash -> Ferment -> Package -> Sell before expanding pressure systems.
 - Do not add accounts, cloud saves, Supabase, Operon integration, or backend infrastructure.

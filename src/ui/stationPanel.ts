@@ -1,6 +1,6 @@
 import type { Batch, EquipmentId, GameState, Recipe } from '../game/schema.js';
 import { getRecipe } from '../data/recipes.js';
-import { campaignAllowsCleaning, campaignAllowsTemperature, campaignVisibleSalesChannels } from '../game/campaign.js';
+import { campaignAllowsCleaning, campaignAllowsFormalBuyers, campaignAllowsTemperature, campaignVisibleSalesChannels } from '../game/campaign.js';
 import {
   caseCountLabel,
   caseDefinitionExplanation,
@@ -11,6 +11,7 @@ import {
   recipeCanStart,
   recipeCategories,
   recipeIngredientCost,
+  saleConsequencePreview,
   saleCasesForChannel,
   salesChannels,
   saleValueForChannel,
@@ -20,13 +21,13 @@ import { renderBrewDayNotes, renderBrewExplainer } from './brewNotes.js';
 import { garageSceneEquipmentInstances } from './sceneEquipment.js';
 import type { GarageSceneEquipmentInstance, SceneTarget } from './types.js';
 
-type EquipmentStatus = {
+export type EquipmentStatus = {
   label: string;
   detail: string;
   toneClass: string;
 };
 
-type StationPanelContext = {
+export type StationPanelContext = {
   state: GameState;
   recipePanelOpen: boolean;
   selectedRecipeCategoryId: string | null;
@@ -55,6 +56,15 @@ const finishedBeerCostBasis = (state: GameState, cases: number): number => {
   return Math.round((ingredientCost / totalCases) * cases);
 };
 
+const renderSaleConsequencePreview = (state: GameState, channelId: ReturnType<typeof salesOfferModels>[number]['id'], cases: number): string => {
+  if (cases <= 0) return 'No sellable cases';
+  const preview = saleConsequencePreview(state, channelId, cases);
+  const riskRelevant = campaignAllowsFormalBuyers(state) || state.visibilityRisk > 0 || state.complianceRisk > 0 || state.householdPressure > 0 || preview.complianceDelta > 0;
+  const simple = `Cash +${formatCurrency(preview.cashDelta)} - Rep +${preview.reputationDelta}`;
+  if (!riskRelevant) return simple;
+  return `${simple} - Visibility +${preview.visibilityDelta} - Compliance +${preview.complianceDelta} - Household +${preview.householdPressureDelta}`;
+};
+
 export const renderSalesOffers = (state: GameState) => `
   <div class="hotspot-actions sales-offers">
     ${salesOfferModels(state)
@@ -64,10 +74,11 @@ export const renderSalesOffers = (state: GameState) => `
         const payout = saleValueForChannel(state, offer.id);
         const costBasis = finishedBeerCostBasis(state, cases);
         const margin = payout - costBasis;
+        const consequencePreview = renderSaleConsequencePreview(state, offer.id, cases);
         const invoiceBlocked = (state.demand.invoiceRequired || (channel.formal && state.visibilityRisk >= channel.invoiceAfter)) && !state.canInvoice;
         const disabled = cases <= 0 || invoiceBlocked;
         return `<button data-action="sell-channel" data-channel-id="${offer.id}" data-cases="${cases}" type="button" ${disabled ? 'disabled' : ''}>
-          ${channel.name}<small>${caseCountLabel(cases)} - payout ${formatCurrency(payout)} - ingredients about ${formatCurrency(costBasis)} - margin about ${formatCurrency(margin)} - ${invoiceBlocked ? 'Invoice blocked' : offer.invoice}</small>
+          ${channel.name}<small>${caseCountLabel(cases)} - payout ${formatCurrency(payout)} - ingredients about ${formatCurrency(costBasis)} - margin about ${formatCurrency(margin)} - preview: ${invoiceBlocked ? 'Invoice blocked' : consequencePreview} - ${offer.invoice}</small>
         </button>`;
       })
       .join('')}

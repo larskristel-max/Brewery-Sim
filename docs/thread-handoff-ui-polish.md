@@ -1,5 +1,7 @@
 # Brewery-Sim Current Handoff
 
+> Historical snapshot: this handoff records the repo state on 2026-05-20. Branch, remote, deployment, and working-tree claims below are not current status. Check `git status`, `git log`, and `TODO.md` before acting on it.
+
 Updated: 2026-05-20  
 Local preview: `http://127.0.0.1:4173/`  
 Current branch: `main`  

@@ -1,5 +1,7 @@
 # Garage Loop Implementation To-Do
 
+> Historical note, updated 2026-05-29: this document contains May 16 implementation notes and walkthrough findings. Many items below have since been implemented or superseded. Use `TODO.md` for the current Rijn-prioritized work list.
+
 This document is the working implementation checklist for the next Brewery-Sim phase. It turns the current planning thread into an ordered build plan so future agents can continue without rereading the full conversation.
 
 Use `docs/equipment-tier-reference.html` as the companion visual reference board for Tier 1, Tier 2, and Tier 3 equipment.
@@ -292,6 +294,8 @@ Keep audio optional and browser-safe.
 
 ### Immediate Next Build Order
 
+Historical May 16 list. Do not treat as the current next-build order without checking `TODO.md`.
+
 1. Remove the bad CSS equipment overlay.
 2. Preserve useful UX fixes: brewhouse opens recipes, order overlay stays open, duplicate missing orders are blocked.
 3. Add real date-based delivery estimates and order status.
@@ -305,7 +309,7 @@ Keep audio optional and browser-safe.
 
 ## Current Local Walkthrough Findings
 
-Verified on May 16, 2026 against the current local app at `http://localhost:4173` after running the existing prototype checks.
+Historical findings verified on May 16, 2026 against the then-current local app at `http://localhost:4173`. These notes are retained for context and may conflict with current code.
 
 - `npm.cmd test` passes; the PowerShell `npm test` alias can fail on this machine because `npm.ps1` is blocked by execution policy.
 - The app opens locally and the iPad-like landscape viewport fits without showing the rotate blocker.
@@ -979,9 +983,9 @@ Done when:
 
 ### 16. Keep Dist In Sync
 
-Purpose: keep GitHub Pages loading the current code.
+Historical deployment note. GitHub Pages now builds and deploys an artifact through `.github/workflows/pages.yml`; committed `dist` is no longer the Pages freshness mechanism unless the repo keeps it for another policy.
 
-For now, the repo tracks built `dist` files. Until deployment is cleaned up:
+If committed `dist` remains tracked, keep it consistent with source during local prototype work:
 
 - Change source files.
 - Run the build.

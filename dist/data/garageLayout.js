@@ -1,6 +1,6 @@
-// Runtime URLs resolve from the canonical public/assets tree in local dev and Pages.
-export const garageEquipmentAssetPath = (tier, filename) => `assets/garage/equipment/${tier}/${filename}`;
-export const garageSellPointAssetPath = (filename) => `assets/garage/sell-point/${filename}`;
+// Runtime URLs resolve from the canonical public/assets tree when served or opened from the repo root.
+export const garageEquipmentAssetPath = (tier, filename) => `public/assets/garage/equipment/${tier}/${filename}`;
+export const garageSellPointAssetPath = (filename) => `public/assets/garage/sell-point/${filename}`;
 const defaultTapPadding = { x: 4, y: 8 };
 const tier1GarageEquipmentLayout = {
     brewhouse: { x: 24.6, y: 53.1, width: 17 },
