@@ -309,6 +309,24 @@ assert.equal(earlyPackage.batches[0].step, 'awaiting-packaging', 'package early 
 assert.ok(earlyPackage.batches[0].conditioningState.packagePressureRisk > 0, 'early packaging should carry package pressure risk forward');
 assert.ok(earlyPackage.batches[0].quality < earlyQualityBefore, 'early packaging should damage quality when FG is not stable');
 
+let lastMinuteGravity = createInitialState();
+lastMinuteGravity = reduceGame(lastMinuteGravity, { type: 'start-batch', recipeId: 'garage-blonde' });
+lastMinuteGravity = reduceGame(lastMinuteGravity, { type: 'wait-until-ready', batchId: lastMinuteGravity.batches[0].id });
+lastMinuteGravity = reduceGame(lastMinuteGravity, { type: 'transfer-batch', batchId: lastMinuteGravity.batches[0].id });
+lastMinuteGravity.batches[0].stepProgress = 99.999;
+lastMinuteGravity = reduceGame(lastMinuteGravity, { type: 'check-gravity', batchId: lastMinuteGravity.batches[0].id });
+assert.equal(lastMinuteGravity.batches[0].step, 'awaiting-packaging', 'last-minute gravity check should preserve completed fermentation state');
+assert.equal(lastMinuteGravity.batches[0].fermentationReadiness.fgConfidence, 'stable', 'last-minute gravity check should not reset FG confidence after fermentation completes');
+assert.equal(lastMinuteGravity.batches[0].fermentationReadiness.apparentProgress, 100, 'last-minute gravity check should keep apparent fermentation progress complete');
+lastMinuteGravity = reduceGame(lastMinuteGravity, { type: 'start-packaging', batchId: lastMinuteGravity.batches[0].id, packagingMode: 'standard' });
+lastMinuteGravity = tickUntilStep(lastMinuteGravity, 'ready');
+assert.equal(lastMinuteGravity.finishedBeerLots.length, 1, 'last-minute gravity checked beer should finish normally');
+assert.equal(
+  lastMinuteGravity.finishedBeerLots[0].verdict.likelyCauses.some((cause) => /Packaged before stable gravity/i.test(cause)),
+  false,
+  'last-minute gravity check should not create an early-packaging verdict cause'
+);
+
 let exactIpa = createInitialState();
 stockRecipeIngredients(exactIpa, ipa);
 exactIpa = reduceGame(exactIpa, { type: 'start-batch', recipeId: 'backyard-ipa' });

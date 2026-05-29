@@ -1154,7 +1154,11 @@ const checkGravity = (next: GameState, batchId?: string): GameState => {
     return next;
   }
   advanceGameTime(next, 15, 4);
-  batch.fermentationReadiness = fermentationReadinessFor(next, getRecipe(batch.recipeId), batch.stepProgress, true);
+  if (batch.step === 'fermenting') {
+    batch.fermentationReadiness = fermentationReadinessFor(next, getRecipe(batch.recipeId), batch.stepProgress, true);
+  } else if (batch.step === 'awaiting-packaging') {
+    batch.fermentationReadiness = batch.fermentationReadiness ?? fermentationReadinessFor(next, getRecipe(batch.recipeId), 100, true);
+  }
   addEvent(next, `${batch.recipeName} gravity check: FG confidence is ${batch.fermentationReadiness.fgConfidence}, yeast cleanup is ${batch.fermentationReadiness.yeastCleanup}.`);
   return next;
 };
