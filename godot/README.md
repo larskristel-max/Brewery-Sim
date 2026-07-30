@@ -12,6 +12,7 @@ Open `project.godot` in Godot 4.7.1 and run the project. “Night of First Light
 4. Recommission the copper brewhouse, mash, solve the temperature drift, choose a response to the missing hop delivery, boil, clean and purge the fermenter, transfer, ferment and package.
 5. Prepare the courtyard during fermentation, serve the 20 L keg, and choose how to answer Apolline at the weekly council.
 6. Begin Week 2 and choose between the Saint Brigid Festival and the Count's Cellar Reserve. The reserve introduces Stable Amber, a higher quality target, and a recipe-specific stalled-runoff decision.
+7. After the second council, negotiate two simultaneous opportunities. The live production board lets one batch ferment while another is prepared, while workers, stations, stock, fatigue, equipment wear, and deadlines compete.
 
 Space pauses; 1, 2, and 4 set time speed. The on-screen 12× control accelerates long work, and “Advance to next milestone” jumps directly to the next scheduled job completion. Save and Load persist the entire campaign state.
 
@@ -25,7 +26,7 @@ Space pauses; 1, 2, and 4 set time speed. The on-screen 12× control accelerates
 - The opening uses cinematic crops, slow camera moves, rain, letterboxing, timed dialogue, and restrained sound cues to establish the failing estate, Armand's mandate, Apolline's financial discipline, and the Brewmaster-to-Steward ambition before the first interactive lamp-lighting.
 - The playable presentation uses six stage-specific 2.5D scenes: appointment, brewery floor, mash intervention, packaging, courtyard service, and weekly council.
 - Equipment hotspots drive contextual commands. Camera focus, parallax, live assignment cards, progress rings, steam, liquid, condensation, transfer flow, firelight, and trust-responsive courtyard warmth make the simulation state visible without treating painted background figures as simulated staff.
-- The interface is environment-first and resolution-aware. Normal management stays in compact top and bottom docks; decision panels appear only when judgment is required. The canvas expands cleanly for ultrawide displays.
+- The interface is environment-first and resolution-aware. Normal management stays in top and bottom docks; decision panels appear only when judgment is required. Multi-batch production adds a persistent contract rail with deadline, quality, work, demand, stock, and station forecasts. The canvas expands cleanly for ultrawide displays.
 - A modular 3D blockout remains in the project as a future asset-production base; it is not presented as final art.
 - Inventory is lot-based. The promise, brewing choices, deadline, sensory tags and final service result feed cash, community trust and the Count's confidence.
 - Four authority ranks are implemented: Castle Brewmaster, Keeper of the Old Stables, Deputy Steward, and Estate Steward.
@@ -48,9 +49,10 @@ godot --headless --path godot --script res://tests/world_layout_test.gd
 godot --headless --path godot --script res://tests/worker_presentation_test.gd
 ```
 
-The model suite runs complete brew routes with different decisions and outcomes, validates Week 2 commitments, recipe-specific production trouble, station and staff constraints, authority gates, restoration, serious business risk, and versioned saves. The UI suite presses the real controls through promotion, Week 2 planning, and the Stable Amber lauter decision. The visual suites verify camera-correct world hotspots and truthful live assignment chips at 720p, 900p, and ultrawide resolutions.
+The model suite runs complete brew routes with different decisions and outcomes, validates Week 2 commitments, three viable Week 3 schedules, overcommitment, multi-batch resource and station conflicts, authority gates, restoration, serious business risk, and versioned saves. The UI suite presses the real controls through promotion, Week 2 planning, the Stable Amber lauter decision, capacity negotiation, and live batch switching. The visual suites verify camera-correct world hotspots and truthful live assignment chips at 720p, 900p, and ultrawide resolutions.
 
 The active milestone and its exit criteria are maintained in [`../TODO.md`](../TODO.md).
+The management-game and accessibility benchmark audit is in [`../docs/ui-ux-benchmark-review.md`](../docs/ui-ux-benchmark-review.md).
 
 To regenerate the visual-review gallery, run the capture script without `--headless`:
 

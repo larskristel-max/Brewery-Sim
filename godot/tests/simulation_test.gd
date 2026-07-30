@@ -389,50 +389,156 @@ func _assert_stage_save(source: BrewSimulation, expected_stage: String, suffix: 
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
 
 func _test_capacity_conflict(failures: Array[String]) -> void:
-	var model := _run_route("cut_heat_stir", "estate_herbs", "pay_creditor", failures)
-	model = _continue_week_two_contract(model, "festival_rush", failures)
-	_expect(is_equal_approx(float(model.state.inventory.empty_keg.quantity), 1.0), "Fresh two-week route should reach capacity planning with one estate keg", failures)
-	_expect(model.begin_next_week().ok and model.state.stage == "capacity_planning", "Week 3 did not open the capacity board", failures)
-	_expect(int(model.state.capacity_board.partner_returnable_kegs) == 1 and int(model.state.capacity_board.constraints.kegs) == 2, "Capacity partners did not supply the legitimate second returnable keg", failures)
-	_expect(model.get_capacity_opportunities().size() == 2, "Capacity board did not show both simultaneous opportunities", failures)
-	var planning_minute := int(model.state.game_minute)
-	model.advance(60)
-	_expect(int(model.state.game_minute) == planning_minute, "Time advanced under unresolved capacity planning", failures)
-	_expect(model.respond_to_capacity_opportunity("abbey_table", "accept").ok, "Could not accept abbey opportunity", failures)
-	_expect(not model.respond_to_capacity_opportunity("inn_cellar", "accept").ok, "Capacity board accepted two full contracts beyond malt/staff limits", failures)
-	_expect(model.respond_to_capacity_opportunity("inn_cellar", "renegotiate").ok, "Could not renegotiate the second opportunity into capacity", failures)
-	_expect(str(model.state.capacity_board.responses.inn_cellar) == "renegotiated", "Renegotiated opportunity did not record its status", failures)
-	_expect(model.finalize_capacity_plan().ok, "A feasible accepted + renegotiated plan could not be finalized", failures)
-	_expect(model.state.stage == "ready_to_mash" and model.state.production_queue.size() == 1, "Capacity finalization did not activate one batch and queue the other", failures)
-	_expect(bool(model.state.capacity_board.pressure.fermenter_overlap), "Two live commitments did not flag fermenter overlap", failures)
-	_expect(int(model.state.capacity_board.pressure.staff_hours_reserved) == 13, "Capacity board did not reserve constrained staff hours", failures)
-	model.state.stations.brewhouse.cleanliness = 92
-	_ensure_on_shift(model, "player")
-	_expect(model.start_action("mash", "player").ok, "Capacity-plan mash could not begin", failures)
-	model.advance_to_next_milestone()
-	_expect(model.choose_issue("cut_heat_stir").ok and model.choose_issue("reduce_bitterness").ok, "Capacity-plan first batch trouble could not be resolved", failures)
-	_ensure_on_shift(model, "player")
-	_expect(model.start_action("boil", "player").ok, "Capacity-plan boil could not begin", failures)
-	model.advance_to_next_milestone()
-	model.state.stations.fermenter.cleanliness = 93
-	_ensure_on_shift(model, "player")
-	_expect(model.start_action("transfer", "player").ok, "Capacity-plan transfer could not begin", failures)
-	model.advance_to_next_milestone()
-	_expect(model.state.stage == "fermenting" and _has_action(model, "prepare_next_batch"), "Queued preparation did not overlap active fermentation", failures)
-	_ensure_on_shift(model, "jules")
-	_expect(model.start_action("prepare_next_batch", "jules").ok, "Could not assign overlapping next-batch preparation", failures)
-	_expect(model.get_active_jobs().size() == 2, "Preparation and fermentation were not simultaneously active", failures)
-	model.advance_to_next_milestone()
-	_expect(bool(model.state.production_queue[0].prepared), "Overlapping preparation did not ready the queued batch", failures)
+	var overcommitted := _capacity_fixture(failures)
+	_expect(int(overcommitted.state.capacity_board.partner_returnable_kegs) == 1 and int(overcommitted.state.capacity_board.constraints.kegs) == 3, "Capacity partners did not supply the legitimate returnable keg", failures)
+	_expect(overcommitted.get_capacity_opportunities().size() == 2, "Capacity board did not show both simultaneous opportunities", failures)
+	var planning_minute := int(overcommitted.state.game_minute)
+	overcommitted.advance(60)
+	_expect(int(overcommitted.state.game_minute) == planning_minute, "Time advanced under unresolved capacity planning", failures)
+	_expect(overcommitted.respond_to_capacity_opportunity("abbey_table", "accept").ok, "Could not accept abbey opportunity", failures)
+	_expect(not overcommitted.respond_to_capacity_opportunity("inn_cellar", "accept").ok, "Capacity board accepted two full contracts beyond the staff-hour limit", failures)
+	_expect(overcommitted.respond_to_capacity_opportunity("inn_cellar", "renegotiate").ok, "Could not renegotiate the second opportunity into capacity", failures)
+	_expect(str(overcommitted.state.capacity_board.responses.inn_cellar) == "renegotiated", "Renegotiated opportunity did not record its status", failures)
+	var malt_before := float(overcommitted.state.inventory.malt.quantity)
+	var hops_before := float(overcommitted.state.inventory.citrus_hops.quantity)
+	var yeast_before := float(overcommitted.state.inventory.yeast.quantity)
+	var kegs_before := float(overcommitted.state.inventory.empty_keg.quantity)
+	_expect(overcommitted.finalize_capacity_plan().ok, "A feasible accepted + renegotiated plan could not be finalized", failures)
+	_expect(overcommitted.state.stage == "operations" and overcommitted.state.production_batches.size() == 2, "Capacity finalization did not create two independent live batches", failures)
+	_expect(bool(overcommitted.state.capacity_board.pressure.fermenter_overlap), "Two live commitments did not flag fermenter overlap", failures)
+	_expect(int(overcommitted.state.capacity_board.pressure.staff_hours_reserved) == 13, "Capacity board did not reserve constrained staff hours", failures)
+	_expect(is_equal_approx(float(overcommitted.state.inventory.malt.quantity), malt_before - 7.2), "Locking the plan did not reserve both malt bills", failures)
+	_expect(is_equal_approx(float(overcommitted.state.inventory.citrus_hops.quantity), hops_before - 0.058), "Locking the plan did not reserve both hop bills", failures)
+	_expect(is_equal_approx(float(overcommitted.state.inventory.yeast.quantity), yeast_before - 2.0) and is_equal_approx(float(overcommitted.state.inventory.empty_keg.quantity), kegs_before - 2.0), "Locking the plan did not reserve yeast and kegs", failures)
+	var first_action: Dictionary = overcommitted.get_available_actions()[0]
+	var fresh_duration := overcommitted.estimate_action_duration(first_action, "player")
+	overcommitted.state.staff.player.energy = 40
+	_expect(overcommitted.estimate_action_duration(first_action, "player") > fresh_duration, "Worker fatigue did not forecast a longer operations work order", failures)
+	overcommitted.state.staff.player.energy = 100
+	var original_deadline := int(overcommitted.state.production_batches[0].deadline_minute)
+	overcommitted.state.production_batches[0].deadline_minute = int(overcommitted.state.game_minute) + 30
+	_expect(str(overcommitted.get_operations_overview().batches[0].risk) == "AT RISK", "A deadline shorter than remaining production was not forecast as at risk", failures)
+	overcommitted.state.production_batches[0].deadline_minute = original_deadline
+	_expect(overcommitted.select_operations_batch(str(overcommitted.state.production_batches[0].id)).ok, "Could not select the first production batch", failures)
+	_expect(_start_operations_step(overcommitted, "player", failures), "Could not start the first live batch work order", failures)
+	overcommitted.advance_to_next_milestone()
+	while str(overcommitted.state.production_batches[0].stage) != "fermenting":
+		_expect(_start_operations_step(overcommitted, "player", failures), "Could not progress the first batch into fermentation", failures)
+		overcommitted.advance_to_next_milestone()
+	var first_fermentation_end := int(overcommitted.get_active_jobs()[0].ends)
+	_expect(not overcommitted.advance_to_next_milestone().ok, "Next milestone skipped an actionable second batch instead of requiring a scheduling choice", failures)
+	_expect(int(overcommitted.state.game_minute) < first_fermentation_end, "The milestone guard advanced through fermenter time despite parallel work", failures)
+	_expect(overcommitted.select_operations_batch(str(overcommitted.state.production_batches[1].id)).ok, "Could not select the second production batch", failures)
+	_expect(_start_operations_step(overcommitted, "jules", failures), "Could not stage the second grain bill during first-batch fermentation", failures)
+	_expect(overcommitted.get_active_jobs().size() == 2, "Second-batch preparation did not overlap active fermentation", failures)
+	_assert_stage_save(overcommitted, "operations", "operations", failures)
+	var max_parallel := _finish_operations_plan(overcommitted, failures)
+	_expect(max_parallel >= 2, "Accepted + renegotiated schedule never used parallel people or stations", failures)
+	_expect(overcommitted.state.stage == "operations_council" and overcommitted.state.operations_results.size() == 2, "Dual-batch schedule did not reach a two-result production council", failures)
+	_expect(str(overcommitted.state.operations_results[0].status) == "fulfilled" and str(overcommitted.state.operations_results[1].status) == "fulfilled", "The accepted + renegotiated plan was not a genuinely viable two-contract schedule", failures)
+	_expect(int(overcommitted.state.demand.community) != 50 and int(overcommitted.state.demand.premium) != 45, "Independent contract results did not change both demand segments", failures)
+	_expect(overcommitted.resolve_operations_council("pay_creditor").ok and overcommitted.state.stage == "complete", "Multi-batch council could not close the week", failures)
 
-	var rejected: BrewSimulation = BrewSimulationModel.new()
-	rejected.new_campaign()
-	rejected.state.week_number = 2
-	rejected.state.stage = "complete"
-	rejected.begin_next_week()
+	var abbey_only := _capacity_fixture(failures)
+	_expect(abbey_only.respond_to_capacity_opportunity("abbey_table", "accept").ok and abbey_only.respond_to_capacity_opportunity("inn_cellar", "reject").ok and abbey_only.finalize_capacity_plan().ok, "Abbey-only viable schedule could not be committed", failures)
+	_finish_operations_plan(abbey_only, failures)
+	_expect(abbey_only.state.operations_results.size() == 1 and str(abbey_only.state.operations_results[0].commitment_id) == "abbey_table" and str(abbey_only.state.operations_results[0].status) == "fulfilled", "Abbey-only viable schedule did not fulfill its contract", failures)
+
+	var inn_only := _capacity_fixture(failures)
+	_expect(inn_only.respond_to_capacity_opportunity("abbey_table", "reject").ok and inn_only.respond_to_capacity_opportunity("inn_cellar", "accept").ok and inn_only.finalize_capacity_plan().ok, "Inn-only viable schedule could not be committed", failures)
+	_finish_operations_plan(inn_only, failures)
+	_expect(inn_only.state.operations_results.size() == 1 and str(inn_only.state.operations_results[0].commitment_id) == "inn_cellar" and str(inn_only.state.operations_results[0].status) == "fulfilled", "Inn-only viable schedule did not fulfill its contract", failures)
+
+	var worn := _capacity_fixture(failures)
+	worn.respond_to_capacity_opportunity("abbey_table", "accept")
+	worn.respond_to_capacity_opportunity("inn_cellar", "reject")
+	worn.finalize_capacity_plan()
+	worn.state.stations.brewhouse.cleanliness = 92
+	worn.state.stations.brewhouse.condition = 30
+	var worn_mash := "ops::%s::mash" % str(worn.state.active_batch_id)
+	_expect(not worn.start_action(worn_mash, "player").ok, "An unsafe worn brewhouse accepted new production", failures)
+	var repair_action := ""
+	for action in worn.get_available_actions():
+		if str(action.get("base_action", "")) == "repair_brewhouse": repair_action = str(action.id)
+	var worn_condition := int(worn.state.stations.brewhouse.condition)
+	_expect(not repair_action.is_empty() and worn.start_action(repair_action, "jules").ok, "Unsafe equipment did not expose a repair work order", failures)
+	worn.advance_to_next_milestone()
+	_expect(int(worn.state.stations.brewhouse.condition) > worn_condition, "Repair work did not restore station condition", failures)
+
+	var rejected := _capacity_fixture(failures)
 	_expect(rejected.respond_to_capacity_opportunity("abbey_table", "reject").ok, "Could not reject first opportunity", failures)
 	_expect(rejected.respond_to_capacity_opportunity("inn_cellar", "reject").ok, "Could not reject second opportunity", failures)
 	_expect(not rejected.finalize_capacity_plan().ok, "Rejecting all work incorrectly began production", failures)
+
+func _capacity_fixture(failures: Array[String]) -> BrewSimulation:
+	var model: BrewSimulation = BrewSimulationModel.new()
+	model.new_campaign()
+	model.state.week_number = 2
+	model.state.stage = "complete"
+	_expect(model.begin_next_week().ok and model.state.stage == "capacity_planning", "Week 3 did not open the capacity board", failures)
+	return model
+
+func _start_operations_step(model: BrewSimulation, preferred_staff: String, failures: Array[String]) -> bool:
+	var actions := model.get_available_actions()
+	var selected_action: Dictionary = {}
+	for action in actions:
+		if str(action.get("batch_id", "")) != str(model.state.active_batch_id): continue
+		if not str(action.get("base_action", "")).begins_with("repair_"):
+			selected_action = action
+			break
+	if selected_action.is_empty():
+		for action in actions:
+			if str(action.get("batch_id", "")) == str(model.state.active_batch_id):
+				selected_action = action
+				break
+	if selected_action.is_empty(): return false
+	if bool(model.state.stations[str(selected_action.station)].busy): return false
+	var worker := _operations_worker(model, selected_action, preferred_staff)
+	if worker.is_empty():
+		model.advance(60)
+		worker = _operations_worker(model, selected_action, preferred_staff)
+	if worker.is_empty(): return false
+	var result := model.start_action(str(selected_action.id), worker)
+	_expect(bool(result.ok), "Operations work order failed: %s" % str(result.message), failures)
+	return bool(result.ok)
+
+func _operations_worker(model: BrewSimulation, action: Dictionary, preferred_staff: String) -> String:
+	var candidates := [preferred_staff, "player", "jules", "maelle", "inez", "noor"]
+	var skill := str(action.get("skill", ""))
+	for staff_id in candidates:
+		if not model.state.staff.has(staff_id): continue
+		if model.is_staff_available(staff_id) and int(model.state.staff[staff_id].skills.get(skill, 0)) > 0:
+			return staff_id
+	return ""
+
+func _finish_operations_plan(model: BrewSimulation, failures: Array[String]) -> int:
+	var guard := 0
+	var max_parallel := model.get_active_jobs().size()
+	while bool(model.state.get("operations_active", false)) and guard < 240:
+		var started := false
+		var batch_ids := []
+		for batch in model.state.production_batches: batch_ids.append(str(batch.id))
+		for batch_id in batch_ids:
+			var batch_index := -1
+			for index in range(model.state.production_batches.size()):
+				if str(model.state.production_batches[index].id) == batch_id: batch_index = index
+			if batch_index < 0: continue
+			var stage := str(model.state.production_batches[batch_index].stage)
+			if stage in ["settled", "fermenting"] or _batch_has_active_job(model, batch_id): continue
+			model.select_operations_batch(batch_id)
+			if _start_operations_step(model, "player", failures): started = true
+		max_parallel = maxi(max_parallel, model.get_active_jobs().size())
+		if not started:
+			var result := model.advance_to_next_milestone()
+			if not bool(result.ok): model.advance(60)
+		guard += 1
+	_expect(guard < 240, "Operations schedule stalled: %s" % JSON.stringify(model.get_operations_overview()), failures)
+	return max_parallel
+
+func _batch_has_active_job(model: BrewSimulation, batch_id: String) -> bool:
+	for job in model.get_active_jobs():
+		if str(job.get("batch_id", "")) == batch_id: return true
+	return false
 
 func _ensure_on_shift(model: BrewSimulation, staff_id: String) -> void:
 	if model.is_staff_available(staff_id): return
@@ -467,6 +573,7 @@ func _test_scenario_recipe_data(failures: Array[String]) -> void:
 		var full_staff_hours := 0
 		for opportunity in contracts.get("capacity_opportunities", []):
 			full_staff_hours += int(opportunity.resources.staff_hours)
+			_expect(float(opportunity.resources.get("hops_kg", 0.0)) > 0.0 and int(opportunity.resources.get("yeast", 0)) == 1 and int(opportunity.resources.get("kegs", 0)) == 1, "Authored capacity opportunity lacks its complete ingredient or packaging bill", failures)
 		_expect(full_staff_hours > 14, "Authored capacity opportunities do not create a real staff-hour conflict", failures)
 
 func _test_fail_forward(failures: Array[String]) -> void:

@@ -36,7 +36,7 @@
       "recipe": "Lantern Blonde",
       "advance": 360,
       "deadline_days": 8,
-      "resources": {"malt_kg": 4.2, "kegs": 1, "staff_hours": 8, "cash": 180}
+      "resources": {"malt_kg": 4.2, "hops_kg": 0.038, "yeast": 1, "kegs": 1, "staff_hours": 8, "cash": 180}
     },
     {
       "id": "inn_cellar",
@@ -44,7 +44,7 @@
       "recipe": "Stable Amber",
       "advance": 520,
       "deadline_days": 10,
-      "resources": {"malt_kg": 5.4, "kegs": 1, "staff_hours": 9, "cash": 260}
+      "resources": {"malt_kg": 5.4, "hops_kg": 0.030, "yeast": 1, "kegs": 1, "staff_hours": 9, "cash": 260}
     }
   ]
 }

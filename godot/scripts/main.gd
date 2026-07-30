@@ -47,7 +47,7 @@ func _process(delta: float) -> void:
 			var whole_minutes := int(minute_accumulator)
 			minute_accumulator -= whole_minutes
 			simulation.advance(whole_minutes)
-			if (issue_before == "" and simulation.state.pending_issue != "") or (stage_before != str(simulation.state.stage) and str(simulation.state.stage) in ["delivery_recovery", "capacity_planning", "council"]):
+			if (issue_before == "" and simulation.state.pending_issue != "") or (stage_before != str(simulation.state.stage) and str(simulation.state.stage) in ["delivery_recovery", "capacity_planning", "council", "operations_council"]):
 				speed = 0
 				_set_status("Time paused — your judgment is required.", true)
 	if simulation.revision != last_revision:
@@ -67,7 +67,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _build_theme() -> Theme:
 	var result := Theme.new()
-	result.default_font_size = 14
+	result.default_font_size = 15
 	result.set_color("font_color", "Label", CREAM)
 	result.set_color("font_color", "Button", CREAM)
 	result.set_color("font_hover_color", "Button", Color.WHITE)
@@ -275,6 +275,33 @@ func _build_command_dock() -> void:
 	load.pressed.connect(_load_game)
 	clock_group.add_child(load)
 	ui.load_button = load
+	var batch_rail_panel := PanelContainer.new()
+	batch_rail_panel.name = "BatchRail"
+	batch_rail_panel.custom_minimum_size = Vector2(0, 76)
+	batch_rail_panel.add_theme_stylebox_override("panel", _panel_style(0.72, 8, 8))
+	batch_rail_panel.visible = false
+	content.add_child(batch_rail_panel)
+	ui.batch_rail_panel = batch_rail_panel
+	var batch_rail_row := HBoxContainer.new()
+	batch_rail_row.add_theme_constant_override("separation", 10)
+	batch_rail_panel.add_child(batch_rail_row)
+	var operations_forecast := Label.new()
+	operations_forecast.custom_minimum_size = Vector2(320, 0)
+	operations_forecast.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	operations_forecast.add_theme_font_size_override("font_size", 15)
+	operations_forecast.add_theme_color_override("font_color", SAGE)
+	batch_rail_row.add_child(operations_forecast)
+	ui.operations_forecast = operations_forecast
+	batch_rail_row.add_child(VSeparator.new())
+	var batch_scroll := ScrollContainer.new()
+	batch_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	batch_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	batch_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	batch_rail_row.add_child(batch_scroll)
+	var batch_rail := HBoxContainer.new()
+	batch_rail.add_theme_constant_override("separation", 8)
+	batch_scroll.add_child(batch_rail)
+	ui.batch_rail = batch_rail
 	content.add_child(HSeparator.new())
 	var command_row := HBoxContainer.new()
 	command_row.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -632,7 +659,11 @@ func _on_first_light_activated() -> void:
 func _refresh(force_structure := false) -> void:
 	last_revision = simulation.revision
 	var state := simulation.state
-	if str(state.stage) in ["week_planning", "delivery_recovery", "capacity_planning", "ready_to_package", "ready_to_serve", "council", "complete"]: selected_station = ""
+	var operations_mode := bool(state.get("operations_active", false)) or str(state.stage) == "operations_council"
+	ui.batch_rail_panel.visible = operations_mode
+	ui.command_dock.offset_top = -446 if operations_mode else -206
+	ui.decision_panel.offset_bottom = -446 if str(state.stage) == "operations_council" else -224
+	if str(state.stage) in ["week_planning", "delivery_recovery", "capacity_planning", "ready_to_package", "ready_to_serve", "council", "operations_council", "complete"]: selected_station = ""
 	ui.cash.text = "¤ %s" % _format_number(int(state.cash))
 	ui.confidence.text = "%d / 100" % int(state.count_confidence)
 	ui.community.text = "%d / 100" % int(state.community_trust)
@@ -642,14 +673,15 @@ func _refresh(force_structure := false) -> void:
 	ui.stage.text = _stage_label(state)
 	ui.stage.tooltip_text = _stage_label(state)
 	ui.time.text = simulation.format_time() + (" · PAUSED" if speed == 0 else " · %d×" % speed)
-	var judgment_pending := str(state.pending_issue) != "" or str(state.stage) in ["week_planning", "delivery_recovery", "capacity_planning", "council", "complete"]
+	var judgment_pending := str(state.pending_issue) != "" or str(state.stage) in ["week_planning", "delivery_recovery", "capacity_planning", "council", "operations_council", "complete"]
 	for clock_control in ui.clock_buttons:
 		clock_control.button.disabled = judgment_pending and int(clock_control.speed) > 0
 	ui.context.text = _context_eyebrow(state)
 	ui.title.text = _context_title()
 	ui.objective.text = _decision_objective() if str(state.pending_issue) != "" else simulation.objective_text()
 	ui.batch.text = "%s · %.1f L · QUALITY %d · SAFETY %d" % [state.batch.recipe, float(state.batch.volume_l), int(state.batch.quality), int(state.batch.safety)]
-	ui.inventory.text = "Malt %.1f kg · Yeast %.0f · Herbs %.2f kg · Kegs %.0f" % [float(state.inventory.malt.quantity), float(state.inventory.yeast.quantity), float(state.inventory.garden_herbs.quantity), float(state.inventory.empty_keg.quantity)]
+	ui.inventory.visible = operations_mode
+	ui.inventory.text = "FREE STOCK · malt %.1f kg · hops %.0f g · yeast %.0f · kegs %.0f" % [float(state.inventory.malt.quantity), float(state.inventory.citrus_hops.quantity) * 1000.0, float(state.inventory.yeast.quantity), float(state.inventory.empty_keg.quantity)]
 	ui.jobs.text = _jobs_text()
 	ui.jobs.tooltip_text = _jobs_tooltip()
 	ui.wait_button.visible = not simulation.get_active_jobs().is_empty()
@@ -659,9 +691,10 @@ func _refresh(force_structure := false) -> void:
 	ui.consequence.text = _consequence_text()
 	ui.guidance.text = _guidance_text()
 	ui.guidance_panel.visible = started and int(state.get("week_number", 1)) == 1 and str(state.stage) in ["appointment","recommission","ready_to_mash"] and str(state.pending_issue) == ""
-	var signature := JSON.stringify([state.stage, state.pending_issue, state.courtyard_prepared, state.labels_prepared, state.jobs, state.staff, state.campaign_lost, state.get("delivery_problem", {}), state.get("delivery_recovery", {}), state.get("capacity_board", {}), selected_station])
+	var signature := JSON.stringify([state.stage, state.pending_issue, state.courtyard_prepared, state.labels_prepared, state.jobs, state.staff, state.stations, state.campaign_lost, state.get("delivery_problem", {}), state.get("delivery_recovery", {}), state.get("capacity_board", {}), state.get("production_batches", []), state.get("active_batch_id", ""), state.get("demand", {}), selected_station])
 	if force_structure or signature != last_structure_signature:
 		last_structure_signature = signature
+		_rebuild_batch_rail()
 		_rebuild_staff()
 		_rebuild_actions()
 		_rebuild_choices()
@@ -681,15 +714,89 @@ func _stage_label(state: Dictionary) -> String:
 	if state.stage == "week_planning": return "WEEK %d · PRODUCTION PLAN" % int(state.week_number)
 	if state.stage == "delivery_recovery": return "DELIVERY ALERT · RECOVERY"
 	if state.stage == "capacity_planning": return "WEEK %d · CAPACITY BOARD" % int(state.week_number)
+	if state.stage == "operations": return "WEEK %d · BREWERY IN MOTION" % int(state.week_number)
+	if state.stage == "operations_council": return "WEEK %d · PRODUCTION COUNCIL" % int(state.week_number)
 	return str(state.stage).replace("_", " ").to_upper()
 
 func _context_eyebrow(state: Dictionary) -> String:
 	if state.pending_issue != "": return "YOUR JUDGMENT"
+	if state.stage == "operations_council": return "WEEK %d · PRODUCTION LEDGER" % int(state.week_number)
+	if bool(state.get("operations_active", false)): return "WEEK %d · LIVE PRODUCTION BOARD" % int(state.week_number)
 	if not selected_station.is_empty(): return "%s · SELECTED WORK ZONE" % selected_station.replace("_"," ").to_upper()
 	if state.stage == "week_planning": return "WEEK %d · YOUR COMMITMENT" % int(state.week_number)
 	if state.stage == "delivery_recovery": return "THE PROMISE IS AT RISK"
 	if state.stage == "capacity_planning": return "TWO PROMISES · ONE BREWHOUSE"
 	return "THE FIRST REAL BREW" if int(state.get("week_number", 1)) == 1 else "THE NEXT BREWING WEEK"
+
+func _rebuild_batch_rail() -> void:
+	_clear_children(ui.batch_rail)
+	var overview := simulation.get_operations_overview()
+	var batches: Array = overview.get("batches", [])
+	if batches.is_empty():
+		ui.operations_forecast.text = "PRODUCTION LEDGER\nNo live batch commitments."
+		return
+	var resources: Dictionary = overview.get("resources", {})
+	var demand: Dictionary = overview.get("demand", {})
+	var busy_stations := 0
+	var lowest_condition := 101
+	var worn_station := ""
+	for station in overview.get("stations", []):
+		if bool(station.get("busy", false)): busy_stations += 1
+		if int(station.get("condition", 100)) < lowest_condition:
+			lowest_condition = int(station.get("condition", 100))
+			worn_station = str(station.get("name", "station"))
+	ui.operations_forecast.text = "FREE · malt %.1f kg · hops %.0f g\nPACK · yeast %d · kegs %d\nDEMAND · local %d · premium %d · reliability %d\nCAPACITY · %d / 4 occupied" % [
+		float(resources.get("malt_kg", 0.0)),
+		float(resources.get("hops_kg", 0.0)) * 1000.0,
+		int(resources.get("yeast", 0)),
+		int(resources.get("kegs", 0)),
+		int(demand.get("community", 0)),
+		int(demand.get("premium", 0)),
+		int(demand.get("reliability", 0)),
+		busy_stations
+	]
+	if not worn_station.is_empty():
+		ui.operations_forecast.text += " · wear %s %d%%" % [worn_station, lowest_condition]
+	for batch in batches:
+		var button := Button.new()
+		var selected := bool(batch.get("selected", false))
+		var conflict := str(batch.get("conflict", ""))
+		var status_line := str(batch.get("risk", "ON TRACK"))
+		if not conflict.is_empty(): status_line += " · " + conflict
+		var active_job: Dictionary = batch.get("active_job", {})
+		var next_step := str(batch.get("next_step", "Review"))
+		if not active_job.is_empty():
+			next_step = "%s · %s left" % [str(active_job.get("label", "Work active")), _duration_label(maxi(0, int(active_job.get("ends", 0)) - int(simulation.state.game_minute)))]
+		button.text = "%s%s · %s\n%s · Q%d/%d · %s\nNEXT · %s · %s remaining" % [
+			"▶ " if selected else "",
+			str(batch.get("contract", "Batch")),
+			str(batch.get("recipe", "")),
+			str(batch.get("stage", "")).replace("_", " ").to_upper(),
+			int(batch.get("quality", 0)),
+			int(batch.get("quality_target", 0)),
+			status_line,
+			next_step,
+			_duration_label(int(batch.get("minutes_left", 0)))
+		]
+		button.custom_minimum_size = Vector2(315, 70)
+		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		button.toggle_mode = true
+		button.button_pressed = selected
+		button.disabled = str(simulation.state.stage) == "operations_council"
+		button.tooltip_text = "%s. Select this batch to assign its next work order." % status_line
+		button.add_theme_color_override("font_color", Color("#d9826b") if str(batch.get("risk", "")) in ["LATE", "AT RISK"] else CREAM)
+		button.pressed.connect(_select_operations_batch.bind(str(batch.get("id", ""))))
+		ui.batch_rail.add_child(button)
+
+func _duration_label(minutes: int) -> String:
+	var absolute := absi(minutes)
+	if minutes < 0: return "%s late" % _duration_label(absolute)
+	var days := absolute / 1440
+	var hours := (absolute % 1440) / 60
+	var mins := absolute % 60
+	if days > 0: return "%dd %dh" % [days, hours]
+	if hours > 0: return "%dh %02dm" % [hours, mins]
+	return "%dm" % mins
 
 func _rebuild_staff() -> void:
 	var picker: OptionButton = ui.staff_picker
@@ -709,7 +816,7 @@ func _rebuild_staff() -> void:
 	if selected_index < 0: selected_index = first_available_index if first_available_index >= 0 else 0
 	picker.select(selected_index)
 	selected_staff_id = str(picker.get_item_metadata(selected_index))
-	picker.disabled = first_available_index < 0 or str(simulation.state.stage) in ["week_planning", "delivery_recovery", "capacity_planning", "council", "complete"] or str(simulation.state.pending_issue) != ""
+	picker.disabled = first_available_index < 0 or str(simulation.state.stage) in ["week_planning", "delivery_recovery", "capacity_planning", "council", "operations_council", "complete"] or str(simulation.state.pending_issue) != ""
 	picker.tooltip_text = "No worker can be assigned during this decision." if picker.disabled else "Choose an available worker for the next work order."
 	_update_selected_staff_summary(summaries)
 
@@ -723,23 +830,33 @@ func _update_selected_staff_summary(summaries: Array) -> void:
 			if int(skills[skill]) > level:
 				strongest = skill
 				level = int(skills[skill])
-		ui.staff_summary.text = "%s · %s %d · energy %d\nShift %02d:%02d–%02d:%02d" % [member.role, str(strongest).capitalize(), level, int(member.energy), int(member.shift_start)/60, int(member.shift_start)%60, int(member.shift_end)/60, int(member.shift_end)%60]
+		var energy := int(member.energy)
+		var fatigue := "FRESH" if energy >= 70 else ("STEADY" if energy >= 50 else ("TIRED · +25% time" if energy >= 30 else "EXHAUSTED · +45% time"))
+		ui.staff_summary.text = "%s · %s %d · energy %d · %s\nShift %02d:%02d–%02d:%02d" % [member.role, str(strongest).capitalize(), level, energy, fatigue, int(member.shift_start)/60, int(member.shift_start)%60, int(member.shift_end)/60, int(member.shift_end)%60]
 		return
 
 func _rebuild_actions() -> void:
 	_clear_children(ui.actions)
 	var available := simulation.get_available_actions()
 	var shown := 0
-	var world_selection_required := str(simulation.state.stage) in ["recommission", "ready_to_mash", "ready_to_boil", "ready_to_transfer", "fermenting"]
+	var operations_mode := bool(simulation.state.get("operations_active", false))
+	var world_selection_required := not operations_mode and str(simulation.state.stage) in ["recommission", "ready_to_mash", "ready_to_boil", "ready_to_transfer", "fermenting"]
 	for action in available:
 		if world_selection_required and selected_station.is_empty(): continue
-		if not selected_station.is_empty() and str(action.station) != selected_station: continue
+		if not operations_mode and not selected_station.is_empty() and str(action.station) != selected_station: continue
 		var button := Button.new()
-		button.text = "%s\n%s · %d MIN" % [action.label, str(action.station).replace("_"," ").to_upper(), int(action.duration)]
-		button.custom_minimum_size = Vector2(164, 84)
+		var batch_prefix := ""
+		if operations_mode and str(action.get("batch_id", "")) != "":
+			batch_prefix = "%s · " % str(simulation.state.batch.get("recipe", "Batch")).to_upper()
+		var shown_duration := simulation.estimate_action_duration(action, selected_staff_id)
+		var cost_text := " · ¤%d" % int(action.get("cash_cost", 0)) if int(action.get("cash_cost", 0)) > 0 else ""
+		button.text = "%s%s\n%s · %d MIN%s" % [batch_prefix, action.label, str(action.station).replace("_"," ").to_upper(), shown_duration, cost_text]
+		button.custom_minimum_size = Vector2(190, 84)
 		var availability := _action_availability(action)
 		button.disabled = not bool(availability.ok)
-		button.tooltip_text = str(availability.reason) if button.disabled else "Assign %s and begin this work order" % simulation.state.staff[selected_staff_id].name
+		var energy_text := ""
+		if simulation.state.staff.has(selected_staff_id): energy_text = " · energy %d" % int(simulation.state.staff[selected_staff_id].energy)
+		button.tooltip_text = str(availability.reason) if button.disabled else "Assign %s and begin this work order%s" % [simulation.state.staff[selected_staff_id].name, energy_text]
 		button.pressed.connect(_start_action.bind(action.id))
 		ui.actions.add_child(button)
 		shown += 1
@@ -752,6 +869,8 @@ func _rebuild_actions() -> void:
 		elif simulation.state.stage == "delivery_recovery": heading.text = "CHOOSE HOW TO RECOVER"
 		elif simulation.state.stage == "capacity_planning": heading.text = "COMMITMENTS REQUIRE JUDGMENT"
 		elif simulation.state.stage == "council": heading.text = "THE LEDGER IS OPEN"
+		elif simulation.state.stage == "operations_council": heading.text = "THE PRODUCTION LEDGER IS OPEN"
+		elif operations_mode: heading.text = "SELECT ANOTHER BATCH OR WAIT"
 		elif simulation.state.stage == "complete": heading.text = "THE NEXT INVESTMENT"
 		else: heading.text = "ACTIVE WORK" if not simulation.get_active_jobs().is_empty() else ("NO COMMAND AT THIS STATION" if not selected_station.is_empty() else "CHOOSE A WORK ZONE")
 		heading.add_theme_font_size_override("font_size", 11)
@@ -763,6 +882,8 @@ func _rebuild_actions() -> void:
 		elif simulation.state.stage == "delivery_recovery": copy.text = "The batch cannot be delivered unchanged. Choose who carries the cost."
 		elif simulation.state.stage == "capacity_planning": copy.text = "Accept, renegotiate, or reject both opportunities, then lock the production plan."
 		elif simulation.state.stage == "council": copy.text = "Choose how the estate answers in the council panel."
+		elif simulation.state.stage == "operations_council": copy.text = "Review every commitment, then choose how the estate uses this week's result."
+		elif operations_mode: copy.text = "A selected batch may be waiting on shared equipment, an active worker, or its fermentation clock."
 		elif simulation.state.stage == "complete": copy.text = "Choose a restoration proposal or preserve the remaining cash."
 		else: copy.text = "Watch the progress ring or jump to its completion." if not simulation.get_active_jobs().is_empty() else ("Select another equipment marker or press Esc to show all commands." if not selected_station.is_empty() else "Select a glowing equipment marker in the brewery.")
 		copy.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -782,6 +903,8 @@ func _action_availability(action: Dictionary) -> Dictionary:
 	var station_id := str(action.get("station", ""))
 	if simulation.state.stations.has(station_id) and bool(simulation.state.stations[station_id].busy):
 		return {"ok": false, "reason": "%s is already occupied." % simulation.state.stations[station_id].name}
+	if int(action.get("cash_cost", 0)) > int(simulation.state.cash):
+		return {"ok": false, "reason": "This work order needs ¤%d working cash." % int(action.get("cash_cost", 0))}
 	return {"ok": true, "reason": ""}
 
 func _rebuild_choices() -> void:
@@ -790,7 +913,7 @@ func _rebuild_choices() -> void:
 	var planning: bool = simulation.state.stage == "week_planning"
 	var recovery: bool = simulation.state.stage == "delivery_recovery"
 	var capacity: bool = simulation.state.stage == "capacity_planning"
-	var council: bool = simulation.state.stage == "council"
+	var council: bool = simulation.state.stage in ["council", "operations_council"]
 	var restoration: bool = simulation.state.stage == "complete"
 	if simulation.state.pending_issue != "": choices = simulation.get_issue_options()
 	elif planning: choices = simulation.get_week_plan_options()
@@ -821,13 +944,23 @@ func _rebuild_capacity_choices() -> void:
 		var heading := Label.new()
 		heading.text = "%s · %s" % [str(opportunity.label).to_upper(), str(opportunity.recipe).to_upper()]
 		heading.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		heading.add_theme_font_size_override("font_size", 13)
+		heading.add_theme_font_size_override("font_size", 15)
 		heading.add_theme_color_override("font_color", CREAM)
 		card.add_child(heading)
 		var terms := Label.new()
-		terms.text = "%s\nCURRENT RESPONSE · %s" % [str(opportunity.effect), str(opportunity.get("response", "pending")).replace("_", " ").to_upper()]
+		var resources: Dictionary = opportunity.get("resources", {})
+		terms.text = "%s\nNEEDS · %.1f kg malt · %.0f g hops · %d yeast · %d keg · %d staff hours · ¤%d\nCURRENT RESPONSE · %s" % [
+			str(opportunity.effect),
+			float(resources.get("malt_kg", 0.0)),
+			float(resources.get("hops_kg", 0.0)) * 1000.0,
+			int(resources.get("yeast", 0)),
+			int(resources.get("kegs", 0)),
+			int(resources.get("staff_hours", 0)),
+			int(resources.get("cash", 0)),
+			str(opportunity.get("response", "pending")).replace("_", " ").to_upper()
+		]
 		terms.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		terms.add_theme_font_size_override("font_size", 10)
+		terms.add_theme_font_size_override("font_size", 15)
 		terms.add_theme_color_override("font_color", SAGE)
 		card.add_child(terms)
 		var responses := HBoxContainer.new()
@@ -873,7 +1006,7 @@ func _choose_issue(option_id: String) -> void:
 	if result.ok: simulation.save_game()
 
 func _choose_council(option_id: String) -> void:
-	var result := simulation.resolve_council(option_id)
+	var result := simulation.resolve_operations_council(option_id) if simulation.state.stage == "operations_council" else simulation.resolve_council(option_id)
 	_play_cue("appointment" if result.ok else "error")
 	_show_result(result)
 	if result.ok: simulation.save_game()
@@ -905,6 +1038,12 @@ func _finalize_capacity_plan() -> void:
 	if result.ok:
 		speed = 1
 		selected_station = ""
+	_show_result(result)
+	if result.ok: simulation.save_game()
+
+func _select_operations_batch(batch_id: String) -> void:
+	var result := simulation.select_operations_batch(batch_id)
+	_play_cue("select" if result.ok else "error")
 	_show_result(result)
 	if result.ok: simulation.save_game()
 
@@ -941,7 +1080,7 @@ func _on_world_station_hovered(id: String, entered: bool) -> void:
 	else: ui.context.text = _context_eyebrow(simulation.state)
 
 func _set_speed(value: int) -> void:
-	if value > 0 and (str(simulation.state.pending_issue) != "" or str(simulation.state.stage) in ["week_planning", "delivery_recovery", "capacity_planning", "council", "complete"]):
+	if value > 0 and (str(simulation.state.pending_issue) != "" or str(simulation.state.stage) in ["week_planning", "delivery_recovery", "capacity_planning", "council", "operations_council", "complete"]):
 		speed = 0
 		_set_status("Resolve the current judgment before restarting the estate clock.", false)
 		_refresh()
@@ -974,14 +1113,19 @@ func _set_status(message: String, positive: bool) -> void:
 func _jobs_text() -> String:
 	var lines := []
 	for job in simulation.get_active_jobs():
-		lines.append("%s · %d MIN" % [str(job.label).to_upper(), max(0, int(job.ends) - int(simulation.state.game_minute))])
+		var batch_name := ""
+		for batch in simulation.state.get("production_batches", []):
+			if str(batch.id) == str(job.get("batch_id", "")): batch_name = "%s · " % str(batch.recipe).to_upper()
+		var work_name := str(job.get("base_action", job.get("label", "work"))).replace("_", " ").to_upper()
+		if work_name == "FERMENTATION": work_name = "FERMENTING"
+		lines.append("%s%s · %s" % [batch_name, work_name, _duration_label(max(0, int(job.ends) - int(simulation.state.game_minute)))])
 	return "\n".join(lines) if not lines.is_empty() else "No active work order"
 
 func _jobs_tooltip() -> String:
 	var lines := []
 	for job in simulation.get_active_jobs():
 		var staff_name := str(simulation.state.staff.get(str(job.staff_id), {}).get("name", "Unassigned"))
-		lines.append("%s at %s · %s · %d minutes remaining" % [job.label, str(job.station).replace("_", " ").capitalize(), staff_name, max(0, int(job.ends) - int(simulation.state.game_minute))])
+		lines.append("%s at %s · %s · %s remaining" % [job.label, str(job.station).replace("_", " ").capitalize(), staff_name, _duration_label(max(0, int(job.ends) - int(simulation.state.game_minute)))])
 	return "\n".join(lines) if not lines.is_empty() else "No active work orders."
 
 func _context_title() -> String:
@@ -991,6 +1135,8 @@ func _context_title() -> String:
 	if simulation.state.stage == "week_planning": return "Choose a promise"
 	if simulation.state.stage == "delivery_recovery": return "Delivery at risk"
 	if simulation.state.stage == "capacity_planning": return "Capacity board"
+	if simulation.state.stage == "operations": return "%s · live work order" % str(simulation.state.batch.recipe)
+	if simulation.state.stage == "operations_council": return "The production ledger"
 	if simulation.state.stage == "council": return "Apolline opens the ledger"
 	if simulation.state.stage == "complete": return "Week %d closes" % int(simulation.state.get("week_number", 1))
 	if not selected_station.is_empty(): return selected_station.replace("_"," ").capitalize()
@@ -1002,6 +1148,7 @@ func _decision_title() -> String:
 	if simulation.state.stage == "week_planning": return "Two promises, one brewhouse"
 	if simulation.state.stage == "delivery_recovery": return "Who carries the failed promise?"
 	if simulation.state.stage == "capacity_planning": return "Two opportunities, finite capacity"
+	if simulation.state.stage == "operations_council": return "The production council · Week %d" % int(simulation.state.get("week_number", 1))
 	if simulation.state.stage == "council": return "The weekly council · Week %d" % int(simulation.state.get("week_number", 1))
 	if simulation.state.stage == "complete": return "The estate answers"
 	return "A decision is waiting"
@@ -1013,6 +1160,8 @@ func _decision_objective() -> String:
 		return "Choose how the estate responds before the result reaches the council ledger."
 	if simulation.state.stage == "capacity_planning":
 		return "Respond to both opportunities, balancing malt, kegs, staff hours, cash, and fermenter overlap."
+	if simulation.state.stage == "operations_council":
+		return "Compare every delivery, rejected promise, demand shift, and resource cost before setting the estate's priority."
 	return simulation.objective_text()
 
 func _consequence_text() -> String:
@@ -1033,7 +1182,23 @@ func _consequence_text() -> String:
 		var board: Dictionary = state.get("capacity_board", {})
 		var constraints: Dictionary = board.get("constraints", {})
 		var pressure: Dictionary = board.get("pressure", {})
-		return "AVAILABLE · %.1f kg malt · %d kegs · %d staff hours · ¤%d\nPRESSURE · %s · fermenter overlap %s" % [float(constraints.get("malt_kg", 0.0)), int(constraints.get("kegs", 0)), int(constraints.get("staff_hours", pressure.get("staff_hours_available", 0))), int(constraints.get("cash", 0)), "simultaneous commitments" if bool(pressure.get("simultaneous", false)) else "single commitment", "yes" if bool(pressure.get("fermenter_overlap", false)) else "no"]
+		return "AVAILABLE · %.1f kg malt · %.0f g hops · %d yeast · %d kegs · %d staff hours · ¤%d\nPRESSURE · %s · fermenter overlap %s" % [float(constraints.get("malt_kg", 0.0)), float(constraints.get("hops_kg", 0.0)) * 1000.0, int(constraints.get("yeast", 0)), int(constraints.get("kegs", 0)), int(constraints.get("staff_hours", pressure.get("staff_hours_available", 0))), int(constraints.get("cash", 0)), "simultaneous commitments" if bool(pressure.get("simultaneous", false)) else "single commitment", "yes" if bool(pressure.get("fermenter_overlap", false)) else "no"]
+	if state.stage == "operations_council":
+		var fulfilled := 0
+		var strained := 0
+		for result in state.get("operations_results", []):
+			if str(result.status) == "fulfilled": fulfilled += 1
+			else: strained += 1
+		var demand: Dictionary = state.get("demand", {})
+		return "DELIVERED · %d fulfilled · %d strained\nDEMAND · community %d · premium %d · reliability %d" % [fulfilled, strained, int(demand.get("community", 0)), int(demand.get("premium", 0)), int(demand.get("reliability", 0))]
+	if bool(state.get("operations_active", false)):
+		var overview := simulation.get_operations_overview()
+		var selected_batch: Dictionary = {}
+		for candidate in overview.get("batches", []):
+			if bool(candidate.get("selected", false)): selected_batch = candidate
+		if not selected_batch.is_empty():
+			var conflict := str(selected_batch.get("conflict", ""))
+			return "DEADLINE · %s · %s\nNEXT · %s%s" % [_duration_label(int(selected_batch.get("minutes_left", 0))), str(selected_batch.get("risk", "ON TRACK")), str(selected_batch.get("next_step", "Review")), (" · " + conflict) if not conflict.is_empty() else ""]
 	if state.stage == "complete":
 		return "SERVICE · %d guests · ¤%d revenue\nCOUNCIL · score %d · %s" % [int(state.service_result.get("guests_served", 0)), int(state.service_result.get("revenue", 0)), int(state.council_result.get("score", 0)), state.authority_role]
 	if state.pending_issue == "mash_drift":
@@ -1082,6 +1247,12 @@ func _handle_story_transition(state: Dictionary) -> void:
 			"capacity_planning":
 				$World.show_feedback("Two opportunities now compete for the same people and equipment.", true)
 				_set_status("Time is paused while you negotiate the first overlapping production plan.", true)
+			"operations":
+				$World.show_feedback("The production board is live. Choose which batch gets the next worker and station.", true)
+				_set_status("Shared capacity is live; select a batch before assigning its next work order.", true)
+			"operations_council":
+				$World.show_feedback("Every production commitment has reached the ledger.", true)
+				_set_status("Time is paused for the Week %d production council." % int(state.get("week_number", 1)), true)
 			"recommission":
 				if not awaiting_first_light:
 					$World.show_feedback("The stable key is yours. Wake the copper brewhouse.", true)

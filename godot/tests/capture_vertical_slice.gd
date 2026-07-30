@@ -113,6 +113,28 @@ func _capture_gallery() -> void:
 	instance._refresh(true)
 	await _settle(1.0)
 	await _save("12-capacity-conflict.png")
+	model.respond_to_capacity_opportunity("abbey_table", "accept")
+	model.respond_to_capacity_opportunity("inn_cellar", "renegotiate")
+	model.finalize_capacity_plan()
+	model.state.stations.brewhouse.cleanliness = 92
+	model.state.stations.fermenter.cleanliness = 93
+	_ensure_shift(model, "player")
+	var first_batch_id := str(model.state.production_batches[0].id)
+	if not _start_and_finish(model, "ops::%s::mash" % first_batch_id, "player"): return
+	if not _start_and_finish(model, "ops::%s::boil" % first_batch_id, "player"): return
+	if not _start_and_finish(model, "ops::%s::transfer" % first_batch_id, "player"): return
+	var second_batch_id := str(model.state.production_batches[1].id)
+	model.select_operations_batch(second_batch_id)
+	_ensure_shift(model, "jules")
+	var parallel_prep := model.start_action("ops::%s::prepare" % second_batch_id, "jules")
+	if not bool(parallel_prep.ok):
+		push_error("Could not stage the second live batch for capture: " + str(parallel_prep.message))
+		quit(1)
+		return
+	instance.selected_staff_id = "player"
+	instance._refresh(true)
+	await _settle(1.0)
+	await _save("15-brewery-in-motion.png")
 
 	model.state = week_two_seed.duplicate(true)
 	model._touch()
@@ -160,6 +182,14 @@ func _start_and_finish(model: BrewSimulation, action_id: String, staff_id: Strin
 		return false
 	model.advance_to_next_milestone()
 	return true
+
+func _ensure_shift(model: BrewSimulation, staff_id: String) -> void:
+	if model.is_staff_available(staff_id): return
+	var staff: Dictionary = model.state.staff[staff_id]
+	var minute_of_day := int(model.state.game_minute) % 1440
+	var delta := int(staff.shift_start) - minute_of_day
+	if delta <= 0: delta += 1440
+	model.advance(delta)
 
 func _stage_delivery(model: BrewSimulation, quality: int, late: bool, damaged: bool) -> bool:
 	model.state.jobs = []

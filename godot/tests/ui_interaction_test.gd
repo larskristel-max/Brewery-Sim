@@ -289,8 +289,31 @@ func _run() -> void:
 	_expect(lock_plan != null, "Capacity board did not expose final plan commitment")
 	if lock_plan: lock_plan.pressed.emit()
 	await _settle()
-	_expect(instance.simulation.state.stage == "ready_to_mash", "Capacity plan did not start its first batch")
-	_expect(instance.simulation.state.production_queue.size() == 1, "Capacity plan did not queue the overlapping second batch")
+	_expect(instance.simulation.state.stage == "operations", "Capacity plan did not open live multi-batch operations")
+	_expect(instance.simulation.state.production_batches.size() == 2, "Capacity plan did not create two independent production batches")
+	_expect(instance.ui.batch_rail_panel.visible and instance.ui.batch_rail.get_child_count() == 2, "Live production did not render two selectable batch cards")
+	_expect(instance.ui.operations_forecast.text.contains("DEMAND") and instance.ui.operations_forecast.text.contains("CAPACITY"), "Production board did not expose demand and station capacity")
+	_expect(instance.ui.inventory.visible and instance.ui.inventory.text.contains("yeast") and instance.ui.inventory.text.contains("kegs"), "Production board did not expose free ingredient and packaging stock")
+	_expect(_fits_in_viewport(instance, instance.ui.command_dock), "Expanded production board overflowed the 1280x720 viewport: dock pos=%s size=%s viewport=%s" % [instance.ui.command_dock.position, instance.ui.command_dock.size, instance.size])
+	await _verify_save_load(instance, "live multi-batch operations")
+	_expect(_select_staff(instance, "player"), "Could not select the Brewmaster for live production")
+	await _settle()
+	var first_operations_action := _find_button_contains(instance.ui.actions, "LANTERN BLONDE")
+	_expect(first_operations_action != null and not first_operations_action.disabled, "Selected first batch did not expose its next work order")
+	if first_operations_action:
+		_expect(first_operations_action.tooltip_text.contains("energy"), "Live work order did not forecast worker energy")
+		first_operations_action.pressed.emit()
+	await _settle()
+	_expect(instance.simulation.get_active_jobs().size() == 1, "Live batch command did not reserve its worker and station")
+	instance.ui.wait_button.pressed.emit()
+	await _settle()
+	var second_batch_card := _find_button_contains(instance.ui.batch_rail, "Three Lanterns")
+	_expect(second_batch_card != null, "Second batch could not be selected from the persistent production board")
+	if second_batch_card: second_batch_card.pressed.emit()
+	await _settle()
+	_expect(str(instance.simulation.state.active_batch_id) == str(instance.simulation.state.production_batches[1].id), "Second batch card did not change the active work context")
+	var second_operations_action := _find_button_contains(instance.ui.actions, "STABLE AMBER")
+	_expect(second_operations_action != null and second_operations_action.text.contains("Stage Stable Amber grain bill"), "Second batch did not expose its independent preparation work")
 
 	for recovery_case in [
 		{"reasons":["missed_quality"],"button":"Offer a contract discount","copy":"QUALITY"},
@@ -333,6 +356,12 @@ func _find_button(root_node: Node, prefix: String) -> Button:
 	for node in root_node.find_children("*", "Button", true, false):
 		var button := node as Button
 		if button.text.begins_with(prefix): return button
+	return null
+
+func _find_button_contains(root_node: Node, fragment: String) -> Button:
+	for node in root_node.find_children("*", "Button", true, false):
+		var button := node as Button
+		if button.text.contains(fragment): return button
 	return null
 
 func _select_staff(instance: Node, staff_id: String) -> bool:

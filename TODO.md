@@ -58,27 +58,27 @@ player owns a production plan.
 
 - [x] Present at least two simultaneous opportunities instead of a single
       exclusive contract choice.
-- [ ] Track limited malt, hops, yeast, packaging, cash, staff hours, fermenter
+- [x] Track limited malt, hops, yeast, packaging, cash, staff hours, fermenter
       space, and keg capacity as planning constraints.
 - [x] Allow the player to accept, reject, or renegotiate each opportunity.
-- [ ] Support overlapping preparation, fermentation, cleaning, packaging, and
+- [x] Support overlapping preparation, fermentation, cleaning, packaging, and
       delivery jobs across multiple batches.
-- [ ] Make deadlines, station occupancy, worker fatigue, and maintenance debt
+- [x] Make deadlines, station occupancy, worker fatigue, and maintenance debt
       visible before the player commits a schedule.
-- [ ] Replace automatic milestone-jumping as the dominant strategy with genuine
+- [x] Replace automatic milestone-jumping as the dominant strategy with genuine
       scheduling tradeoffs and interruption risk.
-- [ ] Carry fulfilled, strained, and rejected commitments into demand, trust,
+- [x] Carry fulfilled, strained, and rejected commitments into demand, trust,
       confidence, cash flow, and council evaluation.
 - [ ] Prove at least three viable weekly plans and one overcommitted failure route
       in automated tests and outside playtests.
 
 ### Brewery in Motion exit criteria
 
-- [ ] A player can explain what they chose to brew, for whom, by when, with which
+- [x] A player can explain what they chose to brew, for whom, by when, with which
       people and equipment, and what risk they accepted.
-- [ ] Two active batches can contend for a worker, station, ingredient, or
+- [x] Two active batches can contend for a worker, station, ingredient, or
       packaging resource.
-- [ ] No single sequence of "advance to next milestone" presses solves every week.
+- [x] No single sequence of "advance to next milestone" presses solves every week.
 - [ ] At least five outside playtests identify a plan the player feels ownership
       over, not merely the next prescribed action.
 
