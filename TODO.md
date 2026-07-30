@@ -40,7 +40,7 @@ different financial, community, and Count outcomes.
       recovery, and the second council.
 - [x] Exercise both successful and recoverable-failure routes through the real UI.
 - [x] Capture final visual evidence for both Week 2 outcomes.
-- [ ] Run the complete Godot validation suite in CI from a clean checkout.
+- [x] Run the complete Godot validation suite in CI from a clean checkout.
 
 ### First Fortnight exit criteria
 
