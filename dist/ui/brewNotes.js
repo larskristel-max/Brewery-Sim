@@ -2,8 +2,15 @@ import { getIngredient } from '../data/ingredients.js';
 import { formatList, ingredientAmountLabel } from '../game/selectors.js';
 const ingredientPhrase = (recipe, category) => {
     const items = recipe.ingredients.filter((item) => getIngredient(item.ingredientId).category === category);
-    if (items.length === 0)
-        return category === 'malt' ? 'the grain' : 'the hops';
+    if (items.length === 0) {
+        if (category === 'malt')
+            return 'the grain';
+        if (category === 'hops')
+            return 'the hops';
+        if (category === 'sugar')
+            return 'the sugar';
+        return 'yeast';
+    }
     return formatList(items.map((item) => {
         const ingredient = getIngredient(item.ingredientId);
         return `${ingredientAmountLabel(item.ingredientId, item.amount)} ${ingredient.name}`;
@@ -12,11 +19,14 @@ const ingredientPhrase = (recipe, category) => {
 export const renderBrewExplainer = (recipe) => {
     const malt = ingredientPhrase(recipe, 'malt');
     const hops = ingredientPhrase(recipe, 'hops');
+    const sugarItems = recipe.ingredients.filter((item) => getIngredient(item.ingredientId).category === 'sugar');
+    const sugar = sugarItems.length > 0 ? ingredientPhrase(recipe, 'sugar') : '';
+    const yeast = ingredientPhrase(recipe, 'yeast');
     return `
     <div class="brew-explainer" aria-label="${recipe.name} brewing steps">
       <div><strong>Mash</strong><span>Hot water pulls sugars from ${malt}.</span></div>
-      <div><strong>Boil</strong><span>${hops} add bitterness and aroma.</span></div>
-      <div><strong>Chill & transfer</strong><span>Cooled wort goes into the fermenter with yeast.</span></div>
+      <div><strong>Boil</strong><span>${hops} balance the beer${sugar ? `; ${sugar} keeps the finish dry` : ''}.</span></div>
+      <div><strong>Chill & transfer</strong><span>Cooled wort goes into the fermenter with ${yeast}.</span></div>
     </div>
   `;
 };

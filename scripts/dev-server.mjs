@@ -16,6 +16,12 @@ const types = new Map([
   ['.map', 'application/json; charset=utf-8']
 ]);
 
+const noCacheHeaders = {
+  'cache-control': 'no-store, max-age=0',
+  pragma: 'no-cache',
+  expires: '0'
+};
+
 const server = createServer(async (request, response) => {
   const url = new URL(request.url ?? '/', `http://${request.headers.host ?? 'localhost'}`);
   const requestedPath = url.pathname === '/' ? '/index.html' : url.pathname;
@@ -27,7 +33,10 @@ const server = createServer(async (request, response) => {
   for (const filePath of filePaths) {
     try {
       const body = await readFile(filePath);
-      response.writeHead(200, { 'content-type': types.get(extname(filePath)) ?? 'application/octet-stream' });
+      response.writeHead(200, {
+        'content-type': types.get(extname(filePath)) ?? 'application/octet-stream',
+        ...noCacheHeaders
+      });
       response.end(body);
       return;
     } catch {
@@ -35,7 +44,7 @@ const server = createServer(async (request, response) => {
     }
   }
 
-  response.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' });
+  response.writeHead(404, { 'content-type': 'text/plain; charset=utf-8', ...noCacheHeaders });
   response.end('Not found');
 });
 

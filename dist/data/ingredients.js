@@ -30,6 +30,16 @@ export const ingredients = [
         sourceNote: 'Consumer homebrew retail anchor: wheat/base malt around EUR2.40/kg.'
     },
     {
+        id: 'aromatic-malt',
+        name: 'Aromatic malt',
+        category: 'malt',
+        unit: 'kg',
+        storageArea: 'dry-shelf',
+        packSize: 1,
+        packPrice: 2.9,
+        sourceNote: 'Small Belgian-style specialty malt pack for honeyed malt depth.'
+    },
+    {
         id: 'crystal-malt',
         name: 'Crystal malt',
         category: 'malt',
@@ -120,6 +130,16 @@ export const ingredients = [
         sourceNote: 'Specialty wheat yeast is modeled above standard ale yeast.'
     },
     {
+        id: 'belgian-yeast',
+        name: 'Belgian ale yeast',
+        category: 'yeast',
+        unit: 'pack',
+        storageArea: 'cold-box',
+        packSize: 1,
+        packPrice: 4.1,
+        sourceNote: 'Abbey-style dry yeast for fruity-spicy Belgian blond fermentation.'
+    },
+    {
         id: 'saison-yeast',
         name: 'Saison yeast',
         category: 'yeast',
@@ -160,6 +180,16 @@ export const ingredients = [
         sourceNote: 'Twelve 33 cl bottles with caps; one in-game case is one bundle.'
     },
     {
+        id: 'candi-sugar',
+        name: 'Light candi sugar',
+        category: 'sugar',
+        unit: 'kg',
+        storageArea: 'dry-shelf',
+        packSize: 0.5,
+        packPrice: 2.6,
+        sourceNote: 'Light Belgian brewing sugar for a dry finish without dark malt flavor.'
+    },
+    {
         id: 'cleaner',
         name: 'Cleaner and sanitizer',
         category: 'cleaning',
@@ -183,15 +213,23 @@ export const createIngredientStock = () => Object.fromEntries(ingredients.map((i
             ? 10
             : ingredient.id === 'pale-malt'
                 ? 8
-                : ingredient.id === 'saaz-hops'
-                    ? 100
-                    : ingredient.id === 'ale-yeast'
-                        ? 2
-                        : ingredient.id === 'bottles'
-                            ? 72
-                            : ingredient.id === 'cleaner'
-                                ? 4
-                                : 0,
+                : ingredient.id === 'aromatic-malt'
+                    ? 0.6
+                    : ingredient.id === 'saaz-hops'
+                        ? 100
+                        : ingredient.id === 'styrian-hops'
+                            ? 100
+                            : ingredient.id === 'ale-yeast'
+                                ? 2
+                                : ingredient.id === 'belgian-yeast'
+                                    ? 2
+                                    : ingredient.id === 'candi-sugar'
+                                        ? 1
+                                        : ingredient.id === 'bottles'
+                                            ? 72
+                                            : ingredient.id === 'cleaner'
+                                                ? 4
+                                                : 0,
         condition: 96
     }
 ]));

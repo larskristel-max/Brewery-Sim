@@ -199,13 +199,14 @@ try {
 
   await page.locator('.hotspot-kettle').click();
   assert.equal(await page.getByRole('dialog', { name: 'Recipe / Brew' }).count(), 0, 'kettle tap should not open the full recipe overlay');
-  await assert.doesNotReject(page.getByRole('button', { name: /Standard brew/ }).waitFor({ state: 'visible', timeout: 5000 }));
+  await assert.doesNotReject(page.getByRole('button', { name: /Brew Garage Blonde/ }).waitFor({ state: 'visible', timeout: 5000 }));
+  assert.equal(await page.getByRole('button', { name: /Careful brew/ }).count(), 0, 'first kettle panel should not expose brewday approach choices');
   await page.getByRole('button', { name: /Other recipes/ }).click();
   await assert.doesNotReject(page.locator('.recipe-category-card').filter({ hasText: 'Starter' }).waitFor({ state: 'visible', timeout: 5000 }));
   assert.match(await page.locator('.recipe-category-card').filter({ hasText: 'Starter' }).innerText(), /Stock: \d+ batch(?:es)? in stock/i, 'recipe category cards should show how many batches stock supports');
   await page.locator('.recipe-category-card').filter({ hasText: 'Starter' }).click();
   assert.match(await page.locator('.recipe-card').filter({ hasText: 'Garage Blonde' }).innerText(), /\d+ batch(?:es)? in stock/i, 'recipe cards should show stock-supported brew count');
-  assert.match(await page.locator('.recipe-card').filter({ hasText: 'Garage Blonde' }).innerText(), /Pilsner malt[\s\S]*Saaz hops[\s\S]*Ale yeast[\s\S]*Bottles and caps/i, 'recipe card should show the ingredient bill of materials');
+  assert.match(await page.locator('.recipe-card').filter({ hasText: 'Garage Blonde' }).innerText(), /Pilsner malt[\s\S]*Aromatic malt[\s\S]*Light candi sugar[\s\S]*Styrian hops[\s\S]*Belgian ale yeast[\s\S]*Bottles and caps/i, 'recipe card should show the ingredient bill of materials');
   assert.match(await page.locator('.recipe-card').filter({ hasText: 'Garage Blonde' }).innerText(), /Mash[\s\S]*Boil[\s\S]*transfer/i, 'recipe card should explain mash, boil, and transfer before brewing');
   assert.doesNotMatch(await page.locator('.recipe-station-panel').innerText(), /Order missing EUR 0/i, 'recipe panel should not show a zero-cost missing-order action');
   assert.equal(
@@ -215,7 +216,7 @@ try {
   );
   await page.locator('.station-panel-close').click();
   await page.locator('.hotspot-kettle').click();
-  await page.getByRole('button', { name: /Standard brew/ }).click();
+  await page.getByRole('button', { name: /Brew Garage Blonde/ }).click();
   await waitForBatchStep(page, 'brewing');
   assert.match(await visibleText(page), /Tap the stock pot to finish the brew day/i, 'started brew should ask the player to wait through the brew day');
   assert.equal(await page.locator('.station-panel').count(), 1, 'station panel should stay open after starting a batch');
@@ -223,7 +224,7 @@ try {
   await page.getByRole('button', { name: /Skip ahead.*transfer/ }).click();
   await waitForBatchStep(page, 'awaiting-transfer');
   await assert.doesNotReject(page.getByRole('button', { name: /Careful transfer/ }).waitFor({ state: 'visible', timeout: 5000 }), 'kettle panel should stay open and offer transfer choices');
-  assert.match(await page.locator('.station-panel').innerText(), /Brew day notes[\s\S]*Gravity[\s\S]*1\.045[\s\S]*4\.6%/i, 'finished brew day should explain wort, gravity, and expected ABV');
+  assert.match(await page.locator('.station-panel').innerText(), /Brew day notes[\s\S]*Gravity[\s\S]*1\.062[\s\S]*6\.4%/i, 'finished brew day should explain wort, gravity, and expected ABV');
   assert.equal(await page.locator('.equipment-object-toggle.next-tap').count(), 1, 'the source station should pulse when transfer is waiting');
   assert.equal(
     await page.locator('.equipment-object-toggle.next-tap').evaluate((node) => getComputedStyle(node, '::after').content),
@@ -299,11 +300,11 @@ try {
   await page.locator('.scene-payoff-sale').waitFor({ state: 'visible', timeout: 5000 });
   assert.match(await page.locator('.scene-payoff-sale').innerText(), /Cases sold[\s\S]*\+EUR\s+\d+[\s\S]*Rep \+\d+/i, 'selling should show a cash and rep floor payoff');
   await assert.doesNotReject(page.locator('[data-tutorial-card="intro"][data-tutorial-mission-id="empty-shelf"]').waitFor({ state: 'visible', timeout: 5000 }), 'first sale should open the restock phone story');
-  assert.match(await page.locator('.story-phone').innerText(), /Rudy[\s\S]*Homebrew shop owner[\s\S]*4\.2 kg Pilsner malt[\s\S]*45 g Saaz hops[\s\S]*1 ale yeast pack[\s\S]*60 bottles[\s\S]*Order 4 x 12 bottle packs/i, 'restock phone should introduce Rudy and the exact order');
+  assert.match(await page.locator('.story-phone').innerText(), /Rudy[\s\S]*Homebrew shop owner[\s\S]*4\.7 kg Pilsner malt[\s\S]*0\.3 kg Aromatic malt[\s\S]*0\.5 kg Light candi sugar[\s\S]*50 g Styrian hops[\s\S]*1 belgian ale yeast pack[\s\S]*60 bottles[\s\S]*Order 4 x 12 bottle packs/i, 'restock phone should introduce Rudy and the exact order');
   await page.getByRole('button', { name: 'Reply: Send me the missing supplies.' }).click();
   await page.locator('[data-tutorial-card="intro"]').waitFor({ state: 'hidden', timeout: 5000 });
   await assertFinishedPallet(page, finishedPalletLevelName(await finishedCases(page)), 'post-sale inventory');
-  assert.match(await page.locator('.first-loop-objective strong').innerText(), /4\.2 KG PILSNER MALT[\s\S]*NEED 48 BOTTLES[\s\S]*ORDER 4 X 12 BOTTLE PACKS/i, 'post-sale objective should teach exact restocking before equipment upgrades');
+  assert.match(await page.locator('.first-loop-objective strong').innerText(), /4\.7 KG PILSNER MALT[\s\S]*0\.3 KG AROMATIC MALT[\s\S]*0\.5 KG LIGHT CANDI SUGAR[\s\S]*50 G STYRIAN HOPS[\s\S]*1 BELGIAN ALE YEAST PACK[\s\S]*NEED 48 BOTTLES[\s\S]*ORDER 4 X 12 BOTTLE PACKS/i, 'post-sale objective should teach exact restocking before equipment upgrades');
 
   assert.equal(await page.locator('.workshop-hotspot').getAttribute('aria-label'), 'Shop cart, next step', 'workshop hotspot should be labelled as the next shop step');
   assert.equal(await page.locator('.shop-cart-hotspot.next-tap').count(), 1, 'shop cart should pulse while the restock mission needs an order');

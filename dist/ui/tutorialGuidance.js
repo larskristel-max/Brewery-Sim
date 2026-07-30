@@ -80,9 +80,9 @@ export const renderPhoneEconomyCard = (state) => {
     return `
     <div class="phone-recipe-card">
       <strong>Why this order matters</strong>
-      <span>Sell four cases to earn cash for the next supplies.</span>
-      <span>Reputation starts opening larger local buyers after the first few orders.</span>
-      <em>Cash keeps the garage moving. Reputation makes the next customer less imaginary.</em>
+      <span>Four cases is enough to prove the garage can handle a real promise.</span>
+      <span>The cash covers the next ingredients, and a clean delivery gives Samira a reason to talk you up.</span>
+      <em>Do this well and the next order will not feel like a favor.</em>
     </div>
   `;
 };

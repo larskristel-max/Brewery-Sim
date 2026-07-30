@@ -33,7 +33,7 @@ export type BreweryTier = 'garage' | 'nano' | 'craft' | 'regional';
 export type BreweryPromiseId = 'mira-regular-tap' | 'festival-saison-slot' | 'restaurant-clean-lager' | 'regional-consistency-contract';
 export type CampaignMissionId = 'barbecue-text' | 'empty-shelf' | 'bucket-empire' | 'uncle-nico-wedding' | 'warm-garage-week' | 'sticky-bucket' | 'labels-at-midnight' | 'first-festival' | 'first-bar-account' | 'household-summit' | 'sandbox-unlocked';
 export type InventoryMovementType = 'order-created' | 'order-received' | 'ingredients-consumed' | 'beer-packaged' | 'cases-sold' | 'loss-recorded';
-export type IngredientId = 'pilsner-malt' | 'pale-malt' | 'wheat-malt' | 'crystal-malt' | 'black-malt' | 'saaz-hops' | 'ipa-hops' | 'styrian-hops' | 'fuggles-hops' | 'ale-yeast' | 'lager-yeast' | 'wheat-yeast' | 'saison-yeast' | 'kveik-yeast' | 'stout-yeast' | 'bottles' | 'cleaner';
+export type IngredientId = 'pilsner-malt' | 'pale-malt' | 'wheat-malt' | 'aromatic-malt' | 'crystal-malt' | 'black-malt' | 'saaz-hops' | 'ipa-hops' | 'styrian-hops' | 'fuggles-hops' | 'ale-yeast' | 'lager-yeast' | 'wheat-yeast' | 'belgian-yeast' | 'saison-yeast' | 'kveik-yeast' | 'stout-yeast' | 'bottles' | 'candi-sugar' | 'cleaner';
 export interface Ingredient {
     id: IngredientId;
     name: string;
