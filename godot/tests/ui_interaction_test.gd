@@ -26,7 +26,7 @@ func _run() -> void:
 	await process_frame
 	await process_frame
 	_expect(instance.ui.has("customization") and is_instance_valid(instance.ui.customization), "Prologue did not hand off to the appointment")
-	var begin := _find_button(instance.ui.customization, "Take the stable key")
+	var begin := _find_button(instance.ui.customization, "Accept the stable key")
 	_expect(begin != null, "Appointment did not expose the stable-key decision")
 	if begin: begin.pressed.emit()
 	await process_frame

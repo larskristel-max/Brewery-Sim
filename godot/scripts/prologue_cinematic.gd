@@ -13,18 +13,18 @@ const SHOTS := [
 		"duration": 8.0,
 		"focus": Vector2(0.80, 0.25),
 		"zoom": 1.28,
-		"eyebrow": "THE VALENNE ESTATE · FIRST NIGHT",
+		"eyebrow": "CHÂTEAU DE VALENNE · THE LAST GOOD NIGHT",
 		"speaker": "",
-		"line": "For three hundred years, the house of Valenne endured.",
+		"line": "At Valenne, the bells still rang. The creditors had simply learned to arrive before them.",
 		"beat": "bell"
 	},
 	{
 		"duration": 8.0,
 		"focus": Vector2(0.28, 0.76),
 		"zoom": 1.72,
-		"eyebrow": "ONE SEASON REMAINS",
+		"eyebrow": "THE FINAL ACCOUNT",
 		"speaker": "",
-		"line": "Now its creditors are leaving with more than promises.",
+		"line": "They took the horses at dusk. At dawn, they would return for the land.",
 		"beat": "ledger"
 	},
 	{
@@ -33,7 +33,7 @@ const SHOTS := [
 		"zoom": 1.28,
 		"eyebrow": "THE APPOINTMENT",
 		"speaker": "COUNT ARMAND DE VALENNE",
-		"line": "The Valennes have held this land for three hundred years. We may not hold it for one more.",
+		"line": "My family has survived wars, winters, and its own pride. I will not have us defeated by an empty cellar.",
 		"beat": "appointment"
 	},
 	{
@@ -42,25 +42,25 @@ const SHOTS := [
 		"zoom": 1.32,
 		"eyebrow": "THE LEDGER",
 		"speaker": "APOLLINE DE VALENNE",
-		"line": "The estate has one season left. Every barrel—and every coin—must count.",
+		"line": "Pride will not pay the maltster. We have one season, little coin, and no beer worth returning for.",
 		"beat": "ledger"
 	},
 	{
 		"duration": 11.0,
 		"focus": Vector2(0.30, 0.26),
 		"zoom": 1.18,
-		"eyebrow": "THE MANDATE",
+		"eyebrow": "THE TERMS",
 		"speaker": "COUNT ARMAND DE VALENNE",
-		"line": "You were hired to brew. Restore these stables, earn the trust of our people… and you may yet become steward of everything that remains.",
+		"line": "Then give them a reason to return. Wake the old brewhouse. Fill the courtyard. Make Valenne useful again.",
 		"beat": "appointment"
 	},
 	{
 		"duration": 8.0,
 		"focus": Vector2(0.48, 0.64),
 		"zoom": 1.84,
-		"eyebrow": "THE LAST BREWER OF VALENNE",
+		"eyebrow": "THE OLD STABLES",
 		"speaker": "",
-		"line": "The stable key passes into your hands.",
+		"line": "The Count set down the key. No one in the room called it hope.",
 		"beat": "key"
 	}
 ]

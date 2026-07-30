@@ -761,13 +761,13 @@ func _show_customization() -> void:
 	speaker.add_theme_color_override("font_color", COPPER_BRIGHT)
 	story_content.add_child(speaker)
 	var line := Label.new()
-	line.text = "“The château can survive another season.\nWhat it needs is a brewer who can make people return.”"
+	line.text = "“Wake the old brewhouse. Fill the courtyard.\nGive them a reason to return.”"
 	line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	line.add_theme_font_size_override("font_size", 21)
 	line.add_theme_color_override("font_color", CREAM)
 	story_content.add_child(line)
 	var terms := Label.new()
-	terms.text = "Apolline keeps the ledger. The Count grants the stable key. You will earn every room beyond it."
+	terms.text = "Apolline waits to record the name of the brewer who accepts."
 	terms.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	terms.add_theme_font_size_override("font_size", 11)
 	terms.add_theme_color_override("font_color", SAGE)
@@ -794,13 +794,13 @@ func _show_customization() -> void:
 	eyebrow.add_theme_color_override("font_color", COPPER)
 	form.add_child(eyebrow)
 	var title := Label.new()
-	title.text = "Take the stable key"
+	title.text = "Accept the stable key"
 	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	title.add_theme_font_size_override("font_size", 29)
 	title.add_theme_color_override("font_color", CREAM)
 	form.add_child(title)
 	var copy := Label.new()
-	copy.text = "The Count offers you the stable key. Name the brewer who will answer for its copper, grain, and promises."
+	copy.text = "The Count has made his terms. Enter the name Apolline will place beside the Old Stables."
 	copy.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	copy.add_theme_font_size_override("font_size", 13)
 	copy.add_theme_color_override("font_color", Color("#d2c4b0"))
@@ -816,7 +816,7 @@ func _show_customization() -> void:
 	name_input.custom_minimum_size = Vector2(0, 44)
 	form.add_child(name_input)
 	var coat_label := Label.new()
-	coat_label.text = "WORK COAT"
+	coat_label.text = "COAT COLOUR · COSMETIC ONLY"
 	coat_label.add_theme_font_size_override("font_size", 9)
 	coat_label.add_theme_color_override("font_color", COPPER)
 	form.add_child(coat_label)
@@ -827,7 +827,7 @@ func _show_customization() -> void:
 	coat.custom_minimum_size = Vector2(0, 44)
 	form.add_child(coat)
 	var begin := Button.new()
-	begin.text = "Take the stable key"
+	begin.text = "Accept the stable key"
 	begin.custom_minimum_size = Vector2(0, 54)
 	begin.add_theme_font_size_override("font_size", 15)
 	begin.add_theme_stylebox_override("normal", _button_style(Color(0.37,0.19,0.09,0.98), COPPER_BRIGHT, 1))

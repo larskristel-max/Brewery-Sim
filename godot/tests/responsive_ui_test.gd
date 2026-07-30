@@ -28,7 +28,7 @@ func _run() -> void:
 	await _settle()
 	_expect(not instance.ui.customization_story.visible, "Desktop story card remained over the phone appointment form")
 	_expect(_fits_in_viewport(instance, instance.ui.customization_card), "Appointment form overflowed the phone viewport")
-	var begin := _find_button(instance.ui.customization, "Take the stable key")
+	var begin := _find_button(instance.ui.customization, "Accept the stable key")
 	_expect(begin != null, "Phone appointment form did not expose the stable key")
 	if begin: begin.pressed.emit()
 	await _settle()
