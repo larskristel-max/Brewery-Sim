@@ -1,0 +1,52 @@
+extends SceneTree
+
+var output_dir := ""
+
+func _init() -> void:
+	call_deferred("_capture")
+
+func _capture() -> void:
+	output_dir = ProjectSettings.globalize_path("res://../outputs/prologue-review-final")
+	DirAccess.make_dir_recursive_absolute(output_dir)
+	var scene: PackedScene = load("res://scenes/main.tscn")
+	var instance = scene.instantiate()
+	root.add_child(instance)
+	await _settle(0.2)
+	instance.begin_campaign_with("Elise", 0)
+	await _settle(1.2)
+	await _save("01-estate-arrival.png")
+
+	instance.ui.prologue.advance()
+	instance.ui.prologue.advance()
+	await _settle(1.2)
+	await _save("02-count-appointment.png")
+
+	instance.ui.prologue.advance()
+	await _settle(1.2)
+	await _save("03-apolline-ledger.png")
+
+	instance.ui.prologue.finish(true)
+	await _settle(0.5)
+	await _save("04-first-light-prompt.png")
+
+	var first_light := instance.get_node_or_null("World/FirstLightHotspot") as Button
+	if first_light:
+		first_light.pressed.emit()
+	await _settle(0.55)
+	await _save("05-stables-awaken.png")
+	await _settle(0.85)
+	await _save("06-gameplay-handoff.png")
+	print("Old Stables prologue review: CAPTURED to " + output_dir)
+	quit(0)
+
+func _settle(seconds: float) -> void:
+	await create_timer(seconds).timeout
+	for frame in range(4):
+		await process_frame
+
+func _save(filename: String) -> void:
+	var image := root.get_texture().get_image()
+	var error := image.save_png(output_dir + "/" + filename)
+	if error != OK:
+		push_error("Could not save prologue review frame: " + filename)
+		quit(1)

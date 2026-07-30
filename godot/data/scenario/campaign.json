@@ -1,0 +1,12 @@
+{
+  "house":"House de Valenne",
+  "patron":{"id":"count_armand","name":"Count Armand de Valenne","tone":"proud_but_fair"},
+  "rival":{"id":"apolline","name":"Apolline de Valenne","position":"acting_administrator","motive":"save_the_estate_through_financial_discipline"},
+  "authority_ladder":[
+    {"rank":1,"id":"castle_brewmaster","unlocks":["brew","clean","ingredient_requests","release_recommendations"]},
+    {"rank":2,"id":"keeper_old_stables","unlocks":["brewery_budget","equipment","courtyard"]},
+    {"rank":3,"id":"deputy_steward","unlocks":["staff","events","contracts","restoration_proposals"]},
+    {"rank":4,"id":"estate_steward","unlocks":["full_estate_management"]}
+  ],
+  "review_tracks":["estate_cash","count_confidence","community_trust","restoration_state"]
+}

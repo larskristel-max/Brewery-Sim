@@ -1,0 +1,249 @@
+[
+  {
+    "beer": "Lantern Blonde",
+    "customer_archetype": "village_inn",
+    "date": "1901-10-19",
+    "demand_id": "DEM-b6293373df",
+    "package": "keg",
+    "payment_signal": "delayed",
+    "provenance": {
+      "evidence_class": "direct",
+      "transform": "party_archetype+date_shift+id_hash+quantity_band"
+    },
+    "quantity_band": "small"
+  },
+  {
+    "beer": "Courtyard Pils",
+    "customer_archetype": "courtyard_guest",
+    "date": "1901-10-19",
+    "demand_id": "DEM-3ad3889170",
+    "package": "bottle",
+    "payment_signal": "delayed",
+    "provenance": {
+      "evidence_class": "direct",
+      "transform": "party_archetype+date_shift+id_hash+quantity_band"
+    },
+    "quantity_band": "medium"
+  },
+  {
+    "beer": "Stable Amber",
+    "customer_archetype": "courtyard_guest",
+    "date": "1901-10-19",
+    "demand_id": "DEM-ef199a9f2a",
+    "package": "bottle",
+    "payment_signal": "delayed",
+    "provenance": {
+      "evidence_class": "direct",
+      "transform": "party_archetype+date_shift+id_hash+quantity_band"
+    },
+    "quantity_band": "medium"
+  },
+  {
+    "beer": "Orchard Pale",
+    "customer_archetype": "courtyard_guest",
+    "date": "1901-10-19",
+    "demand_id": "DEM-fb346890be",
+    "package": "bottle",
+    "payment_signal": "delayed",
+    "provenance": {
+      "evidence_class": "direct",
+      "transform": "party_archetype+date_shift+id_hash+quantity_band"
+    },
+    "quantity_band": "medium"
+  },
+  {
+    "beer": "Stable Amber",
+    "customer_archetype": "regional_shop",
+    "date": "1901-10-19",
+    "demand_id": "DEM-6052dde44d",
+    "package": "bottle",
+    "payment_signal": "settled",
+    "provenance": {
+      "evidence_class": "direct",
+      "transform": "party_archetype+date_shift+id_hash+quantity_band"
+    },
+    "quantity_band": "medium"
+  },
+  {
+    "beer": "Orchard Pale",
+    "customer_archetype": "courtyard_guest",
+    "date": "1901-10-19",
+    "demand_id": "DEM-1408a01ad9",
+    "package": "bottle",
+    "payment_signal": "settled",
+    "provenance": {
+      "evidence_class": "direct",
+      "transform": "party_archetype+date_shift+id_hash+quantity_band"
+    },
+    "quantity_band": "small"
+  },
+  {
+    "beer": "Courtyard Pils",
+    "customer_archetype": "courtyard_guest",
+    "date": "1901-10-19",
+    "demand_id": "DEM-6975da857e",
+    "package": "bottle",
+    "payment_signal": "settled",
+    "provenance": {
+      "evidence_class": "direct",
+      "transform": "party_archetype+date_shift+id_hash+quantity_band"
+    },
+    "quantity_band": "medium"
+  },
+  {
+    "beer": "Stable Amber",
+    "customer_archetype": "courtyard_guest",
+    "date": "1901-10-08",
+    "demand_id": "DEM-693570059b",
+    "package": "bottle",
+    "payment_signal": "settled",
+    "provenance": {
+      "evidence_class": "direct",
+      "transform": "party_archetype+date_shift+id_hash+quantity_band"
+    },
+    "quantity_band": "medium"
+  },
+  {
+    "beer": "Orchard Pale",
+    "customer_archetype": "courtyard_guest",
+    "date": "1901-10-08",
+    "demand_id": "DEM-d2d86c531b",
+    "package": "bottle",
+    "payment_signal": "settled",
+    "provenance": {
+      "evidence_class": "direct",
+      "transform": "party_archetype+date_shift+id_hash+quantity_band"
+    },
+    "quantity_band": "small"
+  },
+  {
+    "beer": "Courtyard Pils",
+    "customer_archetype": "courtyard_guest",
+    "date": "1901-10-08",
+    "demand_id": "DEM-45c11d450f",
+    "package": "bottle",
+    "payment_signal": "settled",
+    "provenance": {
+      "evidence_class": "direct",
+      "transform": "party_archetype+date_shift+id_hash+quantity_band"
+    },
+    "quantity_band": "medium"
+  },
+  {
+    "beer": "Stable Amber",
+    "customer_archetype": "regional_shop",
+    "date": "1901-10-19",
+    "demand_id": "DEM-50321a256f",
+    "package": "bottle",
+    "payment_signal": "delayed",
+    "provenance": {
+      "evidence_class": "direct",
+      "transform": "party_archetype+date_shift+id_hash+quantity_band"
+    },
+    "quantity_band": "medium"
+  },
+  {
+    "beer": "Orchard Pale",
+    "customer_archetype": "regional_shop",
+    "date": "1901-10-19",
+    "demand_id": "DEM-63dd0d28d3",
+    "package": "bottle",
+    "payment_signal": "delayed",
+    "provenance": {
+      "evidence_class": "direct",
+      "transform": "party_archetype+date_shift+id_hash+quantity_band"
+    },
+    "quantity_band": "medium"
+  },
+  {
+    "beer": "Stable Amber",
+    "customer_archetype": "courtyard_guest",
+    "date": "1901-08-29",
+    "demand_id": "DEM-f0e79ac16b",
+    "package": "bottle",
+    "payment_signal": "settled",
+    "provenance": {
+      "evidence_class": "direct",
+      "transform": "party_archetype+date_shift+id_hash+quantity_band"
+    },
+    "quantity_band": "medium"
+  },
+  {
+    "beer": "Orchard Pale",
+    "customer_archetype": "courtyard_guest",
+    "date": "1901-08-29",
+    "demand_id": "DEM-df0903514c",
+    "package": "bottle",
+    "payment_signal": "settled",
+    "provenance": {
+      "evidence_class": "direct",
+      "transform": "party_archetype+date_shift+id_hash+quantity_band"
+    },
+    "quantity_band": "small"
+  },
+  {
+    "beer": "Courtyard Pils",
+    "customer_archetype": "courtyard_guest",
+    "date": "1901-08-29",
+    "demand_id": "DEM-cecfcd050a",
+    "package": "bottle",
+    "payment_signal": "settled",
+    "provenance": {
+      "evidence_class": "direct",
+      "transform": "party_archetype+date_shift+id_hash+quantity_band"
+    },
+    "quantity_band": "medium"
+  },
+  {
+    "beer": "Stable Amber",
+    "customer_archetype": "regional_shop",
+    "date": "1901-07-27",
+    "demand_id": "DEM-1bb8c93c58",
+    "package": "bottle",
+    "payment_signal": "settled",
+    "provenance": {
+      "evidence_class": "direct",
+      "transform": "party_archetype+date_shift+id_hash+quantity_band"
+    },
+    "quantity_band": "medium"
+  },
+  {
+    "beer": "Orchard Pale",
+    "customer_archetype": "courtyard_guest",
+    "date": "1901-07-27",
+    "demand_id": "DEM-1b43aee95c",
+    "package": "bottle",
+    "payment_signal": "settled",
+    "provenance": {
+      "evidence_class": "direct",
+      "transform": "party_archetype+date_shift+id_hash+quantity_band"
+    },
+    "quantity_band": "small"
+  },
+  {
+    "beer": "Courtyard Pils",
+    "customer_archetype": "courtyard_guest",
+    "date": "1901-07-27",
+    "demand_id": "DEM-7880b40440",
+    "package": "bottle",
+    "payment_signal": "settled",
+    "provenance": {
+      "evidence_class": "direct",
+      "transform": "party_archetype+date_shift+id_hash+quantity_band"
+    },
+    "quantity_band": "small"
+  },
+  {
+    "beer": "Stable Amber",
+    "customer_archetype": "courtyard_guest",
+    "date": "1901-09-18",
+    "demand_id": "DEM-de51037f17",
+    "package": "bottle",
+    "payment_signal": "settled",
+    "provenance": {
+      "evidence_class": "direct",
+      "transform": "party_archetype+date_shift+id_hash+quantity_band"
+    },
+    "quantity_band": "medium"
+  }
+]

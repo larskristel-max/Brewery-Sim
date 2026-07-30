@@ -1,0 +1,13 @@
+{
+  "materials": [
+    {"id":"malt_pale_estate","name":"Pale estate malt","unit":"kg","cost_index":100},
+    {"id":"hop_citrus","name":"Citrus hop","unit":"g","cost_index":140},
+    {"id":"herbs_walled_garden","name":"Walled-garden herbs","unit":"g","cost_index":72},
+    {"id":"yeast_house_ale","name":"House ale culture","unit":"pitch","cost_index":95}
+  ],
+  "equipment": [
+    {"id":"kettle_old_copper","name":"Old copper kettle","capacity_l":30,"condition":62},
+    {"id":"fermenter_stable_01","name":"Stable fermenter 01","capacity_l":25,"condition":71},
+    {"id":"filler_manual_01","name":"Four-head filler","capacity_l":20,"condition":54}
+  ]
+}

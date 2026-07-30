@@ -1,0 +1,66 @@
+# Old Stables reboot
+
+This folder is the clean Godot reboot of Brewery-Sim. The original TypeScript prototype remains intact as a legacy design and simulation reference.
+
+## Play
+
+Open `project.godot` in Godot 4.7.1 and run the project. “Night of First Lights” is a complete station-driven management slice presented through staged, animated 2.5D scenes.
+
+1. Customize the Castle Brewmaster and enter the skippable 55-second in-engine prologue. Space advances a shot and Escape skips to the interactive handoff.
+2. Accept the Count's mandate through the story, then click the glowing brass lamp to light the Old Stables and begin play.
+3. Select equipment in the brewery, choose a named worker, and issue the contextual work order from the command dock.
+4. Recommission the copper brewhouse, mash, solve the temperature drift, choose a response to the missing hop delivery, boil, clean and purge the fermenter, transfer, ferment and package.
+5. Prepare the courtyard during fermentation, serve the 20 L keg, and choose how to answer Apolline at the weekly council.
+6. Begin Week 2 and choose between the Saint Brigid Festival and the Count's Cellar Reserve. The reserve introduces Stable Amber, a higher quality target, and a recipe-specific stalled-runoff decision.
+
+Space pauses; 1, 2, and 4 set time speed. The on-screen 12× control accelerates long work, and “Advance to next milestone” jumps directly to the next scheduled job completion. Save and Load persist the entire campaign state.
+
+## Direction
+
+- Player begins as the customizable Castle Brewmaster.
+- The proud but fair Count Armand de Valenne grants authority gradually.
+- Apolline de Valenne is a credible rival for the contested stewardship, not a villain.
+- The fiction is informed by sanitized brewery process patterns. Raw brewery files are never loaded by the game.
+- The visual language is “Nocturne in the Old Stables”: blue hour, warm work lights, stone, ink, cream, and copper.
+- The opening uses cinematic crops, slow camera moves, rain, letterboxing, timed dialogue, and restrained sound cues to establish the failing estate, Armand's mandate, Apolline's financial discipline, and the Brewmaster-to-Steward ambition before the first interactive lamp-lighting.
+- The playable presentation uses six stage-specific 2.5D scenes: appointment, brewery floor, mash intervention, packaging, courtyard service, and weekly council.
+- Equipment hotspots drive contextual commands. Camera focus, parallax, live assignment cards, progress rings, steam, liquid, condensation, transfer flow, firelight, and trust-responsive courtyard warmth make the simulation state visible without treating painted background figures as simulated staff.
+- The interface is environment-first and resolution-aware. Normal management stays in compact top and bottom docks; decision panels appear only when judgment is required. The canvas expands cleanly for ultrawide displays.
+- A modular 3D blockout remains in the project as a future asset-production base; it is not presented as final art.
+- Inventory is lot-based. The promise, brewing choices, deadline, sensory tags and final service result feed cash, community trust and the Count's confidence.
+- Four authority ranks are implemented: Castle Brewmaster, Keeper of the Old Stables, Deputy Steward, and Estate Steward.
+
+## Validate
+
+On Windows, the repository runner discovers Godot 4.7.1, performs the required clean import, and runs every Godot suite:
+
+```powershell
+scripts\run-godot-validation.cmd
+```
+
+The equivalent individual commands are:
+
+```powershell
+godot --headless --editor --path godot --quit
+godot --headless --path godot --script res://tests/run.gd
+godot --headless --path godot --script res://tests/ui_interaction_test.gd
+godot --headless --path godot --script res://tests/world_layout_test.gd
+godot --headless --path godot --script res://tests/worker_presentation_test.gd
+```
+
+The model suite runs complete brew routes with different decisions and outcomes, validates Week 2 commitments, recipe-specific production trouble, station and staff constraints, authority gates, restoration, serious business risk, and versioned saves. The UI suite presses the real controls through promotion, Week 2 planning, and the Stable Amber lauter decision. The visual suites verify camera-correct world hotspots and truthful live assignment chips at 720p, 900p, and ultrawide resolutions.
+
+The active milestone and its exit criteria are maintained in [`../TODO.md`](../TODO.md).
+
+To regenerate the visual-review gallery, run the capture script without `--headless`:
+
+```powershell
+godot --path godot --resolution 1600x900 --script res://tests/capture_vertical_slice.gd
+```
+
+To rebuild the sanitized calibration pack from an authorized workbook snapshot:
+
+```powershell
+python tools/sanitize_brewery_export.py "C:\path\to\Master_Inventory.xlsx" --output godot/data/imported_scenario
+python tools/validate_scenario.py godot/data/imported_scenario
+```

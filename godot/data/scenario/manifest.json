@@ -1,0 +1,15 @@
+{
+  "scenario_id": "fictional_estate_first_lights_v1",
+  "title": "Night of First Lights",
+  "version": 1,
+  "world": "fictional",
+  "source_profile": "sanitized_real_brewery_processes",
+  "provenance": {
+    "evidence_class": "synthetic",
+    "source_signals": ["old_stone_stables", "small_brewhouse", "estate_labels", "cream_ink_copper"],
+    "contains_personal_data": false,
+    "contains_exact_recipes": false,
+    "contains_supplier_prices": false
+  },
+  "files": ["catalog.json", "recipes.json", "starting_state.json", "campaign.json", "contracts.json"]
+}

@@ -1,0 +1,13 @@
+{
+  "demand_count": 19,
+  "event_count": 51,
+  "finished_lot_count": 15,
+  "movement_mix": {
+    "adjustment": 1,
+    "direct sale": 3,
+    "production": 7,
+    "sale": 19,
+    "visit": 17,
+    "visitor takeaway": 4
+  }
+}

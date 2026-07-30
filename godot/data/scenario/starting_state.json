@@ -1,0 +1,13 @@
+{
+  "game_minute":430,
+  "cash_credits":6200,
+  "estate_runway_days":42,
+  "count_confidence":38,
+  "community_trust":24,
+  "player_role":"castle_brewmaster",
+  "authority":["brew","clean","request_ingredients","recommend_release"],
+  "inventory":[
+    {"lot_id":"LOT-MALT-001","material_id":"malt_pale_estate","quantity":18.0,"quality":82},
+    {"lot_id":"LOT-YEAST-001","material_id":"yeast_house_ale","quantity":2,"quality":78}
+  ]
+}

@@ -1,0 +1,563 @@
+[
+  {
+    "beer": "Lantern Blonde",
+    "date": "1901-10-05",
+    "event_id": "EVT-dd0e0fb382",
+    "provenance": {
+      "evidence_class": "direct",
+      "transform": "date_shift+id_hash+quantity_band"
+    },
+    "quantity_band": "cellar",
+    "type": "production"
+  },
+  {
+    "beer": "Lantern Blonde",
+    "date": "1901-10-05",
+    "event_id": "EVT-1d30cb5d94",
+    "provenance": {
+      "evidence_class": "direct",
+      "transform": "date_shift+id_hash+quantity_band"
+    },
+    "quantity_band": "small",
+    "type": "production"
+  },
+  {
+    "beer": "Orchard Pale",
+    "date": "1901-10-05",
+    "event_id": "EVT-512f0896a6",
+    "provenance": {
+      "evidence_class": "direct",
+      "transform": "date_shift+id_hash+quantity_band"
+    },
+    "quantity_band": "cellar",
+    "type": "production"
+  },
+  {
+    "beer": "Lantern Blonde",
+    "date": "1901-10-19",
+    "event_id": "EVT-b427695905",
+    "provenance": {
+      "evidence_class": "direct",
+      "transform": "date_shift+id_hash+quantity_band"
+    },
+    "quantity_band": "small",
+    "type": "stock_movement"
+  },
+  {
+    "beer": "Courtyard Pils",
+    "date": "1901-10-19",
+    "event_id": "EVT-64654cc977",
+    "provenance": {
+      "evidence_class": "direct",
+      "transform": "date_shift+id_hash+quantity_band"
+    },
+    "quantity_band": "medium",
+    "type": "stock_movement"
+  },
+  {
+    "beer": "Stable Amber",
+    "date": "1901-10-19",
+    "event_id": "EVT-303f913f02",
+    "provenance": {
+      "evidence_class": "direct",
+      "transform": "date_shift+id_hash+quantity_band"
+    },
+    "quantity_band": "medium",
+    "type": "stock_movement"
+  },
+  {
+    "beer": "Orchard Pale",
+    "date": "1901-10-19",
+    "event_id": "EVT-10c26eb6dd",
+    "provenance": {
+      "evidence_class": "direct",
+      "transform": "date_shift+id_hash+quantity_band"
+    },
+    "quantity_band": "medium",
+    "type": "stock_movement"
+  },
+  {
+    "beer": "Stable Amber",
+    "date": "1901-10-19",
+    "event_id": "EVT-97483de305",
+    "provenance": {
+      "evidence_class": "direct",
+      "transform": "date_shift+id_hash+quantity_band"
+    },
+    "quantity_band": "medium",
+    "type": "stock_movement"
+  },
+  {
+    "beer": "Orchard Pale",
+    "date": "1901-10-19",
+    "event_id": "EVT-3e3a5113b5",
+    "provenance": {
+      "evidence_class": "direct",
+      "transform": "date_shift+id_hash+quantity_band"
+    },
+    "quantity_band": "small",
+    "type": "stock_movement"
+  },
+  {
+    "beer": "Courtyard Pils",
+    "date": "1901-10-19",
+    "event_id": "EVT-576fb1de73",
+    "provenance": {
+      "evidence_class": "direct",
+      "transform": "date_shift+id_hash+quantity_band"
+    },
+    "quantity_band": "medium",
+    "type": "stock_movement"
+  },
+  {
+    "beer": "Stable Amber",
+    "date": "1901-10-08",
+    "event_id": "EVT-8e58a68455",
+    "provenance": {
+      "evidence_class": "direct",
+      "transform": "date_shift+id_hash+quantity_band"
+    },
+    "quantity_band": "medium",
+    "type": "stock_movement"
+  },
+  {
+    "beer": "Orchard Pale",
+    "date": "1901-10-08",
+    "event_id": "EVT-b848997fc1",
+    "provenance": {
+      "evidence_class": "direct",
+      "transform": "date_shift+id_hash+quantity_band"
+    },
+    "quantity_band": "small",
+    "type": "stock_movement"
+  },
+  {
+    "beer": "Courtyard Pils",
+    "date": "1901-10-08",
+    "event_id": "EVT-54be3ee053",
+    "provenance": {
+      "evidence_class": "direct",
+      "transform": "date_shift+id_hash+quantity_band"
+    },
+    "quantity_band": "medium",
+    "type": "stock_movement"
+  },
+  {
+    "beer": "Stable Amber",
+    "date": "1901-10-19",
+    "event_id": "EVT-0232a8f8ab",
+    "provenance": {
+      "evidence_class": "direct",
+      "transform": "date_shift+id_hash+quantity_band"
+    },
+    "quantity_band": "medium",
+    "type": "stock_movement"
+  },
+  {
+    "beer": "Orchard Pale",
+    "date": "1901-10-19",
+    "event_id": "EVT-f8aa2c3de7",
+    "provenance": {
+      "evidence_class": "direct",
+      "transform": "date_shift+id_hash+quantity_band"
+    },
+    "quantity_band": "medium",
+    "type": "stock_movement"
+  },
+  {
+    "beer": "Stable Amber",
+    "date": "1901-08-29",
+    "event_id": "EVT-eb2e6ce77c",
+    "provenance": {
+      "evidence_class": "direct",
+      "transform": "date_shift+id_hash+quantity_band"
+    },
+    "quantity_band": "medium",
+    "type": "stock_movement"
+  },
+  {
+    "beer": "Orchard Pale",
+    "date": "1901-08-29",
+    "event_id": "EVT-67e85b24bc",
+    "provenance": {
+      "evidence_class": "direct",
+      "transform": "date_shift+id_hash+quantity_band"
+    },
+    "quantity_band": "small",
+    "type": "stock_movement"
+  },
+  {
+    "beer": "Courtyard Pils",
+    "date": "1901-08-29",
+    "event_id": "EVT-6bee8eb01e",
+    "provenance": {
+      "evidence_class": "direct",
+      "transform": "date_shift+id_hash+quantity_band"
+    },
+    "quantity_band": "medium",
+    "type": "stock_movement"
+  },
+  {
+    "beer": "Stable Amber",
+    "date": "1901-07-27",
+    "event_id": "EVT-86c5ae6380",
+    "provenance": {
+      "evidence_class": "direct",
+      "transform": "date_shift+id_hash+quantity_band"
+    },
+    "quantity_band": "medium",
+    "type": "stock_movement"
+  },
+  {
+    "beer": "Orchard Pale",
+    "date": "1901-07-27",
+    "event_id": "EVT-d9be5dbf0c",
+    "provenance": {
+      "evidence_class": "direct",
+      "transform": "date_shift+id_hash+quantity_band"
+    },
+    "quantity_band": "small",
+    "type": "stock_movement"
+  },
+  {
+    "beer": "Courtyard Pils",
+    "date": "1901-07-27",
+    "event_id": "EVT-b4a0bda98c",
+    "provenance": {
+      "evidence_class": "direct",
+      "transform": "date_shift+id_hash+quantity_band"
+    },
+    "quantity_band": "small",
+    "type": "stock_movement"
+  },
+  {
+    "beer": "Stable Amber",
+    "date": "1901-09-18",
+    "event_id": "EVT-3180d63c20",
+    "provenance": {
+      "evidence_class": "direct",
+      "transform": "date_shift+id_hash+quantity_band"
+    },
+    "quantity_band": "medium",
+    "type": "stock_movement"
+  },
+  {
+    "beer": "Courtyard Pils",
+    "date": "1901-12-15",
+    "event_id": "EVT-22c07e8bde",
+    "provenance": {
+      "evidence_class": "direct",
+      "transform": "date_shift+id_hash+quantity_band"
+    },
+    "quantity_band": "small",
+    "type": "stock_movement"
+  },
+  {
+    "beer": "Lantern Blonde",
+    "date": "1901-12-15",
+    "event_id": "EVT-66b4c4ad5b",
+    "provenance": {
+      "evidence_class": "direct",
+      "transform": "date_shift+id_hash+quantity_band"
+    },
+    "quantity_band": "medium",
+    "type": "stock_movement"
+  },
+  {
+    "beer": "Orchard Pale",
+    "date": "1901-12-15",
+    "event_id": "EVT-6829715a53",
+    "provenance": {
+      "evidence_class": "direct",
+      "transform": "date_shift+id_hash+quantity_band"
+    },
+    "quantity_band": "medium",
+    "type": "stock_movement"
+  },
+  {
+    "beer": "Stable Amber",
+    "date": "1901-12-15",
+    "event_id": "EVT-2dcea36ed7",
+    "provenance": {
+      "evidence_class": "direct",
+      "transform": "date_shift+id_hash+quantity_band"
+    },
+    "quantity_band": "medium",
+    "type": "stock_movement"
+  },
+  {
+    "beer": "Lantern Blonde",
+    "date": "1901-12-20",
+    "event_id": "EVT-017f377b6a",
+    "provenance": {
+      "evidence_class": "direct",
+      "transform": "date_shift+id_hash+quantity_band"
+    },
+    "quantity_band": "small",
+    "type": "stock_movement"
+  },
+  {
+    "beer": "Stable Amber",
+    "date": "1901-12-21",
+    "event_id": "EVT-0d4da299a9",
+    "provenance": {
+      "evidence_class": "direct",
+      "transform": "date_shift+id_hash+quantity_band"
+    },
+    "quantity_band": "small",
+    "type": "stock_movement"
+  },
+  {
+    "beer": "Courtyard Pils",
+    "date": "1901-12-21",
+    "event_id": "EVT-3363dc2fd9",
+    "provenance": {
+      "evidence_class": "direct",
+      "transform": "date_shift+id_hash+quantity_band"
+    },
+    "quantity_band": "small",
+    "type": "stock_movement"
+  },
+  {
+    "beer": "Lantern Blonde",
+    "date": "1901-12-21",
+    "event_id": "EVT-7f523c7467",
+    "provenance": {
+      "evidence_class": "direct",
+      "transform": "date_shift+id_hash+quantity_band"
+    },
+    "quantity_band": "small",
+    "type": "stock_movement"
+  },
+  {
+    "beer": "Orchard Pale",
+    "date": "1901-12-21",
+    "event_id": "EVT-c7cd430de7",
+    "provenance": {
+      "evidence_class": "direct",
+      "transform": "date_shift+id_hash+quantity_band"
+    },
+    "quantity_band": "small",
+    "type": "stock_movement"
+  },
+  {
+    "beer": "Stable Amber",
+    "date": "1901-12-21",
+    "event_id": "EVT-bf0773ddd8",
+    "provenance": {
+      "evidence_class": "direct",
+      "transform": "date_shift+id_hash+quantity_band"
+    },
+    "quantity_band": "small",
+    "type": "stock_movement"
+  },
+  {
+    "beer": "Courtyard Pils",
+    "date": "1901-12-21",
+    "event_id": "EVT-263ef84f5a",
+    "provenance": {
+      "evidence_class": "direct",
+      "transform": "date_shift+id_hash+quantity_band"
+    },
+    "quantity_band": "medium",
+    "type": "stock_movement"
+  },
+  {
+    "beer": "Lantern Blonde",
+    "date": "1901-12-21",
+    "event_id": "EVT-85a5746341",
+    "provenance": {
+      "evidence_class": "direct",
+      "transform": "date_shift+id_hash+quantity_band"
+    },
+    "quantity_band": "medium",
+    "type": "stock_movement"
+  },
+  {
+    "beer": "Orchard Pale",
+    "date": "1901-12-21",
+    "event_id": "EVT-fb81e41294",
+    "provenance": {
+      "evidence_class": "direct",
+      "transform": "date_shift+id_hash+quantity_band"
+    },
+    "quantity_band": "medium",
+    "type": "stock_movement"
+  },
+  {
+    "beer": "Stable Amber",
+    "date": "1901-12-21",
+    "event_id": "EVT-c452f5427d",
+    "provenance": {
+      "evidence_class": "direct",
+      "transform": "date_shift+id_hash+quantity_band"
+    },
+    "quantity_band": "medium",
+    "type": "stock_movement"
+  },
+  {
+    "beer": "Courtyard Pils",
+    "date": "1901-12-28",
+    "event_id": "EVT-6e5b417764",
+    "provenance": {
+      "evidence_class": "direct",
+      "transform": "date_shift+id_hash+quantity_band"
+    },
+    "quantity_band": "small",
+    "type": "stock_movement"
+  },
+  {
+    "beer": "Lantern Blonde",
+    "date": "1901-12-28",
+    "event_id": "EVT-07d2bef394",
+    "provenance": {
+      "evidence_class": "direct",
+      "transform": "date_shift+id_hash+quantity_band"
+    },
+    "quantity_band": "small",
+    "type": "stock_movement"
+  },
+  {
+    "beer": "Stable Amber",
+    "date": "1901-12-28",
+    "event_id": "EVT-58184af248",
+    "provenance": {
+      "evidence_class": "direct",
+      "transform": "date_shift+id_hash+quantity_band"
+    },
+    "quantity_band": "small",
+    "type": "stock_movement"
+  },
+  {
+    "beer": "Orchard Pale",
+    "date": "1901-12-28",
+    "event_id": "EVT-fd4ddc8cb0",
+    "provenance": {
+      "evidence_class": "direct",
+      "transform": "date_shift+id_hash+quantity_band"
+    },
+    "quantity_band": "small",
+    "type": "stock_movement"
+  },
+  {
+    "beer": "Courtyard Pils",
+    "date": "1901-12-29",
+    "event_id": "EVT-fd4f6dbe24",
+    "provenance": {
+      "evidence_class": "direct",
+      "transform": "date_shift+id_hash+quantity_band"
+    },
+    "quantity_band": "small",
+    "type": "production"
+  },
+  {
+    "beer": "Courtyard Pils",
+    "date": "1901-12-29",
+    "event_id": "EVT-d6e3c123a8",
+    "provenance": {
+      "evidence_class": "direct",
+      "transform": "date_shift+id_hash+quantity_band"
+    },
+    "quantity_band": "small",
+    "type": "production"
+  },
+  {
+    "beer": "Courtyard Pils",
+    "date": "1901-12-29",
+    "event_id": "EVT-829d4c8719",
+    "provenance": {
+      "evidence_class": "direct",
+      "transform": "date_shift+id_hash+quantity_band"
+    },
+    "quantity_band": "small",
+    "type": "production"
+  },
+  {
+    "beer": "Courtyard Pils",
+    "date": "1901-12-29",
+    "event_id": "EVT-c2ace9540f",
+    "provenance": {
+      "evidence_class": "direct",
+      "transform": "date_shift+id_hash+quantity_band"
+    },
+    "quantity_band": "small",
+    "type": "production"
+  },
+  {
+    "beer": "Courtyard Pils",
+    "date": "1901-12-31",
+    "event_id": "EVT-d1066f5ba3",
+    "provenance": {
+      "evidence_class": "direct",
+      "transform": "date_shift+id_hash+quantity_band"
+    },
+    "quantity_band": "small",
+    "type": "stock_movement"
+  },
+  {
+    "beer": "Orchard Pale",
+    "date": "1901-12-31",
+    "event_id": "EVT-0a0008ebb3",
+    "provenance": {
+      "evidence_class": "direct",
+      "transform": "date_shift+id_hash+quantity_band"
+    },
+    "quantity_band": "small",
+    "type": "stock_movement"
+  },
+  {
+    "beer": "Lantern Blonde",
+    "date": "1901-12-31",
+    "event_id": "EVT-93d67df903",
+    "provenance": {
+      "evidence_class": "direct",
+      "transform": "date_shift+id_hash+quantity_band"
+    },
+    "quantity_band": "small",
+    "type": "stock_movement"
+  },
+  {
+    "beer": "Stable Amber",
+    "date": "1901-12-31",
+    "event_id": "EVT-143abd2272",
+    "provenance": {
+      "evidence_class": "direct",
+      "transform": "date_shift+id_hash+quantity_band"
+    },
+    "quantity_band": "small",
+    "type": "stock_movement"
+  },
+  {
+    "beer": "Orchard Pale",
+    "date": "1901-12-31",
+    "event_id": "EVT-9f52b78f2b",
+    "provenance": {
+      "evidence_class": "direct",
+      "transform": "date_shift+id_hash+quantity_band"
+    },
+    "quantity_band": "medium",
+    "type": "stock_movement"
+  },
+  {
+    "beer": "Lantern Blonde",
+    "date": "1901-12-31",
+    "event_id": "EVT-1853f0b9bb",
+    "provenance": {
+      "evidence_class": "direct",
+      "transform": "date_shift+id_hash+quantity_band"
+    },
+    "quantity_band": "medium",
+    "type": "stock_movement"
+  },
+  {
+    "beer": "Stable Amber",
+    "date": "1901-12-31",
+    "event_id": "EVT-8b318a5ba1",
+    "provenance": {
+      "evidence_class": "direct",
+      "transform": "date_shift+id_hash+quantity_band"
+    },
+    "quantity_band": "medium",
+    "type": "stock_movement"
+  }
+]

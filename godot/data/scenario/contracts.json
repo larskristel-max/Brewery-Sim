@@ -1,0 +1,50 @@
+{
+  "week_two_contracts": [
+    {
+      "id": "festival_rush",
+      "name": "Saint Brigid Festival",
+      "recipe": "Lantern Blonde",
+      "advance": 320,
+      "guests": 50,
+      "quality_target": 62,
+      "deadline_days": 8,
+      "success_outcome": "festival_saved",
+      "failure_outcome": "festival_disappointed"
+    },
+    {
+      "id": "count_reserve",
+      "name": "Count's Cellar Reserve",
+      "recipe": "Stable Amber",
+      "advance": 120,
+      "guests": 32,
+      "quality_target": 72,
+      "deadline_days": 10,
+      "success_outcome": "reserve_approved",
+      "failure_outcome": "reserve_refused"
+    }
+  ],
+  "delivery_recoveries": [
+    {"id": "renegotiate", "reasons": ["missed_quality", "late_delivery"]},
+    {"id": "discount", "reasons": ["missed_quality"]},
+    {"id": "delay_repair", "reasons": ["damaged_equipment"]},
+    {"id": "absorb_loss", "reasons": ["missed_quality", "late_delivery", "damaged_equipment"]}
+  ],
+  "capacity_opportunities": [
+    {
+      "id": "abbey_table",
+      "name": "Abbey harvest table",
+      "recipe": "Lantern Blonde",
+      "advance": 360,
+      "deadline_days": 8,
+      "resources": {"malt_kg": 4.2, "kegs": 1, "staff_hours": 8, "cash": 180}
+    },
+    {
+      "id": "inn_cellar",
+      "name": "Three Lanterns inn cellar",
+      "recipe": "Stable Amber",
+      "advance": 520,
+      "deadline_days": 10,
+      "resources": {"malt_kg": 5.4, "kegs": 1, "staff_hours": 9, "cash": 260}
+    }
+  ]
+}
