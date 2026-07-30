@@ -34,7 +34,13 @@ func _run() -> void:
 	await _settle()
 	var first_light := instance.get_node_or_null("World/FirstLightHotspot") as Button
 	if first_light: first_light.pressed.emit()
-	await create_timer(1.25).timeout
+	await create_timer(0.65).timeout
+	await _settle()
+	var awakening_advance := _find_named_button(instance.ui.awakening, "AdvanceAwakening")
+	_expect(awakening_advance != null, "Phone awakening cinematic did not expose a tap-to-advance layer")
+	_expect(_fits_in_viewport(instance, instance.ui.awakening.subtitle_panel), "Phone awakening subtitles overflowed the viewport")
+	var awakening_skip := _find_button(instance.ui.awakening, "SKIP")
+	if awakening_skip: awakening_skip.pressed.emit()
 	await _settle()
 
 	_expect(instance.ui.mobile_command_stack.visible, "Phone portrait did not expose the stacked command controls")

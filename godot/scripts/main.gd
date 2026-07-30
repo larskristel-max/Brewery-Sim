@@ -2,6 +2,7 @@ extends Control
 
 const BrewSimulationModel = preload("res://scripts/brew_simulation.gd")
 const PrologueCinematicScene = preload("res://scripts/prologue_cinematic.gd")
+const AwakeningCinematicScene = preload("res://scripts/awakening_cinematic.gd")
 
 const INK := Color("#171310")
 const CREAM := Color("#efe4d2")
@@ -26,6 +27,7 @@ var cue_player: AudioStreamPlayer
 var cue_streams: Dictionary = {}
 var prologue_active := false
 var awaiting_first_light := false
+var awakening_active := false
 var portrait_layout := false
 var compact_layout := false
 
@@ -58,7 +60,7 @@ func _process(delta: float) -> void:
 		_refresh()
 
 func _unhandled_input(event: InputEvent) -> void:
-	if prologue_active or awaiting_first_light:
+	if prologue_active or awaiting_first_light or awakening_active:
 		return
 	if event.is_action_pressed("toggle_pause"): _set_speed(0)
 	elif event.is_action_pressed("speed_one"): _set_speed(1)
@@ -905,14 +907,14 @@ func _show_first_light_handoff() -> void:
 	copy.add_child(eyebrow)
 	var title := Label.new()
 	title.name = "Title"
-	title.text = "Light the Old Stables"
+	title.text = "Open the Old Stables"
 	title.add_theme_font_size_override("font_size", 25)
 	title.add_theme_color_override("font_color", CREAM)
 	copy.add_child(title)
 	ui.first_light_title = title
 	var instruction := Label.new()
 	instruction.name = "Instruction"
-	instruction.text = "Click the glowing brass work lamp. Wake the room before you wake the copper."
+	instruction.text = "Click the glowing stable doors. Let the first light in before you wake the copper."
 	instruction.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	instruction.add_theme_font_size_override("font_size", 12)
 	instruction.add_theme_color_override("font_color", Color("#d5c7b4"))
@@ -929,11 +931,35 @@ func _on_first_light_activated() -> void:
 		ui.first_light_title.text = "The Old Stables awaken"
 	if ui.has("first_light_instruction") and is_instance_valid(ui.first_light_instruction):
 		ui.first_light_instruction.text = "Your first real brew begins now."
-	await get_tree().create_timer(1.15).timeout
+	await get_tree().create_timer(0.45).timeout
 	if ui.has("first_light_card") and is_instance_valid(ui.first_light_card):
 		var fade := create_tween()
 		fade.tween_property(ui.first_light_card, "modulate:a", 0.0, 0.32)
 		fade.tween_callback(ui.first_light_card.queue_free)
+	_start_awakening_cinematic()
+
+func _start_awakening_cinematic() -> void:
+	awakening_active = true
+	ui.top_bar.visible = false
+	ui.command_dock.visible = false
+	ui.guidance_panel.visible = false
+	var awakening: Control = AwakeningCinematicScene.new()
+	awakening.name = "AwakeningCinematic"
+	awakening.finished.connect(_on_awakening_finished)
+	awakening.beat.connect(_play_cue)
+	add_child(awakening)
+	ui.awakening = awakening
+	awakening.start()
+
+func _on_awakening_finished(_was_skipped: bool) -> void:
+	if not awakening_active:
+		return
+	awakening_active = false
+	if ui.has("awakening") and is_instance_valid(ui.awakening):
+		ui.awakening.queue_free()
+	_complete_first_light_handoff()
+
+func _complete_first_light_handoff() -> void:
 	ui.top_bar.visible = true
 	ui.command_dock.visible = true
 	ui.guidance_panel.visible = true

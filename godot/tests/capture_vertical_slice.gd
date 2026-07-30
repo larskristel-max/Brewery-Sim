@@ -19,7 +19,10 @@ func _capture_gallery() -> void:
 	await _settle(0.1)
 	var first_light := instance.get_node_or_null("World/FirstLightHotspot") as Button
 	if first_light: first_light.pressed.emit()
-	await _settle(1.3)
+	await _settle(0.65)
+	if instance.ui.has("awakening") and is_instance_valid(instance.ui.awakening):
+		instance.ui.awakening.finish(true)
+	await _settle(0.2)
 	var model: BrewSimulation = instance.simulation
 	instance._refresh(true)
 	await _settle(0.2)

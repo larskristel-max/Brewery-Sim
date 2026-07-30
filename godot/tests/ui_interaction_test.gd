@@ -33,14 +33,21 @@ func _run() -> void:
 	await process_frame
 	_expect(instance.started, "Appointment did not start the campaign")
 	_expect(instance.simulation.state.stage == "recommission", "Appointment did not accept the stable key")
-	_expect(instance.awaiting_first_light, "Appointment did not hand control to the first lamp")
+	_expect(instance.awaiting_first_light, "Appointment did not hand control to the stable doors")
 	var first_light := instance.get_node_or_null("World/FirstLightHotspot") as Button
-	_expect(first_light != null and first_light.visible, "First lamp did not expose an interactive hotspot")
+	_expect(first_light != null and first_light.visible, "Stable doors did not expose an interactive hotspot")
 	if first_light: first_light.pressed.emit()
-	await create_timer(1.25).timeout
+	await create_timer(0.65).timeout
 	await process_frame
-	_expect(not instance.awaiting_first_light, "First lamp did not complete the interactive handoff")
-	_expect(instance.speed == 1, "Estate clock did not begin after the lamp was lit")
+	_expect(instance.awakening_active, "Opening the stable doors did not begin the awakening cinematic")
+	_expect(instance.speed == 0, "Estate clock ran underneath the awakening cinematic")
+	var awakening_skip := _find_button(instance.ui.awakening, "SKIP")
+	_expect(awakening_skip != null, "Awakening cinematic did not expose a skip control")
+	if awakening_skip: awakening_skip.pressed.emit()
+	await process_frame
+	await process_frame
+	_expect(not instance.awaiting_first_light and not instance.awakening_active, "Awakening cinematic did not complete the first-light handoff")
+	_expect(instance.speed == 1, "Estate clock did not begin after the awakening cinematic")
 	_expect(_fits_horizontally(instance.ui.command_header, instance.ui.clock_group), "Command-dock clock and save controls overflowed at 1280x720")
 	_expect(instance.ui.command_dock.position.x >= 0.0 and instance.ui.command_dock.position.x + instance.ui.command_dock.size.x <= instance.size.x, "Command dock extended outside the responsive viewport")
 	var brewhouse_hotspot := instance.get_node_or_null("World/BrewhouseHotspot") as Button

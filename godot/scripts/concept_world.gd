@@ -199,7 +199,7 @@ func _make_first_light_button() -> void:
 	first_light_button.name = "FirstLightHotspot"
 	first_light_button.text = ""
 	first_light_button.flat = true
-	first_light_button.tooltip_text = "Light the Old Stables"
+	first_light_button.tooltip_text = "Open the Old Stables"
 	first_light_button.focus_mode = Control.FOCUS_ALL
 	first_light_button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	first_light_button.visible = false
@@ -338,7 +338,7 @@ func _draw_first_light_state() -> void:
 		draw_circle(point, radius, Color(0.98, 0.56, 0.20, glow_strength * float(6 - index) * 0.09))
 	if first_light_waiting:
 		var font := ThemeDB.fallback_font
-		var title := "LIGHT THE OLD STABLES"
+		var title := "OPEN THE OLD STABLES"
 		var width := font.get_string_size(title, HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x + 30.0
 		var box := Rect2(point + Vector2(-width * 0.5, 70), Vector2(width, 34))
 		draw_rect(box, Color(0.018, 0.017, 0.019, 0.94))
@@ -539,7 +539,7 @@ func _station_point(station_id: String) -> Vector2:
 	return _clamped_interaction_point(STATION_POINTS[station_id], Vector2(52, 52))
 
 func _first_light_point() -> Vector2:
-	return _clamped_interaction_point(Vector2(0.42, 0.22), Vector2(64, 58))
+	return _clamped_interaction_point(Vector2(0.84, 0.72), Vector2(64, 58))
 
 func _clamped_interaction_point(normalized: Vector2, inset: Vector2) -> Vector2:
 	var point := _point(normalized)

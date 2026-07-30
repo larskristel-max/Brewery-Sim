@@ -46,10 +46,32 @@ func _capture() -> void:
 	var first_light := instance.get_node_or_null("World/FirstLightHotspot") as Button
 	if first_light:
 		first_light.pressed.emit()
-	await _settle(0.55)
-	await _save("09-stables-awaken.png")
-	await _settle(0.85)
-	await _save("10-gameplay-handoff.png")
+	await _settle(3.0)
+	await _save("09-awakening-doors.png")
+
+	instance.ui.awakening.advance()
+	await _settle(3.0)
+	await _save("10-awakening-fire.png")
+
+	instance.ui.awakening.advance()
+	await _settle(3.0)
+	await _save("11-awakening-jules.png")
+
+	instance.ui.awakening.advance()
+	await _settle(3.0)
+	await _save("12-awakening-maelle.png")
+
+	instance.ui.awakening.advance()
+	await _settle(3.0)
+	await _save("13-awakening-first-work.png")
+
+	instance.ui.awakening.advance()
+	await _settle(3.0)
+	await _save("14-awakening-inez.png")
+
+	instance.ui.awakening.advance()
+	await _settle(0.4)
+	await _save("15-gameplay-handoff.png")
 	print("Old Stables prologue review: CAPTURED to " + output_dir)
 	quit(0)
 

@@ -39,3 +39,27 @@ Materials/textures: Damp limestone, scratched oak, brushed stainless keg, braide
 Constraints: Accurate brewery packaging equipment and connections; expressive anatomically correct hands; same grounded period-workshop world; fictional heraldry only; no readable text; no labels; no UI; no collage; no grid; no watermark.
 Avoid: Modern industrial factory, glossy advertisement staging, plastic disposable cups, unsafe open transfer, floating tools, extra fingers, cropped primary hands.
 ```
+
+## Old Stables awakening cinematic
+
+Outputs:
+
+- `godot/assets/cinematics/awakening-01-doors.png`
+- `godot/assets/cinematics/awakening-02-fire.png`
+- `godot/assets/cinematics/awakening-03-staff.png`
+- `godot/assets/cinematics/awakening-04-work.png`
+
+```text
+Use case: cinematic story plates
+Asset type: four matching 16:9 plates for the interactive first-light sequence
+Primary request: Show the Old Stables awakening in four grounded beats: the newly appointed Brewmaster forcing open rain-swollen stable doors; striking the first small flame beneath a cold, neglected copper; meeting the five-person brewery staff at the threshold; and the whole staff beginning practical restoration work.
+Input images: The appointment scene is the Brewmaster identity and costume reference. Old Stables in Motion is the architecture, equipment, period-workshop, lighting, and painterly-realism reference.
+Scene/backdrop: A neglected stone-and-timber chateau brewery in 1901, with tarnished copper, soot, damp floors, old grain, rain outside, period hand tools, ledgers, sacks, and lanterns.
+Style/medium: Richly detailed cinematic painterly realism consistent with the existing Old Stables plates.
+Composition/framing: Wide 16:9. Keep every speaking or working character's complete head visible. Preserve a clear lower subtitle-safe area without sacrificing faces or essential work.
+Lighting/mood: Cold blue rain and morning shadow gradually answered by warm lantern light and the first restrained copper flame.
+Continuity: The same young Brewmaster appears in every relevant plate. The staff-arrival and first-work plates contain exactly five distinct adults.
+Action requirements: The work plate shows five readable jobs: inspect the copper, sweep the drain, scrape soot, open the rainy doors or shutters, and count malt sacks.
+Constraints: Period-appropriate clothing and tools; accurate hands and faces; neglected early-restoration state; no readable text; no UI; no modern objects; no watermark.
+Avoid: Cropped heads, roaring furnace, already-restored luxury brewery, idle posing in the work plate, crowds, fantasy magic, modern factory equipment.
+```
