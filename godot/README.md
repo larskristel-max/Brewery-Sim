@@ -80,6 +80,22 @@ source-commit information, and writes a ZIP plus SHA-256 file under
 Tester instructions are maintained in
 [`../docs/windows-playtest-guide.md`](../docs/windows-playtest-guide.md).
 
+## Browser playtest build
+
+The browser build is the primary playtest format. It uses Godot's
+single-threaded web runtime so it works over ordinary HTTPS without
+cross-origin isolation headers:
+
+```powershell
+scripts\build-web-playtest.cmd
+cd web-playtest
+npm.cmd test
+```
+
+The generated game files are embedded in the OpenAI Sites launcher under
+`web-playtest/public/game/`. The Windows ZIP remains available as a fallback
+for testers whose browser or GPU cannot start WebGL 2.
+
 To rebuild the sanitized calibration pack from an authorized workbook snapshot:
 
 ```powershell

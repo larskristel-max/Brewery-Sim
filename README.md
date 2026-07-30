@@ -19,3 +19,19 @@ npm run test
 ```
 
 The Godot reboot and legacy TypeScript prototype are intentionally isolated from each other.
+
+## Browser playtest
+
+The browser build is the primary playtest format; the Windows ZIP remains the
+fallback. Build the single-threaded Godot web export, then validate its OpenAI
+Sites launcher:
+
+```powershell
+scripts\build-web-playtest.cmd
+cd web-playtest
+npm.cmd test
+```
+
+The generated browser payload lives under `web-playtest/public/game/`. It is
+included in the hosted Sites version and uses ordinary HTTPS; no cross-origin
+isolation headers are required.
