@@ -761,13 +761,13 @@ func _show_customization() -> void:
 	speaker.add_theme_color_override("font_color", COPPER_BRIGHT)
 	story_content.add_child(speaker)
 	var line := Label.new()
-	line.text = "“Wake the old brewhouse. Fill the courtyard.\nGive them a reason to return.”"
+	line.text = "“Then light it. Brew one honest beer.\nIf the village asks for a second, Valenne has a future.”"
 	line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	line.add_theme_font_size_override("font_size", 21)
 	line.add_theme_color_override("font_color", CREAM)
 	story_content.add_child(line)
 	var terms := Label.new()
-	terms.text = "Apolline waits to record the name of the brewer who accepts."
+	terms.text = "Apolline has left a line in the ledger for the brewer who accepts."
 	terms.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	terms.add_theme_font_size_override("font_size", 11)
 	terms.add_theme_color_override("font_color", SAGE)

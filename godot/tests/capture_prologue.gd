@@ -17,36 +17,39 @@ func _capture() -> void:
 	await _save("01-estate-arrival.png")
 
 	instance.ui.prologue.advance()
-	instance.ui.prologue.advance()
 	await _settle(3.0)
-	await _save("02-count-appointment.png")
+	await _save("02-apolline-inventory.png")
 
 	instance.ui.prologue.advance()
 	await _settle(3.0)
-	await _save("03-apolline-ledger.png")
+	await _save("03-count-appointment.png")
 
 	instance.ui.prologue.advance()
 	await _settle(3.0)
-	await _save("04-count-terms.png")
+	await _save("04-apolline-cost.png")
 
 	instance.ui.prologue.advance()
 	await _settle(3.0)
-	await _save("05-stable-key.png")
+	await _save("05-count-terms.png")
+
+	instance.ui.prologue.advance()
+	await _settle(3.0)
+	await _save("06-stable-key.png")
 
 	instance.ui.prologue.finish(true)
 	await _settle(0.5)
-	await _save("06-appointment-form.png")
+	await _save("07-appointment-form.png")
 	instance.begin_campaign_with("Elise", 0)
 	await _settle(0.2)
-	await _save("07-first-light-prompt.png")
+	await _save("08-first-light-prompt.png")
 
 	var first_light := instance.get_node_or_null("World/FirstLightHotspot") as Button
 	if first_light:
 		first_light.pressed.emit()
 	await _settle(0.55)
-	await _save("08-stables-awaken.png")
+	await _save("09-stables-awaken.png")
 	await _settle(0.85)
-	await _save("09-gameplay-handoff.png")
+	await _save("10-gameplay-handoff.png")
 	print("Old Stables prologue review: CAPTURED to " + output_dir)
 	quit(0)
 

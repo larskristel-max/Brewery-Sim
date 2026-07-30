@@ -13,18 +13,18 @@ const SHOTS := [
 		"duration": 8.0,
 		"focus": Vector2(0.80, 0.25),
 		"zoom": 1.28,
-		"eyebrow": "CHÂTEAU DE VALENNE · THE LAST GOOD NIGHT",
+		"eyebrow": "ESTATE · LAST LIGHT",
 		"speaker": "",
-		"line": "At Valenne, the bells still rang. The creditors had simply learned to arrive before them.",
+		"line": "The bailiff’s men led Valenne’s last carriage horse through the rain. By morning, they would begin on the furniture.",
 		"beat": "bell"
 	},
 	{
 		"duration": 8.0,
 		"focus": Vector2(0.28, 0.76),
 		"zoom": 1.72,
-		"eyebrow": "THE FINAL ACCOUNT",
-		"speaker": "",
-		"line": "They took the horses at dusk. At dawn, they would return for the land.",
+		"eyebrow": "THE LEDGER",
+		"speaker": "APOLLINE DE VALENNE",
+		"line": "Forty-two days of wages. Eighteen kilos of malt. Two crocks of yeast. Not a hop in the stores.",
 		"beat": "ledger"
 	},
 	{
@@ -33,16 +33,16 @@ const SHOTS := [
 		"zoom": 1.28,
 		"eyebrow": "THE APPOINTMENT",
 		"speaker": "COUNT ARMAND DE VALENNE",
-		"line": "My family has survived wars, winters, and its own pride. I will not have us defeated by an empty cellar.",
+		"line": "My grandfather filled this courtyard from gate to chapel. Can you make people cross it again?",
 		"beat": "appointment"
 	},
 	{
 		"duration": 10.0,
 		"focus": Vector2(0.79, 0.27),
 		"zoom": 1.32,
-		"eyebrow": "THE LEDGER",
+		"eyebrow": "THE COST",
 		"speaker": "APOLLINE DE VALENNE",
-		"line": "Pride will not pay the maltster. We have one season, little coin, and no beer worth returning for.",
+		"line": "Not with memory. The maltster wants cash, the excise man wants his duty, and that copper has been cold for years.",
 		"beat": "ledger"
 	},
 	{
@@ -51,7 +51,7 @@ const SHOTS := [
 		"zoom": 1.18,
 		"eyebrow": "THE TERMS",
 		"speaker": "COUNT ARMAND DE VALENNE",
-		"line": "Then give them a reason to return. Wake the old brewhouse. Fill the courtyard. Make Valenne useful again.",
+		"line": "Then light it. Brew one honest beer. If the village asks for a second, Valenne has a future.",
 		"beat": "appointment"
 	},
 	{
@@ -60,7 +60,7 @@ const SHOTS := [
 		"zoom": 1.84,
 		"eyebrow": "THE OLD STABLES",
 		"speaker": "",
-		"line": "The Count set down the key. No one in the room called it hope.",
+		"line": "He set the stable key beside the ledger. Apolline dipped her pen and left a line for your name.",
 		"beat": "key"
 	}
 ]
