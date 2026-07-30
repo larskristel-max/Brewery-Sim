@@ -50,9 +50,9 @@ const saison = recipes.find((recipe) => recipe.id === 'shed-saison');
 const stout = recipes.find((recipe) => recipe.id === 'midnight-stout');
 const kveik = recipes.find((recipe) => recipe.id === 'hot-garage-kveik');
 assert.ok(blonde && ipa && pils && wheat && saison && stout && kveik, 'starter recipes should include Blonde, IPA, Pils, Wheat, Saison, Stout and Kveik');
-assert.equal(blonde.originalGravity, '1.045', 'Garage Blonde should define original gravity for brew notes');
-assert.equal(blonde.expectedAbv, '4.6%', 'Garage Blonde should define expected ABV for brew notes');
-assert.match(recipeRequirementSummary(blonde), /4\.2 kg Pilsner malt[\s\S]*45 g Saaz hops[\s\S]*1 ale yeast pack[\s\S]*60 bottles/, 'Garage Blonde requirement summary should teach exact quantities');
+assert.equal(blonde.originalGravity, '1.062', 'Garage Blonde should define original gravity for brew notes');
+assert.equal(blonde.expectedAbv, '6.4%', 'Garage Blonde should define expected ABV for brew notes');
+assert.match(recipeRequirementSummary(blonde), /4\.7 kg Pilsner malt[\s\S]*0\.3 kg Aromatic malt[\s\S]*0\.5 kg Light candi sugar[\s\S]*50 g Styrian hops[\s\S]*1 belgian ale yeast pack[\s\S]*60 bottles/, 'Garage Blonde requirement summary should teach exact quantities');
 const restockPreview = reduceGame(createInitialState(), { type: 'start-batch', recipeId: 'garage-blonde' });
 assert.match(recipeMissingOrderSummary(restockPreview, blonde), /Need 48 bottles\. Order 4 x 12 bottle packs\./, 'restock summary should round missing bottles to shop packs');
 assert.equal(recipeSupplyBreakdown(restockPreview, blonde).find((item) => item.ingredientId === 'bottles')?.packsToOrder, 4, 'supply breakdown should expose rounded packs to order');
@@ -224,7 +224,7 @@ assert.equal(blonde.ingredients.find((item) => item.ingredientId === 'bottles')?
 
 state = reduceGame(state, { type: 'start-batch', recipeId: 'garage-blonde' });
 assert.equal(state.batches.length, 1, 'starting a batch should create one active batch');
-assert.equal(state.inventory.ingredients['pilsner-malt'].amount, 5.8, 'starting a Blonde consumes named pilsner malt');
+assert.equal(state.inventory.ingredients['pilsner-malt'].amount, 5.3, 'starting a Blonde consumes named pilsner malt');
 assert.equal(state.inventory.ingredients.bottles.amount, 12, 'starting a Blonde consumes five 12 bottle cases from starter packaging stock');
 assert.equal(state.batches[0].step, 'brewing', 'brew day should be an explicit timed step before transfer');
 assert.equal(firstLoopObjective(state), 'Tap the stock pot to finish the brew day.', 'brewing objective should point at the kettle time skip');
@@ -391,7 +391,7 @@ assert.equal(samiraPromises.length, 1, 'selling Samira cases should update the e
 assert.equal(samiraPromises[0].deliveredCases, 4, 'Samira promise ledger should track delivered cases');
 assert.equal(samiraPromises[0].status, 'fulfilled', 'Samira promise should be fulfilled after delivery');
 assert.equal(state.campaign.missionId, 'empty-shelf', 'selling the first four cases should advance to the restock storyline mission');
-assert.match(campaignNextStep(state), /4\.2 kg Pilsner malt[\s\S]*Need 48 bottles[\s\S]*Order 4 x 12 bottle packs/i, 'post-sale campaign guidance should teach exact restock quantities before upgrades');
+assert.match(campaignNextStep(state), /4\.7 kg Pilsner malt[\s\S]*0\.3 kg Aromatic malt[\s\S]*0\.5 kg Light candi sugar[\s\S]*50 g Styrian hops[\s\S]*1 belgian ale yeast pack[\s\S]*Need 48 bottles[\s\S]*Order 4 x 12 bottle packs/i, 'post-sale campaign guidance should teach exact restock quantities before upgrades');
 assert.ok(['Sell', 'Mash'].includes(currentWorkflowStage(state).stage), 'flow should either keep selling remaining cases or return to brewing after stock sells out');
 assert.ok(state.cash > 140, 'selling cases should increase cash');
 assert.ok(state.visibilityRisk > 0, 'garage sales should increase visibility risk');

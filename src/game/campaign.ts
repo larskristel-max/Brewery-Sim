@@ -61,11 +61,11 @@ export const campaignMissions: Record<CampaignMissionId, CampaignMission> = {
     characterId: 'samira',
     act: 'Garage Doors Up',
     message:
-      'Big barbecue in six weeks. Could you bring 4 cases of Garage Blonde? People keep asking about that garage beer. I said yes before asking you. Sorry. Sort of.',
+      'The barbecue is in six weeks, and people are already asking if you are bringing Garage Blonde again. Could you do 4 cases? I may have told them yes.',
     phoneThread: [
-      'Big barbecue in six weeks.',
-      'People keep asking about that Garage Blonde you made in the garage.',
-      'Could you bring 4 cases? I said yes before asking you. Sorry. Sort of.'
+      'Barbecue is in six weeks.',
+      'People are already asking if you are bringing Garage Blonde again.',
+      'Could you do 4 cases? I may have told them yes.'
     ],
     replyText: 'I can do 4 cases.',
     goal: 'Brew, bottle, and deliver 4 cases of Garage Blonde.',

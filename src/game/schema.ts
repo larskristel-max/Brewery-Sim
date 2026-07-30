@@ -83,6 +83,7 @@ export type IngredientId =
   | 'pilsner-malt'
   | 'pale-malt'
   | 'wheat-malt'
+  | 'aromatic-malt'
   | 'crystal-malt'
   | 'black-malt'
   | 'saaz-hops'
@@ -92,10 +93,12 @@ export type IngredientId =
   | 'ale-yeast'
   | 'lager-yeast'
   | 'wheat-yeast'
+  | 'belgian-yeast'
   | 'saison-yeast'
   | 'kveik-yeast'
   | 'stout-yeast'
   | 'bottles'
+  | 'candi-sugar'
   | 'cleaner';
 
 export interface Ingredient {

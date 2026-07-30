@@ -65,10 +65,8 @@ const renderSaleConsequencePreview = (state: GameState, channelId: ReturnType<ty
   return `${simple} - Visibility +${preview.visibilityDelta} - Compliance +${preview.complianceDelta} - Household +${preview.householdPressureDelta}`;
 };
 
-const renderBrewdayChoiceButtons = (recipeId: string, canBrew: boolean, blocker: string) => `
-  <button data-action="start-batch" data-recipe-id="${recipeId}" data-brewday-approach="careful" type="button" ${canBrew ? '' : `disabled title="${blocker || 'Blocked'}"`}>Careful brew<small>${canBrew ? 'Slower, cleaner process' : blocker}</small></button>
-  <button data-action="start-batch" data-recipe-id="${recipeId}" data-brewday-approach="standard" type="button" ${canBrew ? '' : `disabled title="${blocker || 'Blocked'}"`}>Standard brew<small>${canBrew ? 'Expected recipe path' : blocker}</small></button>
-  <button data-action="start-batch" data-recipe-id="${recipeId}" data-brewday-approach="fast" type="button" ${canBrew ? '' : `disabled title="${blocker || 'Blocked'}"`}>Fast brew<small>${canBrew ? 'Saves time, style-dependent risk' : blocker}</small></button>
+const renderPrimaryBrewButton = (recipeId: string, canBrew: boolean, blocker: string) => `
+  <button data-action="start-batch" data-recipe-id="${recipeId}" data-brewday-approach="standard" type="button" ${canBrew ? '' : `disabled title="${blocker || 'Blocked'}"`}>Brew Garage Blonde<small>${canBrew ? 'Start the first 20 L batch' : blocker}</small></button>
 `;
 
 const readinessSummary = (batch: Batch): string => {
@@ -214,9 +212,9 @@ export const renderEquipmentActions = (context: StationPanelContext, equipmentId
       `;
     }
     return `
-      <div class="hotspot-actions">
-        ${recipe ? renderBrewExplainer(recipe) : ''}
-        ${renderBrewdayChoiceButtons('garage-blonde', canBrew, blocker)}
+        <div class="hotspot-actions">
+          ${recipe ? renderBrewExplainer(recipe) : ''}
+        ${renderPrimaryBrewButton('garage-blonde', canBrew, blocker)}
         <button data-action="open-overlay" data-overlay="recipes" type="button">Other recipes</button>
         ${cleanButton}
       </div>
