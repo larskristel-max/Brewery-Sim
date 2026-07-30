@@ -209,11 +209,11 @@ func _make_first_light_button() -> void:
 func _layout_hotspots() -> void:
 	for id in station_buttons:
 		var button: Button = station_buttons[id]
-		var point := _point(STATION_POINTS[id])
+		var point := _station_point(id)
 		button.position = point - Vector2(52, 52)
 		button.size = Vector2(104, 104)
 	if is_instance_valid(first_light_button):
-		var light_point := _point(Vector2(0.42, 0.22))
+		var light_point := _first_light_point()
 		first_light_button.position = light_point - Vector2(64, 58)
 		first_light_button.size = Vector2(128, 116)
 
@@ -331,7 +331,7 @@ func _draw_window_rain() -> void:
 func _draw_first_light_state() -> void:
 	var darkness := (1.0 - first_light_reveal) * 0.82
 	draw_rect(Rect2(Vector2.ZERO, size), Color(0.005, 0.009, 0.016, darkness))
-	var point := _point(Vector2(0.42, 0.22))
+	var point := _first_light_point()
 	var glow_strength := (0.22 + (sin(pulse * 3.2) + 1.0) * 0.055) if first_light_waiting else first_light_reveal * 0.38
 	for index in range(5, 0, -1):
 		var radius := 25.0 + float(index) * 14.0
@@ -348,7 +348,7 @@ func _draw_first_light_state() -> void:
 func _draw_station_state() -> void:
 	var font := ThemeDB.fallback_font
 	for id in STATION_POINTS:
-		var point: Vector2 = _point(STATION_POINTS[id])
+		var point: Vector2 = _station_point(id)
 		var busy: bool = _station_busy(id)
 		var highlighted: bool = id == selected_station or id == hovered_station
 		var radius: float = 33.0 + (sin(pulse * 3.0) * 3.0 if busy else 0.0)
@@ -442,7 +442,7 @@ func _assignment_chip_rect(staff_id: String) -> Rect2:
 			break
 		if str(assignment.station_id) == station_id:
 			stack_index += 1
-	var anchor := _point(STATION_POINTS[station_id]) + Vector2(0, 75 + stack_index * 47)
+	var anchor := _station_point(station_id) + Vector2(0, 75 + stack_index * 47)
 	var position := anchor - Vector2(ASSIGNMENT_CHIP_SIZE.x * 0.5, 0)
 	position.x = clampf(position.x, 8.0, maxf(8.0, size.x - ASSIGNMENT_CHIP_SIZE.x - 8.0))
 	position.y = clampf(position.y, 8.0, maxf(8.0, size.y - ASSIGNMENT_CHIP_SIZE.y - 8.0))
@@ -534,3 +534,15 @@ func _point(normalized: Vector2) -> Vector2:
 	var source := _source_rect(texture)
 	var source_point := normalized * texture_size
 	return (source_point - source.position) / source.size * size
+
+func _station_point(station_id: String) -> Vector2:
+	return _clamped_interaction_point(STATION_POINTS[station_id], Vector2(52, 52))
+
+func _first_light_point() -> Vector2:
+	return _clamped_interaction_point(Vector2(0.42, 0.22), Vector2(64, 58))
+
+func _clamped_interaction_point(normalized: Vector2, inset: Vector2) -> Vector2:
+	var point := _point(normalized)
+	point.x = clampf(point.x, inset.x, maxf(inset.x, size.x - inset.x))
+	point.y = clampf(point.y, inset.y, maxf(inset.y, size.y - inset.y))
+	return point

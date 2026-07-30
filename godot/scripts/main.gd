@@ -26,17 +26,21 @@ var cue_player: AudioStreamPlayer
 var cue_streams: Dictionary = {}
 var prologue_active := false
 var awaiting_first_light := false
+var portrait_layout := false
+var compact_layout := false
 
 func _ready() -> void:
 	simulation = BrewSimulationModel.new()
 	simulation.new_campaign()
 	theme = _build_theme()
 	_build_interface()
+	resized.connect(_apply_responsive_layout)
 	$World.station_selected.connect(_on_world_station_selected)
 	$World.station_hovered.connect(_on_world_station_hovered)
 	$World.first_light_activated.connect(_on_first_light_activated)
 	_refresh(true)
 	_show_customization()
+	_apply_responsive_layout()
 
 func _process(delta: float) -> void:
 	if started and speed > 0 and not simulation.state.campaign_lost:
@@ -137,6 +141,7 @@ func _build_top_bar() -> void:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 18)
 	panel.add_child(row)
+	ui.top_row = row
 	var brand := VBoxContainer.new()
 	brand.custom_minimum_size = Vector2(224, 0)
 	brand.add_theme_constant_override("separation", 0)
@@ -151,7 +156,11 @@ func _build_top_bar() -> void:
 	subtitle.add_theme_font_size_override("font_size", 10)
 	subtitle.add_theme_color_override("font_color", COPPER)
 	brand.add_child(subtitle)
-	row.add_child(VSeparator.new())
+	ui.brand = brand
+	var brand_separator := VSeparator.new()
+	row.add_child(brand_separator)
+	ui.brand_separator = brand_separator
+	ui.metric_boxes = []
 	for metric in [
 		{"id":"cash","label":"ESTATE CASH"},
 		{"id":"confidence","label":"COUNT"},
@@ -173,6 +182,7 @@ func _build_top_bar() -> void:
 		value.add_theme_color_override("font_color", CREAM)
 		box.add_child(value)
 		ui[metric.id] = value
+		ui.metric_boxes.append({"box": box, "caption": caption, "value": value})
 		row.add_child(box)
 	var rank := VBoxContainer.new()
 	rank.custom_minimum_size = Vector2(210, 0)
@@ -187,6 +197,7 @@ func _build_top_bar() -> void:
 	rank.add_child(rank_value)
 	ui.rank = rank_value
 	row.add_child(rank)
+	ui.rank_box = rank
 
 func _build_guidance() -> void:
 	var panel := PanelContainer.new()
@@ -307,10 +318,13 @@ func _build_command_dock() -> void:
 	command_row.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	command_row.add_theme_constant_override("separation", 10)
 	content.add_child(command_row)
+	ui.command_content = content
+	ui.command_row = command_row
 	var objective_box := VBoxContainer.new()
 	objective_box.custom_minimum_size = Vector2(260, 0)
 	objective_box.add_theme_constant_override("separation", 4)
 	command_row.add_child(objective_box)
+	ui.objective_box = objective_box
 	var context := Label.new()
 	context.add_theme_font_size_override("font_size", 9)
 	context.add_theme_color_override("font_color", COPPER)
@@ -339,11 +353,14 @@ func _build_command_dock() -> void:
 	inventory.visible = false
 	objective_box.add_child(inventory)
 	ui.inventory = inventory
-	command_row.add_child(VSeparator.new())
+	var objective_separator := VSeparator.new()
+	command_row.add_child(objective_separator)
+	ui.objective_separator = objective_separator
 	var staff_box := VBoxContainer.new()
 	staff_box.custom_minimum_size = Vector2(195, 0)
 	staff_box.add_theme_constant_override("separation", 5)
 	command_row.add_child(staff_box)
+	ui.staff_box = staff_box
 	var assign_label := Label.new()
 	assign_label.text = "WHO TAKES THE WORK?"
 	assign_label.add_theme_font_size_override("font_size", 9)
@@ -369,13 +386,16 @@ func _build_command_dock() -> void:
 	jobs.add_theme_color_override("font_color", COPPER_BRIGHT)
 	staff_box.add_child(jobs)
 	ui.jobs = jobs
-	command_row.add_child(VSeparator.new())
+	var staff_separator := VSeparator.new()
+	command_row.add_child(staff_separator)
+	ui.staff_separator = staff_separator
 	var action_scroll := ScrollContainer.new()
 	action_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	action_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	action_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
 	action_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	command_row.add_child(action_scroll)
+	ui.action_scroll = action_scroll
 	var actions := HBoxContainer.new()
 	actions.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	actions.add_theme_constant_override("separation", 8)
@@ -388,6 +408,13 @@ func _build_command_dock() -> void:
 	wait_button.pressed.connect(_advance_to_milestone)
 	command_row.add_child(wait_button)
 	ui.wait_button = wait_button
+	var mobile_stack := VBoxContainer.new()
+	mobile_stack.name = "MobileCommandStack"
+	mobile_stack.visible = false
+	mobile_stack.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	mobile_stack.add_theme_constant_override("separation", 7)
+	content.add_child(mobile_stack)
+	ui.mobile_command_stack = mobile_stack
 
 func _build_decision_panel() -> void:
 	var panel := PanelContainer.new()
@@ -443,6 +470,194 @@ func _build_audio() -> void:
 	cue_player.volume_db = -15.0
 	add_child(cue_player)
 
+func _apply_responsive_layout() -> void:
+	if not is_inside_tree() or size.x < 2.0 or size.y < 2.0 or not ui.has("command_dock"):
+		return
+	var aspect := size.x / size.y
+	var target_scale := Vector2i(540, 960) if aspect < 0.78 else (Vector2i(960, 540) if aspect > 2.0 else Vector2i(1280, 720))
+	if get_tree().root.content_scale_size != target_scale:
+		get_tree().root.content_scale_size = target_scale
+		call_deferred("_apply_responsive_layout")
+		return
+
+	portrait_layout = aspect < 0.78
+	compact_layout = portrait_layout or size.x < 960.0 or size.y < 650.0
+	_layout_top_bar()
+	_layout_guidance()
+	_layout_command_dock()
+	_layout_decision_panel()
+	_layout_story_overlays()
+
+func _layout_top_bar() -> void:
+	if portrait_layout:
+		ui.top_bar.offset_left = 8
+		ui.top_bar.offset_top = 8
+		ui.top_bar.offset_right = -8
+		ui.top_bar.offset_bottom = 74
+		ui.top_row.add_theme_constant_override("separation", 5)
+		ui.brand.visible = false
+		ui.brand_separator.visible = false
+		ui.rank_box.visible = false
+		for index in range(ui.metric_boxes.size()):
+			var metric: Dictionary = ui.metric_boxes[index]
+			metric.box.visible = index < 3
+			metric.box.custom_minimum_size = Vector2.ZERO
+			metric.caption.add_theme_font_size_override("font_size", 8)
+			metric.value.add_theme_font_size_override("font_size", 16)
+	else:
+		ui.top_bar.offset_left = 24
+		ui.top_bar.offset_top = 18
+		ui.top_bar.offset_right = -24
+		ui.top_bar.offset_bottom = 92
+		ui.top_row.add_theme_constant_override("separation", 18)
+		ui.brand.visible = true
+		ui.brand_separator.visible = true
+		ui.rank_box.visible = true
+		for metric in ui.metric_boxes:
+			metric.box.visible = true
+			metric.box.custom_minimum_size = Vector2(108, 0)
+			metric.caption.add_theme_font_size_override("font_size", 9)
+			metric.value.add_theme_font_size_override("font_size", 18)
+
+func _layout_guidance() -> void:
+	if portrait_layout:
+		ui.guidance_panel.anchor_left = 0.0
+		ui.guidance_panel.anchor_right = 1.0
+		ui.guidance_panel.offset_left = 8
+		ui.guidance_panel.offset_top = 82
+		ui.guidance_panel.offset_right = -8
+		ui.guidance_panel.offset_bottom = 132
+	else:
+		ui.guidance_panel.anchor_left = 0.5
+		ui.guidance_panel.anchor_right = 0.5
+		ui.guidance_panel.offset_left = -290
+		ui.guidance_panel.offset_top = 106
+		ui.guidance_panel.offset_right = 290
+		ui.guidance_panel.offset_bottom = 150
+
+func _layout_command_dock() -> void:
+	var operations_mode := bool(simulation.state.get("operations_active", false)) or str(simulation.state.stage) == "operations_council"
+	if portrait_layout:
+		_move_control(ui.objective_box, ui.mobile_command_stack, 0)
+		_move_control(ui.staff_box, ui.mobile_command_stack, 1)
+		_move_control(ui.action_scroll, ui.mobile_command_stack, 2)
+		_move_control(ui.wait_button, ui.mobile_command_stack, 3)
+		ui.command_row.visible = false
+		ui.mobile_command_stack.visible = true
+		ui.objective_separator.visible = false
+		ui.staff_separator.visible = false
+		ui.command_dock.offset_left = 8
+		ui.command_dock.offset_right = -8
+		ui.command_dock.offset_bottom = -8
+		ui.command_dock.offset_top = -minf(size.y * 0.62, 610.0 if operations_mode else 500.0)
+		ui.command_header.add_theme_constant_override("separation", 5)
+		ui.stage.custom_minimum_size = Vector2.ZERO
+		ui.stage.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		ui.time.visible = false
+		ui.status.visible = false
+		ui.save_button.visible = false
+		ui.load_button.visible = false
+		for clock_control in ui.clock_buttons:
+			var clock_speed := int(clock_control.speed)
+			clock_control.button.visible = clock_speed in [0, 1]
+			clock_control.button.custom_minimum_size = Vector2(48, 42)
+		ui.objective_box.custom_minimum_size = Vector2(0, 94)
+		ui.staff_box.custom_minimum_size = Vector2(0, 74)
+		ui.staff_summary.visible = false
+		ui.action_scroll.custom_minimum_size = Vector2(0, 88)
+		ui.wait_button.custom_minimum_size = Vector2(0, 58)
+		ui.operations_forecast.visible = false
+		ui.batch_rail_panel.custom_minimum_size = Vector2(0, 104)
+	else:
+		_move_control(ui.objective_box, ui.command_row, 0)
+		_move_control(ui.objective_separator, ui.command_row, 1)
+		_move_control(ui.staff_box, ui.command_row, 2)
+		_move_control(ui.staff_separator, ui.command_row, 3)
+		_move_control(ui.action_scroll, ui.command_row, 4)
+		_move_control(ui.wait_button, ui.command_row, 5)
+		ui.command_row.visible = true
+		ui.mobile_command_stack.visible = false
+		ui.objective_separator.visible = true
+		ui.staff_separator.visible = true
+		ui.command_dock.offset_left = 24
+		ui.command_dock.offset_right = -24
+		ui.command_dock.offset_bottom = -18
+		ui.command_dock.offset_top = -446 if operations_mode else -206
+		ui.command_header.add_theme_constant_override("separation", 8)
+		ui.stage.custom_minimum_size = Vector2(165, 0)
+		ui.stage.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+		ui.time.visible = true
+		ui.status.visible = true
+		ui.save_button.visible = true
+		ui.load_button.visible = true
+		for clock_control in ui.clock_buttons:
+			clock_control.button.visible = true
+			clock_control.button.custom_minimum_size = Vector2(36, 32)
+		ui.objective_box.custom_minimum_size = Vector2(260, 0)
+		ui.staff_box.custom_minimum_size = Vector2(195, 0)
+		ui.staff_summary.visible = true
+		ui.action_scroll.custom_minimum_size = Vector2.ZERO
+		ui.wait_button.custom_minimum_size = Vector2(116, 84)
+		ui.operations_forecast.visible = true
+		ui.batch_rail_panel.custom_minimum_size = Vector2(0, 76)
+
+func _layout_decision_panel() -> void:
+	if portrait_layout:
+		ui.decision_panel.anchor_left = 0.0
+		ui.decision_panel.anchor_top = 0.0
+		ui.decision_panel.anchor_right = 1.0
+		ui.decision_panel.anchor_bottom = 1.0
+		ui.decision_panel.offset_left = 8
+		ui.decision_panel.offset_top = 82
+		ui.decision_panel.offset_right = -8
+		ui.decision_panel.offset_bottom = -8
+	else:
+		ui.decision_panel.anchor_left = 1.0
+		ui.decision_panel.anchor_top = 0.0
+		ui.decision_panel.anchor_right = 1.0
+		ui.decision_panel.anchor_bottom = 1.0
+		ui.decision_panel.offset_left = -500
+		ui.decision_panel.offset_top = 8 if compact_layout else 116
+		ui.decision_panel.offset_right = -24
+		ui.decision_panel.offset_bottom = -446 if str(simulation.state.stage) == "operations_council" else -224
+
+func _layout_story_overlays() -> void:
+	if ui.has("customization_story") and is_instance_valid(ui.customization_story):
+		ui.customization_story.visible = not portrait_layout
+		if compact_layout and not portrait_layout:
+			_set_anchor_rect(ui.customization_story, 0.035, 0.52, 0.48, 0.95)
+		elif not portrait_layout:
+			_set_anchor_rect(ui.customization_story, 0.035, 0.60, 0.47, 0.91)
+	if ui.has("customization_card") and is_instance_valid(ui.customization_card):
+		if portrait_layout:
+			_set_anchor_rect(ui.customization_card, 0.035, 0.08, 0.965, 0.96)
+		elif compact_layout:
+			_set_anchor_rect(ui.customization_card, 0.60, 0.05, 0.97, 0.95)
+		else:
+			_set_anchor_rect(ui.customization_card, 0.62, 0.15, 0.965, 0.72)
+	if ui.has("first_light_card") and is_instance_valid(ui.first_light_card):
+		if portrait_layout:
+			_set_anchor_rect(ui.first_light_card, 0.035, 0.10, 0.965, 0.30)
+		elif compact_layout:
+			_set_anchor_rect(ui.first_light_card, 0.58, 0.08, 0.97, 0.35)
+		else:
+			_set_anchor_rect(ui.first_light_card, 0.61, 0.14, 0.965, 0.32)
+
+func _move_control(control: Control, target: Container, index: int) -> void:
+	if control.get_parent() != target:
+		control.reparent(target)
+	target.move_child(control, mini(index, target.get_child_count() - 1))
+
+func _set_anchor_rect(control: Control, left: float, top: float, right: float, bottom: float) -> void:
+	control.anchor_left = left
+	control.anchor_top = top
+	control.anchor_right = right
+	control.anchor_bottom = bottom
+	control.offset_left = 0
+	control.offset_top = 0
+	control.offset_right = 0
+	control.offset_bottom = 0
+
 func _exit_tree() -> void:
 	if is_instance_valid(cue_player):
 		cue_player.stop()
@@ -464,6 +679,7 @@ func _show_customization() -> void:
 	story.anchor_bottom = 0.91
 	story.add_theme_stylebox_override("panel", _panel_style(0.88, 10, 20))
 	shade.add_child(story)
+	ui.customization_story = story
 	var story_content := VBoxContainer.new()
 	story_content.add_theme_constant_override("separation", 7)
 	story.add_child(story_content)
@@ -491,6 +707,7 @@ func _show_customization() -> void:
 	card.anchor_bottom = 0.72
 	card.add_theme_stylebox_override("panel", _panel_style(0.97, 12, 22))
 	shade.add_child(card)
+	ui.customization_card = card
 	var form_scroll := ScrollContainer.new()
 	form_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	form_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
@@ -548,6 +765,7 @@ func _show_customization() -> void:
 	ui.command_dock.visible = false
 	ui.guidance_panel.visible = false
 	name_input.grab_focus()
+	_apply_responsive_layout()
 
 func begin_campaign_with(name_source, coat_source = null) -> void:
 	var display_name := str(name_source.text if name_source is LineEdit else name_source).strip_edges()
@@ -703,6 +921,7 @@ func _refresh(force_structure := false) -> void:
 	_handle_story_transition(state)
 	last_stage = str(state.stage)
 	last_issue = str(state.pending_issue)
+	_apply_responsive_layout()
 
 func _stage_label(state: Dictionary) -> String:
 	if state.pending_issue == "mash_drift": return "BREWING ALERT · MASH"

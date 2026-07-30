@@ -75,6 +75,8 @@ var dialogue: Label
 var progress: Label
 var transition: ColorRect
 var subtitle_panel: PanelContainer
+var skip_button: Button
+var chapter_label: Label
 
 func start(target_world: Control) -> void:
 	world = target_world
@@ -85,6 +87,8 @@ func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	_build_interface()
+	resized.connect(_apply_responsive_layout)
+	_apply_responsive_layout()
 	set_process(false)
 
 func _process(delta: float) -> void:
@@ -94,7 +98,8 @@ func _process(delta: float) -> void:
 	var shot: Dictionary = SHOTS[shot_index]
 	var reveal_duration: float = clampf(str(shot.line).length() * 0.026, 0.7, 2.6)
 	dialogue.visible_ratio = clampf(shot_elapsed / reveal_duration, 0.0, 1.0)
-	progress.text = "%02d:%02d  ·  SPACE ADVANCE  ·  ESC SKIP" % [int(_remaining_time()) / 60, int(_remaining_time()) % 60]
+	var controls_hint := "TAP ADVANCE  ·  SKIP ABOVE" if size.y > size.x * 1.28 else "SPACE ADVANCE  ·  ESC SKIP"
+	progress.text = "%02d:%02d  ·  %s" % [int(_remaining_time()) / 60, int(_remaining_time()) % 60, controls_hint]
 	if shot_elapsed >= float(shot.duration):
 		advance()
 
@@ -165,6 +170,15 @@ func _build_interface() -> void:
 			bar.anchor_bottom = 1.0
 		add_child(bar)
 
+	var advance_button := Button.new()
+	advance_button.name = "AdvancePrologue"
+	advance_button.flat = true
+	advance_button.focus_mode = Control.FOCUS_NONE
+	advance_button.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	advance_button.tooltip_text = "Tap to advance the story"
+	advance_button.pressed.connect(advance)
+	add_child(advance_button)
+
 	var skip := Button.new()
 	skip.name = "SkipPrologue"
 	skip.text = "SKIP  »"
@@ -177,6 +191,7 @@ func _build_interface() -> void:
 	skip.focus_mode = Control.FOCUS_ALL
 	skip.pressed.connect(finish.bind(true))
 	add_child(skip)
+	skip_button = skip
 
 	var chapter := Label.new()
 	chapter.text = "PROLOGUE"
@@ -187,6 +202,7 @@ func _build_interface() -> void:
 	chapter.add_theme_font_size_override("font_size", 11)
 	chapter.add_theme_color_override("font_color", COPPER)
 	add_child(chapter)
+	chapter_label = chapter
 
 	subtitle_panel = PanelContainer.new()
 	subtitle_panel.anchor_left = 0.13
@@ -242,3 +258,36 @@ func _build_interface() -> void:
 	transition.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	transition.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(transition)
+	_apply_responsive_layout()
+
+func _apply_responsive_layout() -> void:
+	if size.x < 2.0 or size.y < 2.0 or not is_instance_valid(subtitle_panel):
+		return
+	var portrait := size.y > size.x * 1.28
+	if portrait:
+		subtitle_panel.anchor_left = 0.05
+		subtitle_panel.anchor_top = 0.61
+		subtitle_panel.anchor_right = 0.95
+		subtitle_panel.anchor_bottom = 0.88
+		progress.offset_left = -210
+		progress.offset_right = 210
+		progress.text = "TAP TO ADVANCE  ·  SKIP AT TOP RIGHT"
+		skip_button.offset_left = -126
+		skip_button.offset_top = 18
+		skip_button.offset_right = -18
+		skip_button.offset_bottom = 62
+		chapter_label.offset_left = 20
+		chapter_label.offset_top = 27
+	else:
+		subtitle_panel.anchor_left = 0.13
+		subtitle_panel.anchor_top = 0.665
+		subtitle_panel.anchor_right = 0.87
+		subtitle_panel.anchor_bottom = 0.88
+		progress.offset_left = -240
+		progress.offset_right = 240
+		skip_button.offset_left = -142
+		skip_button.offset_top = 24
+		skip_button.offset_right = -30
+		skip_button.offset_bottom = 64
+		chapter_label.offset_left = 34
+		chapter_label.offset_top = 29
