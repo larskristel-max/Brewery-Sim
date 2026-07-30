@@ -11,6 +11,7 @@ Open `project.godot` in Godot 4.7.1 and run the project. “Night of First Light
 3. Select equipment in the brewery, choose a named worker, and issue the contextual work order from the command dock.
 4. Recommission the copper brewhouse, mash, solve the temperature drift, choose a response to the missing hop delivery, boil, clean and purge the fermenter, transfer, ferment and package.
 5. Prepare the courtyard during fermentation, serve the 20 L keg, and choose how to answer Apolline at the weekly council.
+6. Begin Week 2 and choose between the Saint Brigid Festival and the Count's Cellar Reserve. The reserve introduces Stable Amber, a higher quality target, and a recipe-specific stalled-runoff decision.
 
 Space pauses; 1, 2, and 4 set time speed. The on-screen 12× control accelerates long work, and “Advance to next milestone” jumps directly to the next scheduled job completion. Save and Load persist the entire campaign state.
 
@@ -48,6 +49,8 @@ godot --headless --path godot --script res://tests/worker_presentation_test.gd
 ```
 
 The model suite runs complete brew routes with different decisions and outcomes, validates Week 2 commitments, recipe-specific production trouble, station and staff constraints, authority gates, restoration, serious business risk, and versioned saves. The UI suite presses the real controls through promotion, Week 2 planning, and the Stable Amber lauter decision. The visual suites verify camera-correct world hotspots and truthful live assignment chips at 720p, 900p, and ultrawide resolutions.
+
+The active milestone and its exit criteria are maintained in [`../TODO.md`](../TODO.md).
 
 To regenerate the visual-review gallery, run the capture script without `--headless`:
 

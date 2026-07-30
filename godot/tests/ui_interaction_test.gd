@@ -11,6 +11,8 @@ func _run() -> void:
 	var instance = scene.instantiate()
 	root.add_child(instance)
 	await process_frame
+	root.size = Vector2i(1280, 720)
+	await process_frame
 	var begin := _find_button(instance.ui.customization, "Begin the first real brew")
 	_expect(begin != null, "Customization start button was not rendered")
 	if begin: begin.pressed.emit()
@@ -172,6 +174,9 @@ func _run() -> void:
 	var festival := _find_button(instance.ui.choices, "Supply the Saint Brigid festival")
 	var reserve := _find_button(instance.ui.choices, "Brew the Count's cellar reserve")
 	_expect(festival != null and reserve != null, "Week 2 did not present both competing production commitments")
+	await _verify_save_load(instance, "Week 2 planning")
+	festival = _find_button(instance.ui.choices, "Supply the Saint Brigid festival")
+	reserve = _find_button(instance.ui.choices, "Brew the Count's cellar reserve")
 	if reserve: reserve.pressed.emit()
 	await _settle()
 	_expect(instance.simulation.state.stage == "ready_to_mash", "Choosing the cellar reserve did not schedule production")
@@ -207,20 +212,112 @@ func _run() -> void:
 	_expect(instance.ui.consequence.text.contains("STABLE AMBER") and instance.ui.consequence.text.contains("quality target 72"), "Stable Amber decision did not preview its recipe and contract stakes")
 	var recirculate := _find_button(instance.ui.choices, "Rake and recirculate patiently")
 	_expect(recirculate != null, "Stable Amber runoff responses were not rendered")
+	await _verify_save_load(instance, "Stable Amber production trouble")
+	recirculate = _find_button(instance.ui.choices, "Rake and recirculate patiently")
 	var amber_quality := int(instance.simulation.state.batch.quality)
 	var amber_confidence := int(instance.simulation.state.count_confidence)
 	var amber_minute := int(instance.simulation.state.game_minute)
+	instance.speed = 0
 	if recirculate: recirculate.pressed.emit()
+	_expect(int(instance.simulation.state.game_minute) == amber_minute + 60, "Patient recirculation did not apply its one-hour delay")
 	await _settle()
 	_expect(instance.simulation.state.pending_issue == "", "Stable Amber runoff response did not clear the production judgment")
 	_expect(instance.simulation.state.stage == "ready_to_boil", "Stable Amber runoff response did not advance to boiling")
 	_expect(int(instance.simulation.state.batch.quality) == amber_quality + 7, "Patient recirculation did not apply its quality consequence")
 	_expect(int(instance.simulation.state.count_confidence) == amber_confidence + 2, "Patient recirculation did not apply its confidence consequence")
-	_expect(int(instance.simulation.state.game_minute) == amber_minute + 60, "Patient recirculation did not apply its one-hour delay")
 	_expect(instance.simulation.state.batch.flavor_tags.has("clear_runoff"), "Stable Amber runoff choice did not persist its flavor consequence")
+
+	_expect(await _complete_station_action(instance, "World/BrewhouseHotspot", "Boil the wort", "player"), "Stable Amber boil could not be completed through the UI")
+	_expect(instance.simulation.state.stage == "ready_to_transfer", "Stable Amber boil did not reach transfer preparation")
+	if int(instance.simulation.state.stations.fermenter.cleanliness) < 75:
+		_expect(await _complete_station_action(instance, "World/FermenterHotspot", "Clean and purge fermenter", "jules"), "Week 2 fermenter cleaning could not be completed")
+	_expect(await _complete_station_action(instance, "World/FermenterHotspot", "Transfer and pitch yeast", "player"), "Stable Amber transfer could not be completed")
+	_expect(instance.simulation.state.stage == "fermenting", "Stable Amber did not enter fermentation")
+	await _verify_save_load(instance, "Week 2 fermentation")
+
+	if not bool(instance.simulation.state.courtyard_prepared):
+		_expect(await _complete_station_action(instance, "World/CourtyardHotspot", "Prepare the long table", "noor"), "Week 2 courtyard preparation could not be completed")
+	if not bool(instance.simulation.state.labels_prepared):
+		_expect(await _complete_station_action(instance, "World/PackagingHotspot", "Prepare keg collars", "inez"), "Week 2 packaging preparation could not be completed")
+	if int(instance.simulation.state.stations.packaging.cleanliness) < 75 and instance.simulation.state.stage == "fermenting":
+		_expect(await _complete_station_action(instance, "World/PackagingHotspot", "Clean and sanitize the filler", "inez"), "Week 2 filler cleaning could not be completed")
+	var week_two_fermentation_guard := 0
+	while instance.simulation.state.stage == "fermenting" and week_two_fermentation_guard < 8:
+		instance.simulation.advance_to_next_milestone()
+		instance._refresh(true)
+		await _settle()
+		week_two_fermentation_guard += 1
+	_expect(instance.simulation.state.stage == "ready_to_package", "Stable Amber fermentation did not reach packaging")
+	if int(instance.simulation.state.stations.packaging.cleanliness) < 75:
+		_expect(await _complete_station_action(instance, "World/PackagingHotspot", "Clean and sanitize the filler", "inez"), "Week 2 filler was not recoverable before packaging")
+	_expect(await _complete_station_action(instance, "World/PackagingHotspot", "Fill the first 20 L keg", "maelle"), "Stable Amber packaging could not be completed")
+	_expect(instance.simulation.state.stage == "ready_to_serve", "Stable Amber packaging did not reach delivery")
+	var recovery_seed: Dictionary = instance.simulation.state.duplicate(true)
+	_expect(await _complete_station_action(instance, "World/CourtyardHotspot", "Serve Count's Cellar Reserve", "maelle"), "The Count's reserve could not be delivered")
+	_expect(instance.simulation.state.stage == "council", "Successful reserve delivery did not reach the second council")
+	_expect(str(instance.simulation.state.service_result.get("contract_outcome", "")) == "reserve_approved", "Reserve delivery did not record its contract-specific outcome")
+	_expect(bool(instance.simulation.state.service_result.get("target_met", false)), "Successful reserve route missed its quality target")
+	_expect(instance.ui.decision_title.text.contains("Week 2"), "The second council was still presented as the first council")
+	await _verify_save_load(instance, "second weekly council")
+	var second_council := _find_button(instance.ui.choices, "Fund the next courtyard night")
+	_expect(second_council != null, "Second council choices were not rendered")
+	if second_council: second_council.pressed.emit()
+	await _settle()
+	_expect(instance.simulation.state.stage == "complete", "Second council did not close Week 2")
+	var capacity_week := _find_button(instance.ui.choices, "Close the account and begin Week 3")
+	_expect(capacity_week != null, "Week 2 outcome did not expose the first capacity-planning week")
+	if capacity_week: capacity_week.pressed.emit()
+	await _settle()
+	_expect(instance.simulation.state.stage == "capacity_planning", "Week 3 did not open the capacity board")
+	_expect(instance.speed == 0, "Estate clock ran underneath capacity negotiation")
+	_expect(instance.ui.decision_title.text == "Two opportunities, finite capacity", "Capacity conflict did not receive a player-facing title")
+	_expect(instance.ui.consequence.text.contains("malt") and instance.ui.consequence.text.contains("kegs") and instance.ui.consequence.text.contains("staff hours"), "Capacity board did not expose its limiting resources")
+	_expect(_fits_in_viewport(instance, instance.ui.decision_panel), "Capacity board overflowed the 1280x720 viewport")
+	var abbey_accept := _find_capacity_response(instance.ui.choices, "ABBEY HARVEST TABLE", "Accept")
+	_expect(abbey_accept != null and not abbey_accept.disabled, "Abbey opportunity did not expose an affordable accept response")
+	if abbey_accept: abbey_accept.pressed.emit()
+	await _settle()
+	var answered_abbey_reject := _find_capacity_response(instance.ui.choices, "ABBEY HARVEST TABLE", "Reject")
+	_expect(answered_abbey_reject != null and answered_abbey_reject.disabled, "Answered capacity opportunity remained actionable")
+	var inn_accept := _find_capacity_response(instance.ui.choices, "THREE LANTERNS INN CELLAR", "Accept")
+	var inn_renegotiate := _find_capacity_response(instance.ui.choices, "THREE LANTERNS INN CELLAR", "Renegotiate")
+	_expect(inn_accept != null and inn_accept.disabled, "Capacity board did not block two infeasible full commitments")
+	_expect(inn_renegotiate != null and not inn_renegotiate.disabled, "Capacity board did not offer the viable renegotiated commitment")
+	if inn_renegotiate: inn_renegotiate.pressed.emit()
+	await _settle()
+	var lock_plan := _find_button(instance.ui.choices, "Lock the production plan")
+	_expect(lock_plan != null, "Capacity board did not expose final plan commitment")
+	if lock_plan: lock_plan.pressed.emit()
+	await _settle()
+	_expect(instance.simulation.state.stage == "ready_to_mash", "Capacity plan did not start its first batch")
+	_expect(instance.simulation.state.production_queue.size() == 1, "Capacity plan did not queue the overlapping second batch")
+
+	for recovery_case in [
+		{"reasons":["missed_quality"],"button":"Offer a contract discount","copy":"QUALITY"},
+		{"reasons":["late_delivery"],"button":"Renegotiate the promise","copy":"DEADLINE MISSED"},
+		{"reasons":["damaged_equipment"],"button":"Delay delivery and repair","copy":"EQUIPMENT DAMAGE"}
+	]:
+		instance.simulation.state = recovery_seed.duplicate(true)
+		instance.simulation.state.stage = "delivery_recovery"
+		instance.simulation.state.delivery_problem = {"reasons":recovery_case.reasons,"quality":60,"target":72,"late":recovery_case.reasons.has("late_delivery"),"equipment_damage":12}
+		instance.simulation.state.delivery_recovery = {}
+		instance.simulation._touch()
+		instance.speed = 0
+		instance._refresh(true)
+		await _settle()
+		_expect(instance.ui.stage.text == "DELIVERY ALERT · RECOVERY", "Recovery screen did not receive an alert stage")
+		_expect(instance.ui.consequence.text.contains(recovery_case.copy), "Recovery screen did not explain %s" % recovery_case.copy)
+		var recovery_button := _find_button(instance.ui.choices, recovery_case.button)
+		_expect(recovery_button != null, "Recovery screen did not expose %s" % recovery_case.button)
+		_expect(_fits_in_viewport(instance, instance.ui.decision_panel), "Recovery panel overflowed the 1280x720 viewport: pos=%s size=%s viewport=%s" % [instance.ui.decision_panel.position, instance.ui.decision_panel.size, instance.size])
+		if recovery_case.button == "Offer a contract discount" and recovery_button != null:
+			recovery_button.pressed.emit()
+			await _settle()
+			_expect(instance.simulation.state.stage == "council", "The real recovery control did not settle the delivery into council")
+			_expect(str(instance.simulation.state.delivery_recovery.get("choice", "")) == "discount", "The recovery choice was not persisted in the delivery account")
 	var exit_code := 0
 	if failures.is_empty():
-		print("Old Stables UI interaction test: PASS (complete route through promotion and Stable Amber production trouble)")
+		print("Old Stables UI interaction test: PASS (First Fortnight, recovery, persistence, and capacity conflict)")
 	else:
 		for failure in failures: push_error(failure)
 		exit_code = 1
@@ -255,6 +352,76 @@ func _staff_index(instance: Node, staff_id: String) -> int:
 
 func _fits_horizontally(parent: Control, child: Control) -> bool:
 	return child.position.x >= 0.0 and child.position.x + child.size.x <= parent.size.x + 0.5
+
+func _fits_in_viewport(instance: Control, child: Control) -> bool:
+	return child.position.x >= 0.0 and child.position.y >= 0.0 and child.position.x + child.size.x <= instance.size.x + 0.5 and child.position.y + child.size.y <= instance.size.y + 0.5
+
+func _ensure_staff_on_shift(instance: Node, staff_id: String) -> void:
+	var member: Dictionary = instance.simulation.state.staff[staff_id]
+	var minute_of_day := int(instance.simulation.state.game_minute) % 1440
+	var shift_start := int(member.shift_start)
+	var shift_end := int(member.shift_end)
+	if minute_of_day < shift_start:
+		instance.simulation.advance(shift_start - minute_of_day)
+	elif minute_of_day > shift_end:
+		instance.simulation.advance(1440 - minute_of_day + shift_start)
+	instance._refresh(true)
+	await _settle()
+
+func _complete_station_action(instance: Node, hotspot_path: String, action_prefix: String, staff_id: String) -> bool:
+	await _ensure_staff_on_shift(instance, staff_id)
+	var hotspot := instance.get_node_or_null(hotspot_path) as Button
+	if hotspot == null: return false
+	hotspot.pressed.emit()
+	await _settle()
+	if not _select_staff(instance, staff_id): return false
+	await _settle()
+	var action := _find_button(instance.ui.actions, action_prefix)
+	if action == null or action.disabled: return false
+	action.pressed.emit()
+	await _settle()
+	if instance.simulation.get_active_jobs().is_empty(): return false
+	instance.ui.wait_button.pressed.emit()
+	await _settle()
+	return true
+
+func _verify_save_load(instance: Node, checkpoint: String) -> void:
+	var prior_speed := int(instance.speed)
+	instance.speed = 0
+	var expected_stage := str(instance.simulation.state.stage)
+	var expected_minute := int(instance.simulation.state.game_minute)
+	var expected_cash := int(instance.simulation.state.cash)
+	var expected_issue := str(instance.simulation.state.pending_issue)
+	var expected_jobs: int = instance.simulation.state.jobs.size()
+	instance.ui.save_button.pressed.emit()
+	await _settle()
+	instance.simulation.state.stage = "appointment"
+	instance.simulation.state.game_minute = expected_minute + 333
+	instance.simulation.state.cash = expected_cash + 777
+	instance.simulation.state.pending_issue = ""
+	instance.simulation.state.jobs = []
+	instance.simulation._touch()
+	instance.ui.load_button.pressed.emit()
+	await _settle()
+	_expect(str(instance.simulation.state.stage) == expected_stage, "%s save/load did not restore the stage" % checkpoint)
+	_expect(int(instance.simulation.state.game_minute) == expected_minute, "%s save/load did not restore the estate clock" % checkpoint)
+	_expect(int(instance.simulation.state.cash) == expected_cash, "%s save/load did not restore cash" % checkpoint)
+	_expect(str(instance.simulation.state.pending_issue) == expected_issue, "%s save/load did not restore the pending judgment" % checkpoint)
+	_expect(instance.simulation.state.jobs.size() == expected_jobs, "%s save/load did not restore work orders" % checkpoint)
+	instance.speed = prior_speed
+
+func _find_capacity_response(root_node: Node, opportunity_prefix: String, response_text: String) -> Button:
+	for card in root_node.get_children():
+		if not card is VBoxContainer: continue
+		var identifies_opportunity := false
+		for label in card.find_children("*", "Label", true, false):
+			if str(label.text).begins_with(opportunity_prefix):
+				identifies_opportunity = true
+				break
+		if not identifies_opportunity: continue
+		for button in card.find_children("*", "Button", true, false):
+			if str(button.text) == response_text: return button
+	return null
 
 func _settle() -> void:
 	await process_frame

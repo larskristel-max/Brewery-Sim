@@ -79,7 +79,11 @@ func new_campaign(player_name := "Elise", coat_index := 0) -> void:
 		"courtyard_prepared": false,
 		"labels_prepared": false,
 		"service_result": {},
+		"delivery_problem": {},
+		"delivery_recovery": {},
 		"council_result": {},
+		"capacity_board": {},
+		"production_queue": [],
 		"restoration_projects": {
 			"stable_lighting": {"name":"Stable work lighting", "cost":320, "complete":false},
 			"pump_reseal": {"name":"Pump and seal overhaul", "cost":480, "complete":false},
@@ -116,6 +120,8 @@ func get_available_actions() -> Array:
 			if not state.courtyard_prepared: actions.append(_action("prepare_courtyard", "Prepare the long table", "courtyard", 180, "service"))
 			if not state.labels_prepared: actions.append(_action("prepare_labels", "Prepare keg collars", "packaging", 60, "packaging"))
 			if int(state.stations.packaging.cleanliness) < 75: actions.append(_action("clean_packaging", "Clean and sanitize the filler", "packaging", 45, "maintenance"))
+			if not state.get("production_queue", []).is_empty() and not bool(state.production_queue[0].get("prepared", false)):
+				actions.append(_action("prepare_next_batch", "Stage the next grain bill", "brewhouse", 120, "brewing"))
 		"ready_to_package":
 			if int(state.stations.packaging.cleanliness) < 75: actions.append(_action("clean_packaging", "Clean and sanitize the filler", "packaging", 45, "maintenance"))
 			else: actions.append(_action("package", "Fill the first 20 L keg", "packaging", 120, "packaging"))
@@ -181,12 +187,13 @@ func _apply_start_costs(action_id: String) -> void:
 		"transfer": state.inventory.yeast.quantity -= 1.0
 		"prepare_courtyard": state.cash -= 90
 		"prepare_labels": state.cash -= 24
+		"prepare_next_batch": state.cash -= 40
 		"clean_packaging": state.cash -= 25
 		"package": state.inventory.empty_keg.quantity -= 1.0
 
 func advance(minutes: float) -> void:
 	if minutes <= 0 or state.campaign_lost: return
-	if str(state.pending_issue) != "" or str(state.stage) in ["week_planning", "council", "complete"]: return
+	if str(state.pending_issue) != "" or str(state.stage) in ["week_planning", "capacity_planning", "delivery_recovery", "council", "complete"]: return
 	state.game_minute += int(minutes)
 	_update_runway()
 	_complete_due_jobs()
@@ -232,7 +239,7 @@ func _complete_action(action_id: String, staff_id: String) -> void:
 			state.batch.status = "in_process"
 			state.batch.quality += skill_bonus
 			state.stations.brewhouse.cleanliness = maxi(0, int(state.stations.brewhouse.cleanliness) - 10)
-			if str(state.get("active_week_plan", "")) == "count_reserve":
+			if str(state.batch.get("recipe", "")) == "Stable Amber":
 				state.pending_issue = "amber_lauter_stall"
 			else:
 				state.pending_issue = "mash_drift"
@@ -264,6 +271,11 @@ func _complete_action(action_id: String, staff_id: String) -> void:
 			state.labels_prepared = true
 			state.count_confidence += 2
 			state.staff.inez.relationship = mini(100, int(state.staff.inez.relationship) + 2)
+		"prepare_next_batch":
+			if not state.production_queue.is_empty():
+				state.production_queue[0].prepared = true
+				state.production_queue[0].prepared_minute = int(state.game_minute)
+				state.capacity_board.pressure.overlap_prepared = true
 		"clean_packaging":
 			state.stations.packaging.cleanliness = 92
 			state.batch.safety += 2
@@ -359,9 +371,25 @@ func get_issue_options() -> Array:
 		]
 	return []
 
-func _resolve_service() -> void:
+func _resolve_service(skip_recovery := false) -> void:
 	var quality: int = int(state.batch.quality)
 	var late: bool = int(state.game_minute) > int(state.promise.deadline_minute)
+	if int(state.get("week_number", 1)) >= 2 and not skip_recovery:
+		var reasons: Array[String] = []
+		if quality < int(state.promise.get("quality_target", 58)): reasons.append("missed_quality")
+		if late: reasons.append("late_delivery")
+		if int(state.stations.brewhouse.condition) < 58: reasons.append("damaged_equipment")
+		if not reasons.is_empty():
+			state.delivery_problem = {
+				"reasons": reasons,
+				"quality": quality,
+				"target": int(state.promise.get("quality_target", 58)),
+				"late": late,
+				"equipment_damage": maxi(0, 62 - int(state.stations.brewhouse.condition))
+			}
+			state.stage = "delivery_recovery"
+			_log("The delivery account needs a recovery decision.")
+			return
 	var guests_served: int = mini(int(state.promise.guests), int(floor(float(state.batch.packaged_l) / 0.4)))
 	var memorable: bool = state.batch.flavor_tags.has("wild_green") or quality >= 70
 	var revenue: int = guests_served * (24 if quality >= 70 else 19 if quality >= 60 else 14)
@@ -388,13 +416,88 @@ func _resolve_service() -> void:
 			revenue = int(revenue * (0.4 if late else 0.55))
 			confidence_delta = -14
 			trust_delta = -3
+	var recovery_id := str(state.get("delivery_recovery", {}).get("choice", ""))
+	var settlement_modifier := float(state.get("delivery_recovery", {}).get("settlement_modifier", 1.0))
+	if settlement_modifier < 1.0:
+		revenue = int(revenue * settlement_modifier)
+	if recovery_id == "discount": trust_delta += 4
+	elif recovery_id == "absorb_loss":
+		trust_delta += 2
+		confidence_delta += 2
 	state.cash += revenue
 	state.community_trust += trust_delta
 	state.count_confidence += confidence_delta
 	state.promise.status = "kept" if not late and target_met else "strained"
 	state.batch.status = "served"
-	state.service_result = {"quality":quality,"quality_target":quality_target,"target_met":target_met,"revenue":revenue,"guests_served":guests_served,"late":late,"memorable":memorable,"trust_delta":trust_delta,"confidence_delta":confidence_delta,"plan_id":plan_id}
+	state.service_result = {
+		"quality":quality,
+		"quality_target":quality_target,
+		"target_met":target_met,
+		"revenue":revenue,
+		"guests_served":guests_served,
+		"late":late,
+		"memorable":memorable,
+		"trust_delta":trust_delta,
+		"confidence_delta":confidence_delta,
+		"plan_id":plan_id,
+		"contract_outcome": _contract_outcome(plan_id, target_met, late),
+		"recovery": state.get("delivery_recovery", {}).duplicate(true),
+		"problem_reasons": state.get("delivery_problem", {}).get("reasons", []).duplicate()
+	}
 	state.stage = "council"
+
+func _contract_outcome(plan_id: String, target_met: bool, late: bool) -> String:
+	if plan_id == "festival_rush":
+		return "festival_saved" if target_met and not late else "festival_disappointed"
+	if plan_id == "count_reserve":
+		return "reserve_approved" if target_met and not late else "reserve_refused"
+	return "first_lights_kept" if target_met and not late else "first_lights_strained"
+
+func get_delivery_recovery_options() -> Array:
+	if state.stage != "delivery_recovery": return []
+	var reasons: Array = state.delivery_problem.get("reasons", [])
+	var options := []
+	if reasons.has("missed_quality") or reasons.has("late_delivery"):
+		options.append({"id":"renegotiate","label":"Renegotiate the promise","effect":"smaller order, -20% settlement, protect confidence"})
+	if reasons.has("missed_quality"):
+		options.append({"id":"discount","label":"Offer a contract discount","effect":"-30% settlement, recover community trust"})
+	if reasons.has("damaged_equipment"):
+		options.append({"id":"delay_repair","label":"Delay delivery and repair","effect":"+1 day, restore the brewhouse, improve the batch"})
+	options.append({"id":"absorb_loss","label":"Absorb the loss","effect":"-¤300, deliver as promised, protect confidence"})
+	return options
+
+func choose_delivery_recovery(option_id: String) -> Dictionary:
+	if state.stage != "delivery_recovery": return _fail("There is no delivery problem to recover.")
+	var available := false
+	for option in get_delivery_recovery_options():
+		if str(option.id) == option_id:
+			available = true
+			break
+	if not available: return _fail("That recovery is not appropriate for this delivery.")
+	state.delivery_recovery = {"choice":option_id,"settlement_modifier":1.0}
+	match option_id:
+		"renegotiate":
+			state.promise.guests = maxi(1, int(ceil(float(state.promise.guests) * 0.8)))
+			state.promise.quality_target = maxi(0, int(state.promise.quality_target) - 4)
+			if bool(state.delivery_problem.get("late", false)):
+				state.promise.deadline_minute = int(state.game_minute)
+			state.delivery_recovery.settlement_modifier = 0.8
+			state.count_confidence -= 4
+		"discount":
+			state.delivery_recovery.settlement_modifier = 0.7
+			state.count_confidence -= 2
+		"delay_repair":
+			state.game_minute += 24 * 60
+			state.cash -= 160
+			state.batch.quality += 3
+			state.stations.brewhouse.condition = mini(100, int(state.stations.brewhouse.condition) + 14)
+			state.delivery_recovery.settlement_modifier = 0.9
+		"absorb_loss":
+			state.cash -= 300
+	_log("Delivery recovery chosen: %s." % option_id.replace("_", " ").capitalize())
+	_resolve_service(true)
+	_touch()
+	return _ok("The contract has been settled through %s." % option_id.replace("_", " "))
 
 func resolve_council(option_id: String) -> Dictionary:
 	if state.stage != "council": return _fail("The weekly council is not in session.")
@@ -474,6 +577,10 @@ func choose_week_plan(plan_id: String) -> Dictionary:
 	if selected.is_empty(): return _fail("That production commitment is not available.")
 	state.active_week_plan = plan_id
 	state.cash += int(selected.advance)
+	# Each Week 2 patron supplies the dedicated culture and returnable keg needed
+	# for their commission; malt remains the estate's binding production input.
+	state.inventory.yeast.quantity += 1.0
+	state.inventory.empty_keg.quantity += 1.0
 	if plan_id == "festival_rush":
 		state.batch = {
 			"id": "BATCH-LANTERN-%03d" % int(state.week_number),
@@ -533,6 +640,8 @@ func begin_next_week() -> Dictionary:
 		"plan_id": str(state.get("active_week_plan", state.promise.get("plan_id", ""))),
 		"issue_history": state.issue_history.duplicate(true),
 		"service_result": state.service_result.duplicate(true),
+		"delivery_problem": state.get("delivery_problem", {}).duplicate(true),
+		"delivery_recovery": state.get("delivery_recovery", {}).duplicate(true),
 		"council_result": state.council_result.duplicate(true)
 	})
 	state.week_number = completed_week + 1
@@ -561,15 +670,198 @@ func begin_next_week() -> Dictionary:
 	state.courtyard_prepared = false
 	state.labels_prepared = false
 	state.service_result = {}
+	state.delivery_problem = {}
+	state.delivery_recovery = {}
 	state.council_result = {}
 	for staff_id in state.staff:
 		state.staff[staff_id].assignment = ""
 	for station_id in state.stations:
 		state.stations[station_id].busy = false
-	state.stage = "week_planning"
-	_log("Week %d begins with two competing production commitments." % int(state.week_number))
+	if completed_week >= 2:
+		_open_capacity_board()
+	else:
+		state.stage = "week_planning"
+		_log("Week %d begins with two competing production commitments." % int(state.week_number))
 	_touch()
+	if completed_week >= 2:
+		return _ok("Week %d is ready for capacity planning." % int(state.week_number))
 	return _ok("Week %d is ready for a production commitment." % int(state.week_number))
+
+func _open_capacity_board() -> void:
+	# The two prospective partners send one shared returnable keg with their
+	# proposals. This makes accepted + renegotiated terms operationally possible
+	# after two real deliveries, while two full contracts still exceed staff and
+	# (on the reserve route) malt capacity.
+	state.inventory.empty_keg.quantity += 1.0
+	var constraints := {
+		"malt_kg": float(state.inventory.malt.quantity),
+		"kegs": int(state.inventory.empty_keg.quantity),
+		"staff_hours": 14,
+		"cash": mini(900, maxi(0, int(state.cash)))
+	}
+	state.capacity_board = {
+		"constraints": constraints,
+		"partner_returnable_kegs": 1,
+		"reserved": {"malt_kg":0.0,"kegs":0,"staff_hours":0,"cash":0},
+		"responses": {"abbey_table":"pending","inn_cellar":"pending"},
+		"active_commitments": [],
+		"pressure": {
+			"simultaneous": true,
+			"fermenter_overlap": false,
+			"overlap_prepared": false,
+			"staff_hours_reserved": 0,
+			"staff_hours_available": int(constraints.staff_hours)
+		}
+	}
+	state.production_queue = []
+	state.stage = "capacity_planning"
+	_log("Two overlapping opportunities arrive for one brewhouse and one fermenter.")
+
+func _capacity_opportunity_definitions() -> Array:
+	return [
+		{
+			"id":"abbey_table",
+			"label":"Abbey harvest table",
+			"recipe":"Lantern Blonde",
+			"effect":"Due in 8 days · community trust · overlaps inn preparation",
+			"advance":360,
+			"deadline_days":8,
+			"guests":48,
+			"quality_target":64,
+			"resources":{"malt_kg":4.2,"kegs":1,"staff_hours":8,"cash":180}
+		},
+		{
+			"id":"inn_cellar",
+			"label":"Three Lanterns inn cellar",
+			"recipe":"Stable Amber",
+			"effect":"Due in 10 days · premium cash · overlaps abbey fermentation",
+			"advance":520,
+			"deadline_days":10,
+			"guests":36,
+			"quality_target":70,
+			"resources":{"malt_kg":5.4,"kegs":1,"staff_hours":9,"cash":260}
+		}
+	]
+
+func get_capacity_opportunities() -> Array:
+	if state.stage != "capacity_planning": return []
+	var result := []
+	for definition in _capacity_opportunity_definitions():
+		var option: Dictionary = definition.duplicate(true)
+		var response := str(state.capacity_board.responses.get(option.id, "pending"))
+		option.response = response
+		option.can_accept = response == "pending" and _capacity_can_reserve(option.resources)
+		option.can_renegotiate = response == "pending" and _capacity_can_reserve(_renegotiated_resources(option.resources))
+		result.append(option)
+	return result
+
+func _renegotiated_resources(resources: Dictionary) -> Dictionary:
+	return {
+		"malt_kg": min(3.0, float(resources.malt_kg)),
+		"kegs": 1,
+		"staff_hours": 5,
+		"cash": 100
+	}
+
+func _capacity_can_reserve(resources: Dictionary) -> bool:
+	var limits: Dictionary = state.capacity_board.constraints
+	var reserved: Dictionary = state.capacity_board.reserved
+	return (
+		float(reserved.malt_kg) + float(resources.malt_kg) <= float(limits.malt_kg) + 0.001
+		and int(reserved.kegs) + int(resources.kegs) <= int(limits.kegs)
+		and int(reserved.staff_hours) + int(resources.staff_hours) <= int(limits.staff_hours)
+		and int(reserved.cash) + int(resources.cash) <= int(limits.cash)
+	)
+
+func respond_to_capacity_opportunity(opportunity_id: String, decision: String) -> Dictionary:
+	if state.stage != "capacity_planning": return _fail("The capacity board is not open.")
+	if not ["accept", "renegotiate", "reject"].has(decision): return _fail("Unknown capacity response.")
+	if not state.capacity_board.responses.has(opportunity_id): return _fail("Unknown opportunity.")
+	if str(state.capacity_board.responses[opportunity_id]) != "pending": return _fail("That opportunity already has an answer.")
+	var definition: Dictionary = {}
+	for candidate in _capacity_opportunity_definitions():
+		if str(candidate.id) == opportunity_id:
+			definition = candidate
+			break
+	if definition.is_empty(): return _fail("Unknown opportunity.")
+	if decision == "reject":
+		state.capacity_board.responses[opportunity_id] = "rejected"
+		_log("Capacity response: %s rejected." % definition.label)
+		_touch()
+		return _ok("%s declined." % definition.label)
+	var resources: Dictionary = definition.resources.duplicate(true)
+	if decision == "renegotiate": resources = _renegotiated_resources(resources)
+	if not _capacity_can_reserve(resources): return _fail("The estate lacks malt, kegs, staff hours, or working cash for those terms.")
+	for resource_id in resources:
+		state.capacity_board.reserved[resource_id] = float(state.capacity_board.reserved[resource_id]) + float(resources[resource_id])
+	state.capacity_board.reserved.kegs = int(state.capacity_board.reserved.kegs)
+	state.capacity_board.reserved.staff_hours = int(state.capacity_board.reserved.staff_hours)
+	state.capacity_board.reserved.cash = int(state.capacity_board.reserved.cash)
+	state.capacity_board.responses[opportunity_id] = "accepted" if decision == "accept" else "renegotiated"
+	var commitment: Dictionary = definition.duplicate(true)
+	commitment.status = str(state.capacity_board.responses[opportunity_id])
+	commitment.resources = resources
+	if decision == "renegotiate":
+		commitment.advance = int(definition.advance * 0.55)
+		commitment.guests = int(ceil(float(definition.guests) * 0.6))
+		commitment.quality_target = maxi(58, int(definition.quality_target) - 4)
+		commitment.deadline_days = int(definition.deadline_days) + 2
+	state.capacity_board.active_commitments.append(commitment)
+	state.capacity_board.pressure.staff_hours_reserved = int(state.capacity_board.reserved.staff_hours)
+	_log("Capacity response: %s %s." % [definition.label, decision])
+	_touch()
+	return _ok("%s terms recorded." % definition.label)
+
+func finalize_capacity_plan() -> Dictionary:
+	if state.stage != "capacity_planning": return _fail("The capacity board is not open.")
+	for opportunity_id in state.capacity_board.responses:
+		if str(state.capacity_board.responses[opportunity_id]) == "pending":
+			return _fail("Answer both opportunities before locking the production plan.")
+	if state.capacity_board.active_commitments.is_empty():
+		return _fail("At least one opportunity must remain in the production plan.")
+	var commitments: Array = state.capacity_board.active_commitments
+	state.cash -= int(state.capacity_board.reserved.cash)
+	for commitment in commitments: state.cash += int(commitment.advance)
+	var primary: Dictionary = commitments[0]
+	_activate_capacity_commitment(primary, 1)
+	state.production_queue = []
+	for index in range(1, commitments.size()):
+		var queued: Dictionary = commitments[index].duplicate(true)
+		queued.prepared = false
+		queued.batch_id = "BATCH-QUEUE-%03d-%d" % [int(state.week_number), index + 1]
+		state.production_queue.append(queued)
+	state.capacity_board.pressure.fermenter_overlap = state.production_queue.size() > 0
+	state.capacity_board.finalized = true
+	state.stage = "ready_to_mash"
+	_log("Capacity plan locked with %d live commitment(s)." % commitments.size())
+	_touch()
+	return _ok("Production capacity committed.")
+
+func _activate_capacity_commitment(commitment: Dictionary, sequence: int) -> void:
+	var renegotiated := str(commitment.status) == "renegotiated"
+	var volume := 12.0 if renegotiated else 20.0
+	var base_quality := 58 if str(commitment.recipe) == "Lantern Blonde" else 62
+	state.active_week_plan = str(commitment.id)
+	state.batch = {
+		"id":"BATCH-CAPACITY-%03d-%d" % [int(state.week_number), sequence],
+		"recipe":str(commitment.recipe),
+		"malt_kg":float(commitment.resources.malt_kg),
+		"volume_l":volume,
+		"quality":base_quality,
+		"safety":72,
+		"flavor_tags":["capacity_plan"],
+		"packaged_l":0.0,
+		"status":"planned"
+	}
+	state.promise = {
+		"plan_id":str(commitment.id),
+		"name":str(commitment.label),
+		"guests":int(commitment.guests),
+		"deadline_minute":int(state.game_minute) + int(commitment.deadline_days) * 24 * 60,
+		"quality_target":int(commitment.quality_target),
+		"status":"accepted",
+		"advance":int(commitment.advance)
+	}
 
 func fund_restoration(project_id: String) -> Dictionary:
 	if state.stage != "complete": return _fail("Restoration proposals are approved after the weekly council.")
@@ -656,6 +948,10 @@ func load_game(path := "user://old_stables_save.json") -> Dictionary:
 	if not state.has("week_number"): state.week_number = 1
 	if not state.has("week_history"): state.week_history = []
 	if not state.has("active_week_plan"): state.active_week_plan = str(state.promise.get("plan_id", ""))
+	if not state.has("delivery_problem"): state.delivery_problem = {}
+	if not state.has("delivery_recovery"): state.delivery_recovery = {}
+	if not state.has("capacity_board"): state.capacity_board = {}
+	if not state.has("production_queue"): state.production_queue = []
 	if not state.promise.has("plan_id"): state.promise.plan_id = str(state.active_week_plan)
 	if not state.promise.has("quality_target"): state.promise.quality_target = 58
 	_touch()
@@ -681,16 +977,19 @@ func format_time() -> String:
 func objective_text() -> String:
 	if state.pending_issue == "mash_drift": return "Mash temperature is drifting. Choose an intervention."
 	if state.pending_issue == "missing_hops": return "The citrus hop delivery is missing. Choose the beer's new direction."
+	if state.pending_issue == "amber_lauter_stall": return "The Stable Amber runoff has stalled. Choose how hard to push the old copper."
 	match state.stage:
 		"appointment": return "Accept the Count's mandate and take the stable key."
 		"recommission": return "Assign someone to make the brewhouse safe and clean."
 		"week_planning": return "Choose which Week %d commitment the Old Stables will accept." % int(state.week_number)
+		"capacity_planning": return "Answer both overlapping opportunities within the estate's malt, keg, staff, and cash limits."
 		"ready_to_mash": return "Commit %.1f kg of malt and begin %s." % [float(state.batch.get("malt_kg", 4.2)), str(state.batch.recipe)]
 		"ready_to_boil": return "Boil the wort using the chosen ingredient plan."
 		"ready_to_transfer": return "Transfer, pitch the house yeast, and seal the fermenter."
 		"fermenting": return "Prepare the estate while fermentation works."
 		"ready_to_package": return "Package the finished beer into the first 20 L keg."
 		"ready_to_serve": return "Keep the promise: open the courtyard and serve the batch."
+		"delivery_recovery": return "Choose how the Old Stables will recover the strained delivery."
 		"council": return "Face Apolline and the Count at the weekly council."
 		"complete": return "Choose any restoration investment, then begin the next brewing week."
 	return "Restore the estate one batch at a time."

@@ -47,7 +47,7 @@ func _process(delta: float) -> void:
 			var whole_minutes := int(minute_accumulator)
 			minute_accumulator -= whole_minutes
 			simulation.advance(whole_minutes)
-			if (issue_before == "" and simulation.state.pending_issue != "") or (stage_before != "council" and simulation.state.stage == "council"):
+			if (issue_before == "" and simulation.state.pending_issue != "") or (stage_before != str(simulation.state.stage) and str(simulation.state.stage) in ["delivery_recovery", "capacity_planning", "council"]):
 				speed = 0
 				_set_status("Time paused — your judgment is required.", true)
 	if simulation.revision != last_revision:
@@ -267,12 +267,14 @@ func _build_command_dock() -> void:
 	save.tooltip_text = "Save the current campaign"
 	save.pressed.connect(_save_game)
 	clock_group.add_child(save)
+	ui.save_button = save
 	var load := Button.new()
 	load.text = "LOAD"
 	load.custom_minimum_size = Vector2(52, 32)
 	load.tooltip_text = "Load the latest campaign save"
 	load.pressed.connect(_load_game)
 	clock_group.add_child(load)
+	ui.load_button = load
 	content.add_child(HSeparator.new())
 	var command_row := HBoxContainer.new()
 	command_row.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -630,7 +632,7 @@ func _on_first_light_activated() -> void:
 func _refresh(force_structure := false) -> void:
 	last_revision = simulation.revision
 	var state := simulation.state
-	if str(state.stage) in ["week_planning", "ready_to_package", "ready_to_serve", "council", "complete"]: selected_station = ""
+	if str(state.stage) in ["week_planning", "delivery_recovery", "capacity_planning", "ready_to_package", "ready_to_serve", "council", "complete"]: selected_station = ""
 	ui.cash.text = "¤ %s" % _format_number(int(state.cash))
 	ui.confidence.text = "%d / 100" % int(state.count_confidence)
 	ui.community.text = "%d / 100" % int(state.community_trust)
@@ -640,7 +642,7 @@ func _refresh(force_structure := false) -> void:
 	ui.stage.text = _stage_label(state)
 	ui.stage.tooltip_text = _stage_label(state)
 	ui.time.text = simulation.format_time() + (" · PAUSED" if speed == 0 else " · %d×" % speed)
-	var judgment_pending := str(state.pending_issue) != "" or str(state.stage) in ["week_planning", "council", "complete"]
+	var judgment_pending := str(state.pending_issue) != "" or str(state.stage) in ["week_planning", "delivery_recovery", "capacity_planning", "council", "complete"]
 	for clock_control in ui.clock_buttons:
 		clock_control.button.disabled = judgment_pending and int(clock_control.speed) > 0
 	ui.context.text = _context_eyebrow(state)
@@ -657,7 +659,7 @@ func _refresh(force_structure := false) -> void:
 	ui.consequence.text = _consequence_text()
 	ui.guidance.text = _guidance_text()
 	ui.guidance_panel.visible = started and int(state.get("week_number", 1)) == 1 and str(state.stage) in ["appointment","recommission","ready_to_mash"] and str(state.pending_issue) == ""
-	var signature := JSON.stringify([state.stage, state.pending_issue, state.courtyard_prepared, state.labels_prepared, state.jobs, state.staff, state.campaign_lost, selected_station])
+	var signature := JSON.stringify([state.stage, state.pending_issue, state.courtyard_prepared, state.labels_prepared, state.jobs, state.staff, state.campaign_lost, state.get("delivery_problem", {}), state.get("delivery_recovery", {}), state.get("capacity_board", {}), selected_station])
 	if force_structure or signature != last_structure_signature:
 		last_structure_signature = signature
 		_rebuild_staff()
@@ -677,12 +679,16 @@ func _stage_label(state: Dictionary) -> String:
 	if jobs.size() == 1: return "IN PROGRESS · %s" % str(jobs[0].label).to_upper()
 	if jobs.size() > 1: return "%d WORK ORDERS ACTIVE" % jobs.size()
 	if state.stage == "week_planning": return "WEEK %d · PRODUCTION PLAN" % int(state.week_number)
+	if state.stage == "delivery_recovery": return "DELIVERY ALERT · RECOVERY"
+	if state.stage == "capacity_planning": return "WEEK %d · CAPACITY BOARD" % int(state.week_number)
 	return str(state.stage).replace("_", " ").to_upper()
 
 func _context_eyebrow(state: Dictionary) -> String:
 	if state.pending_issue != "": return "YOUR JUDGMENT"
 	if not selected_station.is_empty(): return "%s · SELECTED WORK ZONE" % selected_station.replace("_"," ").to_upper()
 	if state.stage == "week_planning": return "WEEK %d · YOUR COMMITMENT" % int(state.week_number)
+	if state.stage == "delivery_recovery": return "THE PROMISE IS AT RISK"
+	if state.stage == "capacity_planning": return "TWO PROMISES · ONE BREWHOUSE"
 	return "THE FIRST REAL BREW" if int(state.get("week_number", 1)) == 1 else "THE NEXT BREWING WEEK"
 
 func _rebuild_staff() -> void:
@@ -703,7 +709,7 @@ func _rebuild_staff() -> void:
 	if selected_index < 0: selected_index = first_available_index if first_available_index >= 0 else 0
 	picker.select(selected_index)
 	selected_staff_id = str(picker.get_item_metadata(selected_index))
-	picker.disabled = first_available_index < 0 or str(simulation.state.stage) in ["week_planning", "council", "complete"] or str(simulation.state.pending_issue) != ""
+	picker.disabled = first_available_index < 0 or str(simulation.state.stage) in ["week_planning", "delivery_recovery", "capacity_planning", "council", "complete"] or str(simulation.state.pending_issue) != ""
 	picker.tooltip_text = "No worker can be assigned during this decision." if picker.disabled else "Choose an available worker for the next work order."
 	_update_selected_staff_summary(summaries)
 
@@ -743,6 +749,8 @@ func _rebuild_actions() -> void:
 		var heading := Label.new()
 		if simulation.state.pending_issue != "": heading.text = "PRODUCTION PAUSED"
 		elif simulation.state.stage == "week_planning": heading.text = "CHOOSE THIS WEEK'S COMMITMENT"
+		elif simulation.state.stage == "delivery_recovery": heading.text = "CHOOSE HOW TO RECOVER"
+		elif simulation.state.stage == "capacity_planning": heading.text = "COMMITMENTS REQUIRE JUDGMENT"
 		elif simulation.state.stage == "council": heading.text = "THE LEDGER IS OPEN"
 		elif simulation.state.stage == "complete": heading.text = "THE NEXT INVESTMENT"
 		else: heading.text = "ACTIVE WORK" if not simulation.get_active_jobs().is_empty() else ("NO COMMAND AT THIS STATION" if not selected_station.is_empty() else "CHOOSE A WORK ZONE")
@@ -752,6 +760,8 @@ func _rebuild_actions() -> void:
 		var copy := Label.new()
 		if simulation.state.pending_issue != "": copy.text = "Read the equipment and choose a response in the decision panel."
 		elif simulation.state.stage == "week_planning": copy.text = "Compare the two promises in the planning panel before assigning workers."
+		elif simulation.state.stage == "delivery_recovery": copy.text = "The batch cannot be delivered unchanged. Choose who carries the cost."
+		elif simulation.state.stage == "capacity_planning": copy.text = "Accept, renegotiate, or reject both opportunities, then lock the production plan."
 		elif simulation.state.stage == "council": copy.text = "Choose how the estate answers in the council panel."
 		elif simulation.state.stage == "complete": copy.text = "Choose a restoration proposal or preserve the remaining cash."
 		else: copy.text = "Watch the progress ring or jump to its completion." if not simulation.get_active_jobs().is_empty() else ("Select another equipment marker or press Esc to show all commands." if not selected_station.is_empty() else "Select a glowing equipment marker in the brewery.")
@@ -778,10 +788,18 @@ func _rebuild_choices() -> void:
 	_clear_children(ui.choices)
 	var choices: Array = []
 	var planning: bool = simulation.state.stage == "week_planning"
+	var recovery: bool = simulation.state.stage == "delivery_recovery"
+	var capacity: bool = simulation.state.stage == "capacity_planning"
 	var council: bool = simulation.state.stage == "council"
 	var restoration: bool = simulation.state.stage == "complete"
 	if simulation.state.pending_issue != "": choices = simulation.get_issue_options()
 	elif planning: choices = simulation.get_week_plan_options()
+	elif recovery: choices = simulation.get_delivery_recovery_options()
+	elif capacity:
+		_rebuild_capacity_choices()
+		ui.decision_panel.visible = true
+		_reveal(ui.decision_panel)
+		return
 	elif council: choices = simulation.get_council_options()
 	elif restoration: choices = simulation.get_restoration_options()
 	for choice in choices:
@@ -789,11 +807,51 @@ func _rebuild_choices() -> void:
 		button.text = "%s\n%s" % [choice.label, choice.effect]
 		button.custom_minimum_size = Vector2(0, 60)
 		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		button.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 		button.tooltip_text = "Commit the Old Stables to %s" % choice.label if planning else str(choice.effect)
-		button.pressed.connect((_choose_week_plan if planning else _choose_council if council else _fund_restoration if restoration else _choose_issue).bind(choice.id))
+		button.pressed.connect((_choose_week_plan if planning else _choose_delivery_recovery if recovery else _choose_council if council else _fund_restoration if restoration else _choose_issue).bind(choice.id))
 		ui.choices.add_child(button)
-	ui.decision_panel.visible = not choices.is_empty() or planning or council or restoration
+	ui.decision_panel.visible = not choices.is_empty() or planning or recovery or council or restoration
 	if ui.decision_panel.visible: _reveal(ui.decision_panel)
+
+func _rebuild_capacity_choices() -> void:
+	for opportunity in simulation.get_capacity_opportunities():
+		var card := VBoxContainer.new()
+		card.add_theme_constant_override("separation", 5)
+		var heading := Label.new()
+		heading.text = "%s · %s" % [str(opportunity.label).to_upper(), str(opportunity.recipe).to_upper()]
+		heading.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		heading.add_theme_font_size_override("font_size", 13)
+		heading.add_theme_color_override("font_color", CREAM)
+		card.add_child(heading)
+		var terms := Label.new()
+		terms.text = "%s\nCURRENT RESPONSE · %s" % [str(opportunity.effect), str(opportunity.get("response", "pending")).replace("_", " ").to_upper()]
+		terms.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		terms.add_theme_font_size_override("font_size", 10)
+		terms.add_theme_color_override("font_color", SAGE)
+		card.add_child(terms)
+		var responses := HBoxContainer.new()
+		responses.add_theme_constant_override("separation", 5)
+		for decision in ["accept", "renegotiate", "reject"]:
+			var button := Button.new()
+			button.text = str(decision).capitalize()
+			button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			button.custom_minimum_size = Vector2(0, 38)
+			var already_answered := str(opportunity.get("response", "pending")) != "pending"
+			button.disabled = already_answered or (decision == "accept" and not bool(opportunity.get("can_accept", true))) or (decision == "renegotiate" and not bool(opportunity.get("can_renegotiate", true)))
+			button.tooltip_text = "This opportunity already has a recorded response." if already_answered else ("The current resources cannot support this response." if button.disabled else "%s %s" % [str(decision).capitalize(), str(opportunity.label)])
+			button.pressed.connect(_respond_to_capacity.bind(str(opportunity.id), decision))
+			responses.add_child(button)
+		card.add_child(responses)
+		ui.choices.add_child(card)
+		ui.choices.add_child(HSeparator.new())
+	var finalize := Button.new()
+	finalize.text = "Lock the production plan\nStart the first batch and queue any second commitment"
+	finalize.custom_minimum_size = Vector2(0, 58)
+	finalize.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	finalize.add_theme_color_override("font_color", Color("#f4d09c"))
+	finalize.pressed.connect(_finalize_capacity_plan)
+	ui.choices.add_child(finalize)
 
 func _start_action(action_id: String) -> void:
 	var action := {}
@@ -823,6 +881,27 @@ func _choose_council(option_id: String) -> void:
 func _choose_week_plan(plan_id: String) -> void:
 	var result := simulation.choose_week_plan(plan_id)
 	_play_cue("decision" if result.ok else "error")
+	if result.ok:
+		speed = 1
+		selected_station = ""
+	_show_result(result)
+	if result.ok: simulation.save_game()
+
+func _choose_delivery_recovery(option_id: String) -> void:
+	var result := simulation.choose_delivery_recovery(option_id)
+	_play_cue("decision" if result.ok else "error")
+	_show_result(result)
+	if result.ok: simulation.save_game()
+
+func _respond_to_capacity(opportunity_id: String, decision: String) -> void:
+	var result := simulation.respond_to_capacity_opportunity(opportunity_id, decision)
+	_play_cue("decision" if result.ok else "error")
+	_show_result(result)
+	if result.ok: simulation.save_game()
+
+func _finalize_capacity_plan() -> void:
+	var result := simulation.finalize_capacity_plan()
+	_play_cue("work" if result.ok else "error")
 	if result.ok:
 		speed = 1
 		selected_station = ""
@@ -862,7 +941,7 @@ func _on_world_station_hovered(id: String, entered: bool) -> void:
 	else: ui.context.text = _context_eyebrow(simulation.state)
 
 func _set_speed(value: int) -> void:
-	if value > 0 and (str(simulation.state.pending_issue) != "" or str(simulation.state.stage) in ["week_planning", "council", "complete"]):
+	if value > 0 and (str(simulation.state.pending_issue) != "" or str(simulation.state.stage) in ["week_planning", "delivery_recovery", "capacity_planning", "council", "complete"]):
 		speed = 0
 		_set_status("Resolve the current judgment before restarting the estate clock.", false)
 		_refresh()
@@ -910,8 +989,10 @@ func _context_title() -> String:
 	var issue_title := _issue_title()
 	if not issue_title.is_empty(): return issue_title
 	if simulation.state.stage == "week_planning": return "Choose a promise"
+	if simulation.state.stage == "delivery_recovery": return "Delivery at risk"
+	if simulation.state.stage == "capacity_planning": return "Capacity board"
 	if simulation.state.stage == "council": return "Apolline opens the ledger"
-	if simulation.state.stage == "complete": return "The first account closes"
+	if simulation.state.stage == "complete": return "Week %d closes" % int(simulation.state.get("week_number", 1))
 	if not selected_station.is_empty(): return selected_station.replace("_"," ").capitalize()
 	return "The First Real Brew" if int(simulation.state.get("week_number", 1)) == 1 else str(simulation.state.batch.recipe)
 
@@ -919,19 +1000,40 @@ func _decision_title() -> String:
 	var issue_title := _issue_title()
 	if not issue_title.is_empty(): return issue_title
 	if simulation.state.stage == "week_planning": return "Two promises, one brewhouse"
-	if simulation.state.stage == "council": return "The first weekly council"
+	if simulation.state.stage == "delivery_recovery": return "Who carries the failed promise?"
+	if simulation.state.stage == "capacity_planning": return "Two opportunities, finite capacity"
+	if simulation.state.stage == "council": return "The weekly council · Week %d" % int(simulation.state.get("week_number", 1))
 	if simulation.state.stage == "complete": return "The estate answers"
 	return "A decision is waiting"
 
 func _decision_objective() -> String:
 	if simulation.state.pending_issue == "amber_lauter_stall":
 		return "Stable Amber's toasted grain bed has compacted. Choose how to restore its runoff."
+	if simulation.state.stage == "delivery_recovery":
+		return "Choose how the estate responds before the result reaches the council ledger."
+	if simulation.state.stage == "capacity_planning":
+		return "Respond to both opportunities, balancing malt, kegs, staff hours, cash, and fermenter overlap."
 	return simulation.objective_text()
 
 func _consequence_text() -> String:
 	var state := simulation.state
 	if state.stage == "week_planning":
 		return "FESTIVAL · more cash, more guests, tighter deadline\nRESERVE · higher quality target, more preparation time"
+	if state.stage == "delivery_recovery":
+		var problem: Dictionary = state.get("delivery_problem", {})
+		var reasons: Array = problem.get("reasons", [])
+		var readable := []
+		for reason in reasons:
+			match str(reason):
+				"missed_quality": readable.append("QUALITY %d / %d" % [int(problem.get("quality", state.batch.get("quality", 0))), int(problem.get("target", state.promise.get("quality_target", 0)))])
+				"late_delivery": readable.append("DEADLINE MISSED")
+				"damaged_equipment": readable.append("EQUIPMENT DAMAGE")
+		return "%s\nRenegotiate, discount, repair first, or absorb the loss." % " · ".join(readable)
+	if state.stage == "capacity_planning":
+		var board: Dictionary = state.get("capacity_board", {})
+		var constraints: Dictionary = board.get("constraints", {})
+		var pressure: Dictionary = board.get("pressure", {})
+		return "AVAILABLE · %.1f kg malt · %d kegs · %d staff hours · ¤%d\nPRESSURE · %s · fermenter overlap %s" % [float(constraints.get("malt_kg", 0.0)), int(constraints.get("kegs", 0)), int(constraints.get("staff_hours", pressure.get("staff_hours_available", 0))), int(constraints.get("cash", 0)), "simultaneous commitments" if bool(pressure.get("simultaneous", false)) else "single commitment", "yes" if bool(pressure.get("fermenter_overlap", false)) else "no"]
 	if state.stage == "complete":
 		return "SERVICE · %d guests · ¤%d revenue\nCOUNCIL · score %d · %s" % [int(state.service_result.get("guests_served", 0)), int(state.service_result.get("revenue", 0)), int(state.council_result.get("score", 0)), state.authority_role]
 	if state.pending_issue == "mash_drift":
@@ -942,7 +1044,11 @@ func _consequence_text() -> String:
 		return "STABLE AMBER · quality target %d\nProtect its toasted depth without forcing a harsh runoff." % int(state.promise.get("quality_target", 72))
 	if state.pending_issue != "":
 		return "%s · production judgment\nEvery response changes flavor, schedule, cash, or trust." % str(state.batch.get("recipe", "Batch")).to_upper()
-	if state.stage == "council": return "Apolline weighs delivery, cash, trust, and the Count’s confidence. Your answer defines the next week."
+	if state.stage == "council":
+		var outcome := str(state.service_result.get("contract_outcome", "")).replace("_", " ").to_upper()
+		if not outcome.is_empty():
+			return "%s · QUALITY %d / %d · %s\nSETTLEMENT ¤%d · trust %+d · confidence %+d" % [outcome, int(state.service_result.get("quality", 0)), int(state.service_result.get("quality_target", 0)), "LATE" if bool(state.service_result.get("late", false)) else "ON TIME", int(state.service_result.get("revenue", 0)), int(state.service_result.get("trust_delta", 0)), int(state.service_result.get("confidence_delta", 0))]
+		return "Apolline weighs delivery, cash, trust, and the Count’s confidence. Your answer defines the next week."
 	var deadline := int(state.promise.get("deadline_minute", 0))
 	var deadline_day := deadline / 1440 + 1
 	var deadline_minute := deadline % 1440
@@ -970,6 +1076,12 @@ func _handle_story_transition(state: Dictionary) -> void:
 			"week_planning":
 				$World.show_feedback("Two promises compete for the Old Stables.", true)
 				_set_status("Time is paused until you choose this week's production commitment.", true)
+			"delivery_recovery":
+				$World.show_feedback("The delivery is at risk. Decide who carries the cost.", false)
+				_set_status("Time is paused until the failed promise has a recovery plan.", false)
+			"capacity_planning":
+				$World.show_feedback("Two opportunities now compete for the same people and equipment.", true)
+				_set_status("Time is paused while you negotiate the first overlapping production plan.", true)
 			"recommission":
 				if not awaiting_first_light:
 					$World.show_feedback("The stable key is yours. Wake the copper brewhouse.", true)
@@ -988,10 +1100,10 @@ func _handle_story_transition(state: Dictionary) -> void:
 				_set_status("The first keg and courtyard are ready for service.", true)
 			"council":
 				$World.show_feedback("The courtyard falls quiet. Apolline opens the ledger.", true)
-				_set_status("Time is paused for the first weekly council.", true)
+				_set_status("Time is paused for the Week %d council." % int(state.get("week_number", 1)), true)
 			"complete":
 				$World.show_feedback("The Count has made his judgment.", true)
-				_set_status("The first account is closed; choose the estate’s next investment.", true)
+				_set_status("Week %d is closed; choose the estate's next investment." % int(state.get("week_number", 1)), true)
 	if last_issue == "" and issue != "":
 		var alert_title := _issue_title()
 		$World.show_feedback(("%s — choose a response." % alert_title) if not alert_title.is_empty() else "A brewing problem needs your judgment.", false)

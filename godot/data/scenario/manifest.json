@@ -11,5 +11,5 @@
     "contains_exact_recipes": false,
     "contains_supplier_prices": false
   },
-  "files": ["catalog.json", "recipes.json", "starting_state.json", "campaign.json"]
+  "files": ["catalog.json", "recipes.json", "starting_state.json", "campaign.json", "contracts.json"]
 }
