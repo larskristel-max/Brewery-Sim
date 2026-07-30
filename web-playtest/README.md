@@ -18,6 +18,7 @@ through OpenAI Sites using the project recorded in `.openai/hosting.json`.
 
 The Godot export deliberately disables thread support. That keeps browser
 hosting compatible with ordinary HTTPS and avoids requiring cross-origin
-isolation headers. The WebAssembly runtime is stored gzip-compressed and served
-as a precompressed static asset so each hosted artifact stays within the Sites
-file-size limit. The Windows ZIP under `build/playtest/` remains the fallback.
+isolation headers. The WebAssembly runtime is split into sub-25 MB static files
+and reassembled by the loader in the browser so each hosted artifact stays
+within the Sites file-size limit without relying on CDN compression behavior.
+The Windows ZIP under `build/playtest/` remains the fallback.

@@ -35,9 +35,13 @@ test("server-renders the Old Stables browser launcher", async () => {
   assert.match(html, /\/game\/index\.html/);
 });
 
-test("packages WebAssembly below the Sites single-file limit", async () => {
-  await access(new URL("../dist/client/game/index.wasm.gz", import.meta.url));
+test("packages WebAssembly in sub-25 MB parts for Sites", async () => {
+  await access(new URL("../dist/client/game/index.wasm.0", import.meta.url));
+  await access(new URL("../dist/client/game/index.wasm.1", import.meta.url));
   await assert.rejects(
     access(new URL("../dist/client/game/index.wasm", import.meta.url)),
+  );
+  await assert.rejects(
+    access(new URL("../dist/client/game/index.wasm.gz", import.meta.url)),
   );
 });

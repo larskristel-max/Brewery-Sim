@@ -666,7 +666,23 @@ const Engine = (function () {
 	Engine.load = function (basePath, size) {
 		if (loadPromise == null) {
 			loadPath = basePath;
-			loadPromise = preloader.loadPromise(`${loadPath}.wasm.gz`, size, true);
+			const wasmParts = [`${loadPath}.wasm.0`, `${loadPath}.wasm.1`];
+			loadPromise = Promise.all(wasmParts.map(function (part, index) {
+				return preloader.loadPromise(part, size[index] || 0);
+			})).then(function (buffers) {
+				const total = buffers.reduce(function (sum, buffer) {
+					return sum + buffer.byteLength;
+				}, 0);
+				const merged = new Uint8Array(total);
+				let offset = 0;
+				buffers.forEach(function (buffer) {
+					merged.set(new Uint8Array(buffer), offset);
+					offset += buffer.byteLength;
+				});
+				return new Response(merged, {
+					'headers': [['content-type', 'application/wasm']],
+				});
+			});
 			requestAnimationFrame(preloader.animateProgress);
 		}
 		return loadPromise;
@@ -706,7 +722,7 @@ const Engine = (function () {
 						initPromise = Promise.reject(new Error('A base path must be provided when calling `init` and the engine is not loaded.'));
 						return initPromise;
 					}
-					Engine.load(basePath, this.config.fileSizes[`${basePath}.wasm.gz`]);
+					Engine.load(basePath, [this.config.fileSizes[`${basePath}.wasm.0`], this.config.fileSizes[`${basePath}.wasm.1`]]);
 				}
 				const me = this;
 				function doInit(promise) {

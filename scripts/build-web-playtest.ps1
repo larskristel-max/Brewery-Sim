@@ -72,24 +72,35 @@ foreach ($file in $requiredFiles) {
 }
 
 $wasmPath = Join-Path $gameDirectory "index.wasm"
-$compressedWasmPath = "$wasmPath.gz"
+$wasmChunkSize = 20MB
+$wasmPartPaths = @()
 $inputStream = [System.IO.File]::OpenRead($wasmPath)
 try {
-    $outputStream = [System.IO.File]::Create($compressedWasmPath)
-    try {
-        $gzipStream = [System.IO.Compression.GZipStream]::new(
-            $outputStream,
-            [System.IO.Compression.CompressionLevel]::Optimal
-        )
+    $buffer = New-Object byte[] (1MB)
+    $partIndex = 0
+    while ($inputStream.Position -lt $inputStream.Length) {
+        $partPath = "$wasmPath.$partIndex"
+        $wasmPartPaths += $partPath
+        $outputStream = [System.IO.File]::Create($partPath)
         try {
-            $inputStream.CopyTo($gzipStream)
+            $remaining = [Math]::Min(
+                [long]$wasmChunkSize,
+                $inputStream.Length - $inputStream.Position
+            )
+            while ($remaining -gt 0) {
+                $requested = [int][Math]::Min($buffer.Length, $remaining)
+                $read = $inputStream.Read($buffer, 0, $requested)
+                if ($read -le 0) {
+                    throw "Unexpected end of the Godot WebAssembly runtime."
+                }
+                $outputStream.Write($buffer, 0, $read)
+                $remaining -= $read
+            }
         }
         finally {
-            $gzipStream.Dispose()
+            $outputStream.Dispose()
         }
-    }
-    finally {
-        $outputStream.Dispose()
+        $partIndex += 1
     }
 }
 finally {
@@ -98,22 +109,57 @@ finally {
 
 $engineScriptPath = Join-Path $gameDirectory "index.js"
 $engineScript = [System.IO.File]::ReadAllText($engineScriptPath)
+$partExpressions = @()
+$partSizeExpressions = @()
+for ($partIndex = 0; $partIndex -lt $wasmPartPaths.Count; $partIndex++) {
+    $partExpressions += ('`${loadPath}.wasm.' + $partIndex + '`')
+    $partSizeExpressions += (
+        'this.config.fileSizes[`${basePath}.wasm.' + $partIndex + '`]'
+    )
+}
+$wasmPartList = '[' + ($partExpressions -join ', ') + ']'
+$wasmPartSizeList = '[' + ($partSizeExpressions -join ', ') + ']'
+$splitLoader = @"
+const wasmParts = $wasmPartList;
+			loadPromise = Promise.all(wasmParts.map(function (part, index) {
+				return preloader.loadPromise(part, size[index] || 0);
+			})).then(function (buffers) {
+				const total = buffers.reduce(function (sum, buffer) {
+					return sum + buffer.byteLength;
+				}, 0);
+				const merged = new Uint8Array(total);
+				let offset = 0;
+				buffers.forEach(function (buffer) {
+					merged.set(new Uint8Array(buffer), offset);
+					offset += buffer.byteLength;
+				});
+				return new Response(merged, {
+					'headers': [['content-type', 'application/wasm']],
+				});
+			});
+"@
 $engineScript = $engineScript.Replace(
-    'preloader.loadPromise(`${loadPath}.wasm`, size, true)',
-    'preloader.loadPromise(`${loadPath}.wasm.gz`, size, true)'
+    'loadPromise = preloader.loadPromise(`${loadPath}.wasm`, size, true);',
+    $splitLoader.TrimEnd()
 )
 $engineScript = $engineScript.Replace(
     'this.config.fileSizes[`${basePath}.wasm`]',
-    'this.config.fileSizes[`${basePath}.wasm.gz`]'
+    $wasmPartSizeList
 )
 [System.IO.File]::WriteAllText($engineScriptPath, $engineScript)
 
 $exportHtml = [System.IO.File]::ReadAllText($exportPath)
-$compressedWasmLength = (Get-Item -LiteralPath $compressedWasmPath).Length
+$partSizeEntries = @()
+for ($partIndex = 0; $partIndex -lt $wasmPartPaths.Count; $partIndex++) {
+    $partLength = (Get-Item -LiteralPath $wasmPartPaths[$partIndex]).Length
+    $partSizeEntries += (
+        '"index.wasm.' + $partIndex + '":' + $partLength
+    )
+}
 $exportHtml = [System.Text.RegularExpressions.Regex]::Replace(
     $exportHtml,
     '"index\.wasm":\d+',
-    ('"index.wasm.gz":' + $compressedWasmLength)
+    ($partSizeEntries -join ',')
 )
 [System.IO.File]::WriteAllText($exportPath, $exportHtml)
 
