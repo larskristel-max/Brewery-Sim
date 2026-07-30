@@ -60,6 +60,26 @@ To regenerate the visual-review gallery, run the capture script without `--headl
 godot --path godot --resolution 1600x900 --script res://tests/capture_vertical_slice.gd
 ```
 
+## Windows playtest build
+
+The first local export installs Godot's official 4.7.1 export templates:
+
+```powershell
+scripts\build-windows-playtest.cmd -InstallTemplates
+```
+
+Later exports use the cached templates:
+
+```powershell
+scripts\build-windows-playtest.cmd
+```
+
+The script exports and launch-checks the game, includes the tester guide and
+source-commit information, and writes a ZIP plus SHA-256 file under
+`build/playtest/`. Generated packages are intentionally excluded from Git.
+Tester instructions are maintained in
+[`../docs/windows-playtest-guide.md`](../docs/windows-playtest-guide.md).
+
 To rebuild the sanitized calibration pack from an authorized workbook snapshot:
 
 ```powershell

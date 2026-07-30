@@ -3,6 +3,7 @@ node_modules/
 tmp-dev-server*.log
 .godot/
 godot/.godot/
+build/playtest/
 outputs/moodboards/
 outputs/prologue-review/
 outputs/prologue-review-final/
