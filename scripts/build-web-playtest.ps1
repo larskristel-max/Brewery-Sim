@@ -71,6 +71,54 @@ foreach ($file in $requiredFiles) {
     }
 }
 
+$wasmPath = Join-Path $gameDirectory "index.wasm"
+$compressedWasmPath = "$wasmPath.gz"
+$inputStream = [System.IO.File]::OpenRead($wasmPath)
+try {
+    $outputStream = [System.IO.File]::Create($compressedWasmPath)
+    try {
+        $gzipStream = [System.IO.Compression.GZipStream]::new(
+            $outputStream,
+            [System.IO.Compression.CompressionLevel]::Optimal
+        )
+        try {
+            $inputStream.CopyTo($gzipStream)
+        }
+        finally {
+            $gzipStream.Dispose()
+        }
+    }
+    finally {
+        $outputStream.Dispose()
+    }
+}
+finally {
+    $inputStream.Dispose()
+}
+
+$engineScriptPath = Join-Path $gameDirectory "index.js"
+$engineScript = [System.IO.File]::ReadAllText($engineScriptPath)
+$engineScript = $engineScript.Replace(
+    'preloader.loadPromise(`${loadPath}.wasm`, size, true)',
+    'preloader.loadPromise(`${loadPath}.wasm.gz`, size, true)'
+)
+$engineScript = $engineScript.Replace(
+    'this.config.fileSizes[`${basePath}.wasm`]',
+    'this.config.fileSizes[`${basePath}.wasm.gz`]'
+)
+[System.IO.File]::WriteAllText($engineScriptPath, $engineScript)
+
+$exportHtml = [System.IO.File]::ReadAllText($exportPath)
+$compressedWasmLength = (Get-Item -LiteralPath $compressedWasmPath).Length
+$exportHtml = [System.Text.RegularExpressions.Regex]::Replace(
+    $exportHtml,
+    '"index\.wasm":\d+',
+    ('"index.wasm.gz":' + $compressedWasmLength)
+)
+[System.IO.File]::WriteAllText($exportPath, $exportHtml)
+
+Remove-Item -LiteralPath $wasmPath -Force
+
 $totalBytes = (Get-ChildItem -LiteralPath $gameDirectory -File | Measure-Object -Property Length -Sum).Sum
 Write-Host "Browser export ready: $gameDirectory"
 Write-Host ("Payload: {0:N1} MB" -f ($totalBytes / 1MB))

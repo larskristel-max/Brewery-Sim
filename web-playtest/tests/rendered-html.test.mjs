@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { access } from "node:fs/promises";
 import test from "node:test";
 
 async function render() {
@@ -32,4 +33,11 @@ test("server-renders the Old Stables browser launcher", async () => {
   assert.match(html, /Browser playtest/);
   assert.match(html, /Open game only/);
   assert.match(html, /\/game\/index\.html/);
+});
+
+test("packages WebAssembly below the Sites single-file limit", async () => {
+  await access(new URL("../dist/client/game/index.wasm.gz", import.meta.url));
+  await assert.rejects(
+    access(new URL("../dist/client/game/index.wasm", import.meta.url)),
+  );
 });
