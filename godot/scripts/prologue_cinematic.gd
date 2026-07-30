@@ -11,8 +11,8 @@ const MUTED := Color("#b8aa98")
 const SHOTS := [
 	{
 		"duration": 8.0,
-		"focus": Vector2(0.88, 0.42),
-		"zoom": 1.62,
+		"focus": Vector2(0.80, 0.25),
+		"zoom": 1.28,
 		"eyebrow": "THE VALENNE ESTATE · FIRST NIGHT",
 		"speaker": "",
 		"line": "For three hundred years, the house of Valenne endured.",
@@ -29,8 +29,8 @@ const SHOTS := [
 	},
 	{
 		"duration": 10.0,
-		"focus": Vector2(0.27, 0.43),
-		"zoom": 1.48,
+		"focus": Vector2(0.30, 0.26),
+		"zoom": 1.28,
 		"eyebrow": "THE APPOINTMENT",
 		"speaker": "COUNT ARMAND DE VALENNE",
 		"line": "The Valennes have held this land for three hundred years. We may not hold it for one more.",
@@ -38,8 +38,8 @@ const SHOTS := [
 	},
 	{
 		"duration": 10.0,
-		"focus": Vector2(0.78, 0.49),
-		"zoom": 1.58,
+		"focus": Vector2(0.79, 0.27),
+		"zoom": 1.32,
 		"eyebrow": "THE LEDGER",
 		"speaker": "APOLLINE DE VALENNE",
 		"line": "The estate has one season left. Every barrel—and every coin—must count.",
@@ -47,8 +47,8 @@ const SHOTS := [
 	},
 	{
 		"duration": 11.0,
-		"focus": Vector2(0.52, 0.48),
-		"zoom": 1.30,
+		"focus": Vector2(0.30, 0.26),
+		"zoom": 1.18,
 		"eyebrow": "THE MANDATE",
 		"speaker": "COUNT ARMAND DE VALENNE",
 		"line": "You were hired to brew. Restore these stables, earn the trust of our people… and you may yet become steward of everything that remains.",
@@ -175,7 +175,6 @@ func _build_interface() -> void:
 	advance_button.flat = true
 	advance_button.focus_mode = Control.FOCUS_NONE
 	advance_button.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	advance_button.tooltip_text = "Tap to advance the story"
 	advance_button.pressed.connect(advance)
 	add_child(advance_button)
 

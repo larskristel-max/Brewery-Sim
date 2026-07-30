@@ -63,6 +63,9 @@ Invoke-ValidationStep "Run complete UI interaction route" $godot @(
 Invoke-ValidationStep "Verify phone and rotation layouts" $godot @(
     "--headless", "--path", $projectPath, "--script", "res://tests/responsive_ui_test.gd"
 )
+Invoke-ValidationStep "Verify prologue speaker framing" $godot @(
+    "--headless", "--path", $projectPath, "--script", "res://tests/prologue_framing_test.gd"
+)
 Invoke-ValidationStep "Verify world hotspot layout" $godot @(
     "--headless", "--path", $projectPath, "--script", "res://tests/world_layout_test.gd"
 )
