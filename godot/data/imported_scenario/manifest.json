@@ -1,0 +1,20 @@
+{
+  "export_version": 1,
+  "privacy": {
+    "contains_exact_financials": false,
+    "contains_exact_recipes": false,
+    "contains_personal_data": false,
+    "contains_raw_invoice_ids": false,
+    "contains_raw_party_names": false
+  },
+  "scenario_id": "sanitized_brewery_pattern_pack_v1",
+  "source": "allowlisted brewery workbook",
+  "source_snapshot_utc": "2026-07-14T10:48:26Z",
+  "transforms": [
+    "fictional aliases",
+    "stable hashing",
+    "date shifting",
+    "quantity banding",
+    "party archetyping"
+  ]
+}

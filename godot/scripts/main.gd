@@ -1,0 +1,1054 @@
+extends Control
+
+const BrewSimulationModel = preload("res://scripts/brew_simulation.gd")
+const PrologueCinematicScene = preload("res://scripts/prologue_cinematic.gd")
+
+const INK := Color("#171310")
+const CREAM := Color("#efe4d2")
+const COPPER := Color("#c7864c")
+const COPPER_BRIGHT := Color("#e3a35f")
+const MUTED := Color("#a99a86")
+const SAGE := Color("#91aa9d")
+const OXBLOOD := Color("#743e3e")
+
+var simulation: BrewSimulation
+var ui := {}
+var started := false
+var speed := 0
+var minute_accumulator := 0.0
+var last_revision := -1
+var last_structure_signature := ""
+var last_stage := ""
+var last_issue := ""
+var selected_staff_id := "player"
+var selected_station := ""
+var cue_player: AudioStreamPlayer
+var cue_streams: Dictionary = {}
+var prologue_active := false
+var awaiting_first_light := false
+
+func _ready() -> void:
+	simulation = BrewSimulationModel.new()
+	simulation.new_campaign()
+	theme = _build_theme()
+	_build_interface()
+	$World.station_selected.connect(_on_world_station_selected)
+	$World.station_hovered.connect(_on_world_station_hovered)
+	$World.first_light_activated.connect(_on_first_light_activated)
+	_refresh(true)
+	_show_customization()
+
+func _process(delta: float) -> void:
+	if started and speed > 0 and not simulation.state.campaign_lost:
+		var issue_before := str(simulation.state.pending_issue)
+		var stage_before := str(simulation.state.stage)
+		minute_accumulator += delta * 6.0 * speed
+		if minute_accumulator >= 1.0:
+			var whole_minutes := int(minute_accumulator)
+			minute_accumulator -= whole_minutes
+			simulation.advance(whole_minutes)
+			if (issue_before == "" and simulation.state.pending_issue != "") or (stage_before != "council" and simulation.state.stage == "council"):
+				speed = 0
+				_set_status("Time paused — your judgment is required.", true)
+	if simulation.revision != last_revision:
+		_refresh()
+
+func _unhandled_input(event: InputEvent) -> void:
+	if prologue_active or awaiting_first_light:
+		return
+	if event.is_action_pressed("toggle_pause"): _set_speed(0)
+	elif event.is_action_pressed("speed_one"): _set_speed(1)
+	elif event.is_action_pressed("speed_two"): _set_speed(2)
+	elif event.is_action_pressed("speed_four"): _set_speed(4)
+	elif event.is_action_pressed("ui_cancel"):
+		selected_station = ""
+		$World.clear_focus()
+		_refresh(true)
+
+func _build_theme() -> Theme:
+	var result := Theme.new()
+	result.default_font_size = 14
+	result.set_color("font_color", "Label", CREAM)
+	result.set_color("font_color", "Button", CREAM)
+	result.set_color("font_hover_color", "Button", Color.WHITE)
+	result.set_color("font_pressed_color", "Button", Color.WHITE)
+	result.set_color("font_disabled_color", "Button", Color("#766c60"))
+	result.set_color("font_color", "OptionButton", CREAM)
+	result.set_color("font_disabled_color", "OptionButton", Color("#766c60"))
+	result.set_color("font_color", "LineEdit", CREAM)
+	result.set_color("caret_color", "LineEdit", COPPER_BRIGHT)
+	result.set_stylebox("normal", "Button", _button_style(Color(0.075,0.066,0.058,0.92), Color(0.55,0.39,0.25,0.55)))
+	result.set_stylebox("hover", "Button", _button_style(Color(0.17,0.115,0.073,0.97), COPPER))
+	result.set_stylebox("pressed", "Button", _button_style(Color(0.25,0.13,0.07,1.0), COPPER_BRIGHT))
+	result.set_stylebox("focus", "Button", _button_style(Color(0,0,0,0), COPPER_BRIGHT, 2))
+	result.set_stylebox("disabled", "Button", _button_style(Color(0.05,0.045,0.04,0.65), Color(0.2,0.18,0.16,0.5)))
+	result.set_stylebox("normal", "OptionButton", _button_style(Color(0.055,0.05,0.046,0.96), Color(0.40,0.31,0.23,0.8)))
+	result.set_stylebox("hover", "OptionButton", _button_style(Color(0.13,0.09,0.06,0.98), COPPER))
+	result.set_stylebox("normal", "LineEdit", _button_style(Color(0.035,0.032,0.03,0.98), Color(0.56,0.46,0.35,0.9)))
+	result.set_stylebox("focus", "LineEdit", _button_style(Color(0.035,0.032,0.03,1.0), COPPER_BRIGHT, 2))
+	result.set_stylebox("panel", "PopupMenu", _panel_style(0.99, 8, 12))
+	result.set_color("font_color", "PopupMenu", CREAM)
+	result.set_color("font_hover_color", "PopupMenu", Color.WHITE)
+	result.set_stylebox("hover", "PopupMenu", _button_style(Color(0.20,0.12,0.07,1.0), Color(0,0,0,0)))
+	return result
+
+func _button_style(background: Color, border: Color, width := 1) -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = background
+	style.border_color = border
+	style.set_border_width_all(width)
+	style.set_corner_radius_all(7)
+	style.content_margin_left = 14
+	style.content_margin_right = 14
+	style.content_margin_top = 9
+	style.content_margin_bottom = 9
+	return style
+
+func _panel_style(alpha := 0.92, radius := 10, margin := 18) -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.040, 0.034, 0.030, alpha)
+	style.border_color = Color(0.52, 0.35, 0.20, 0.82)
+	style.set_border_width_all(1)
+	style.set_corner_radius_all(radius)
+	style.content_margin_left = margin
+	style.content_margin_right = margin
+	style.content_margin_top = margin
+	style.content_margin_bottom = margin
+	return style
+
+func _build_interface() -> void:
+	_build_top_bar()
+	_build_guidance()
+	_build_command_dock()
+	_build_decision_panel()
+	_build_audio()
+
+func _build_top_bar() -> void:
+	var panel := PanelContainer.new()
+	panel.name = "EstateHud"
+	panel.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	panel.offset_left = 24
+	panel.offset_top = 18
+	panel.offset_right = -24
+	panel.offset_bottom = 92
+	panel.add_theme_stylebox_override("panel", _panel_style(0.84, 10, 14))
+	add_child(panel)
+	ui.top_bar = panel
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 18)
+	panel.add_child(row)
+	var brand := VBoxContainer.new()
+	brand.custom_minimum_size = Vector2(224, 0)
+	brand.add_theme_constant_override("separation", 0)
+	row.add_child(brand)
+	var title := Label.new()
+	title.text = "OLD STABLES"
+	title.add_theme_font_size_override("font_size", 18)
+	title.add_theme_color_override("font_color", CREAM)
+	brand.add_child(title)
+	var subtitle := Label.new()
+	subtitle.text = "CHÂTEAU DE VALENNE"
+	subtitle.add_theme_font_size_override("font_size", 10)
+	subtitle.add_theme_color_override("font_color", COPPER)
+	brand.add_child(subtitle)
+	row.add_child(VSeparator.new())
+	for metric in [
+		{"id":"cash","label":"ESTATE CASH"},
+		{"id":"confidence","label":"COUNT"},
+		{"id":"community","label":"COMMUNITY"},
+		{"id":"restoration","label":"RESTORATION"},
+		{"id":"runway","label":"RUNWAY"}
+	]:
+		var box := VBoxContainer.new()
+		box.custom_minimum_size = Vector2(108, 0)
+		box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		box.add_theme_constant_override("separation", 1)
+		var caption := Label.new()
+		caption.text = metric.label
+		caption.add_theme_font_size_override("font_size", 9)
+		caption.add_theme_color_override("font_color", COPPER)
+		box.add_child(caption)
+		var value := Label.new()
+		value.add_theme_font_size_override("font_size", 18)
+		value.add_theme_color_override("font_color", CREAM)
+		box.add_child(value)
+		ui[metric.id] = value
+		row.add_child(box)
+	var rank := VBoxContainer.new()
+	rank.custom_minimum_size = Vector2(210, 0)
+	var rank_caption := Label.new()
+	rank_caption.text = "YOUR OFFICE"
+	rank_caption.add_theme_font_size_override("font_size", 9)
+	rank_caption.add_theme_color_override("font_color", COPPER)
+	rank.add_child(rank_caption)
+	var rank_value := Label.new()
+	rank_value.add_theme_font_size_override("font_size", 13)
+	rank_value.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	rank.add_child(rank_value)
+	ui.rank = rank_value
+	row.add_child(rank)
+
+func _build_guidance() -> void:
+	var panel := PanelContainer.new()
+	panel.name = "Guidance"
+	panel.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	panel.position = Vector2(-290, 106)
+	panel.size = Vector2(580, 44)
+	panel.add_theme_stylebox_override("panel", _panel_style(0.82, 22, 10))
+	add_child(panel)
+	var label := Label.new()
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.add_theme_font_size_override("font_size", 12)
+	label.add_theme_color_override("font_color", Color("#dac5aa"))
+	panel.add_child(label)
+	ui.guidance_panel = panel
+	ui.guidance = label
+
+func _build_command_dock() -> void:
+	var panel := PanelContainer.new()
+	panel.name = "CommandDock"
+	panel.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+	panel.offset_left = 24
+	panel.offset_top = -206
+	panel.offset_right = -24
+	panel.offset_bottom = -18
+	panel.add_theme_stylebox_override("panel", _panel_style(0.93, 12, 14))
+	add_child(panel)
+	ui.command_dock = panel
+	var content := VBoxContainer.new()
+	content.add_theme_constant_override("separation", 8)
+	panel.add_child(content)
+	var header := HBoxContainer.new()
+	header.name = "CommandHeader"
+	header.add_theme_constant_override("separation", 8)
+	content.add_child(header)
+	ui.command_header = header
+	var stage := Label.new()
+	stage.add_theme_font_size_override("font_size", 11)
+	stage.add_theme_color_override("font_color", COPPER_BRIGHT)
+	stage.custom_minimum_size = Vector2(165, 0)
+	stage.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	header.add_child(stage)
+	ui.stage = stage
+	var time := Label.new()
+	time.add_theme_font_size_override("font_size", 11)
+	time.add_theme_color_override("font_color", SAGE)
+	time.custom_minimum_size = Vector2(122, 0)
+	time.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	header.add_child(time)
+	ui.time = time
+	var status := Label.new()
+	status.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	status.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	status.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	status.custom_minimum_size = Vector2(120, 0)
+	status.add_theme_font_size_override("font_size", 11)
+	status.add_theme_color_override("font_color", MUTED)
+	header.add_child(status)
+	ui.status = status
+	var clock_group := HBoxContainer.new()
+	clock_group.name = "ClockAndSaveControls"
+	clock_group.add_theme_constant_override("separation", 4)
+	header.add_child(clock_group)
+	ui.clock_group = clock_group
+	ui.clock_buttons = []
+	for value in [0, 1, 2, 4, 12]:
+		var button := Button.new()
+		button.text = "||" if value == 0 else "%dx" % value
+		button.custom_minimum_size = Vector2(36, 32)
+		button.tooltip_text = "Pause the estate clock" if value == 0 else "Set estate clock to %dx" % value
+		button.pressed.connect(_set_speed.bind(value))
+		clock_group.add_child(button)
+		ui.clock_buttons.append({"button": button, "speed": value})
+	var save := Button.new()
+	save.text = "SAVE"
+	save.custom_minimum_size = Vector2(52, 32)
+	save.tooltip_text = "Save the current campaign"
+	save.pressed.connect(_save_game)
+	clock_group.add_child(save)
+	var load := Button.new()
+	load.text = "LOAD"
+	load.custom_minimum_size = Vector2(52, 32)
+	load.tooltip_text = "Load the latest campaign save"
+	load.pressed.connect(_load_game)
+	clock_group.add_child(load)
+	content.add_child(HSeparator.new())
+	var command_row := HBoxContainer.new()
+	command_row.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	command_row.add_theme_constant_override("separation", 10)
+	content.add_child(command_row)
+	var objective_box := VBoxContainer.new()
+	objective_box.custom_minimum_size = Vector2(260, 0)
+	objective_box.add_theme_constant_override("separation", 4)
+	command_row.add_child(objective_box)
+	var context := Label.new()
+	context.add_theme_font_size_override("font_size", 9)
+	context.add_theme_color_override("font_color", COPPER)
+	objective_box.add_child(context)
+	ui.context = context
+	var title := Label.new()
+	title.add_theme_font_size_override("font_size", 21)
+	title.add_theme_color_override("font_color", CREAM)
+	title.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	objective_box.add_child(title)
+	ui.title = title
+	var objective := Label.new()
+	objective.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	objective.add_theme_font_size_override("font_size", 12)
+	objective.add_theme_color_override("font_color", Color("#d4c6b3"))
+	objective.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	objective_box.add_child(objective)
+	ui.objective = objective
+	var batch := Label.new()
+	batch.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	batch.add_theme_font_size_override("font_size", 10)
+	batch.add_theme_color_override("font_color", SAGE)
+	objective_box.add_child(batch)
+	ui.batch = batch
+	var inventory := Label.new()
+	inventory.visible = false
+	objective_box.add_child(inventory)
+	ui.inventory = inventory
+	command_row.add_child(VSeparator.new())
+	var staff_box := VBoxContainer.new()
+	staff_box.custom_minimum_size = Vector2(195, 0)
+	staff_box.add_theme_constant_override("separation", 5)
+	command_row.add_child(staff_box)
+	var assign_label := Label.new()
+	assign_label.text = "WHO TAKES THE WORK?"
+	assign_label.add_theme_font_size_override("font_size", 9)
+	assign_label.add_theme_color_override("font_color", COPPER)
+	staff_box.add_child(assign_label)
+	var staff_picker := OptionButton.new()
+	staff_picker.custom_minimum_size = Vector2(0, 38)
+	staff_picker.item_selected.connect(_on_staff_selected)
+	staff_box.add_child(staff_picker)
+	ui.staff_picker = staff_picker
+	var staff_summary := Label.new()
+	staff_summary.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	staff_summary.add_theme_font_size_override("font_size", 10)
+	staff_summary.add_theme_color_override("font_color", MUTED)
+	staff_summary.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	staff_box.add_child(staff_summary)
+	ui.staff_summary = staff_summary
+	var jobs := Label.new()
+	jobs.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	jobs.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	jobs.custom_minimum_size = Vector2(0, 28)
+	jobs.add_theme_font_size_override("font_size", 10)
+	jobs.add_theme_color_override("font_color", COPPER_BRIGHT)
+	staff_box.add_child(jobs)
+	ui.jobs = jobs
+	command_row.add_child(VSeparator.new())
+	var action_scroll := ScrollContainer.new()
+	action_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	action_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	action_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	action_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	command_row.add_child(action_scroll)
+	var actions := HBoxContainer.new()
+	actions.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	actions.add_theme_constant_override("separation", 8)
+	action_scroll.add_child(actions)
+	ui.actions = actions
+	var wait_button := Button.new()
+	wait_button.text = "NEXT\nMILESTONE  »"
+	wait_button.custom_minimum_size = Vector2(116, 84)
+	wait_button.add_theme_color_override("font_color", Color("#f4d09c"))
+	wait_button.pressed.connect(_advance_to_milestone)
+	command_row.add_child(wait_button)
+	ui.wait_button = wait_button
+
+func _build_decision_panel() -> void:
+	var panel := PanelContainer.new()
+	panel.name = "DecisionPanel"
+	panel.set_anchors_preset(Control.PRESET_RIGHT_WIDE)
+	panel.offset_left = -500
+	panel.offset_top = 116
+	panel.offset_right = -24
+	panel.offset_bottom = -224
+	panel.add_theme_stylebox_override("panel", _panel_style(0.96, 12, 20))
+	panel.visible = false
+	add_child(panel)
+	ui.decision_panel = panel
+	var scroll := ScrollContainer.new()
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	panel.add_child(scroll)
+	var content := VBoxContainer.new()
+	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	content.add_theme_constant_override("separation", 12)
+	scroll.add_child(content)
+	var role := Label.new()
+	role.add_theme_font_size_override("font_size", 10)
+	role.add_theme_color_override("font_color", COPPER)
+	content.add_child(role)
+	ui.role = role
+	var decision_title := Label.new()
+	decision_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	decision_title.add_theme_font_size_override("font_size", 27)
+	decision_title.add_theme_color_override("font_color", CREAM)
+	content.add_child(decision_title)
+	ui.decision_title = decision_title
+	content.add_child(HSeparator.new())
+	var decision_objective := Label.new()
+	decision_objective.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	decision_objective.add_theme_font_size_override("font_size", 15)
+	decision_objective.add_theme_color_override("font_color", Color("#ddd0be"))
+	content.add_child(decision_objective)
+	ui.decision_objective = decision_objective
+	var consequence := Label.new()
+	consequence.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	consequence.add_theme_font_size_override("font_size", 11)
+	consequence.add_theme_color_override("font_color", SAGE)
+	content.add_child(consequence)
+	ui.consequence = consequence
+	var choices := VBoxContainer.new()
+	choices.add_theme_constant_override("separation", 8)
+	content.add_child(choices)
+	ui.choices = choices
+
+func _build_audio() -> void:
+	cue_player = AudioStreamPlayer.new()
+	cue_player.volume_db = -15.0
+	add_child(cue_player)
+
+func _exit_tree() -> void:
+	if is_instance_valid(cue_player):
+		cue_player.stop()
+		cue_player.stream = null
+	cue_streams.clear()
+
+func _show_customization() -> void:
+	$World.set_story_scene("appointment")
+	var shade := ColorRect.new()
+	shade.name = "Customization"
+	shade.color = Color(0.01, 0.012, 0.018, 0.32)
+	shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	add_child(shade)
+	ui.customization = shade
+	var story := PanelContainer.new()
+	story.anchor_left = 0.035
+	story.anchor_top = 0.60
+	story.anchor_right = 0.47
+	story.anchor_bottom = 0.91
+	story.add_theme_stylebox_override("panel", _panel_style(0.88, 10, 20))
+	shade.add_child(story)
+	var story_content := VBoxContainer.new()
+	story_content.add_theme_constant_override("separation", 7)
+	story.add_child(story_content)
+	var speaker := Label.new()
+	speaker.text = "COUNT ARMAND DE VALENNE"
+	speaker.add_theme_font_size_override("font_size", 10)
+	speaker.add_theme_color_override("font_color", COPPER_BRIGHT)
+	story_content.add_child(speaker)
+	var line := Label.new()
+	line.text = "“The château can survive another season.\nWhat it needs is a brewer who can make people return.”"
+	line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	line.add_theme_font_size_override("font_size", 21)
+	line.add_theme_color_override("font_color", CREAM)
+	story_content.add_child(line)
+	var terms := Label.new()
+	terms.text = "Apolline keeps the ledger. The Count grants the stable key. You will earn every room beyond it."
+	terms.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	terms.add_theme_font_size_override("font_size", 11)
+	terms.add_theme_color_override("font_color", SAGE)
+	story_content.add_child(terms)
+	var card := PanelContainer.new()
+	card.anchor_left = 0.62
+	card.anchor_top = 0.15
+	card.anchor_right = 0.965
+	card.anchor_bottom = 0.72
+	card.add_theme_stylebox_override("panel", _panel_style(0.97, 12, 22))
+	shade.add_child(card)
+	var form_scroll := ScrollContainer.new()
+	form_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	form_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	card.add_child(form_scroll)
+	var form := VBoxContainer.new()
+	form.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	form.add_theme_constant_override("separation", 13)
+	form_scroll.add_child(form)
+	var eyebrow := Label.new()
+	eyebrow.text = "APPOINTMENT LEDGER · DAY ONE"
+	eyebrow.add_theme_font_size_override("font_size", 10)
+	eyebrow.add_theme_color_override("font_color", COPPER)
+	form.add_child(eyebrow)
+	var title := Label.new()
+	title.text = "Take the stable key"
+	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	title.add_theme_font_size_override("font_size", 29)
+	title.add_theme_color_override("font_color", CREAM)
+	form.add_child(title)
+	var copy := Label.new()
+	copy.text = "You arrive as Castle Brewmaster. Restore the brewery, keep the Count’s confidence, and prove you can steward more than copper and grain."
+	copy.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	copy.add_theme_font_size_override("font_size", 13)
+	copy.add_theme_color_override("font_color", Color("#d2c4b0"))
+	form.add_child(copy)
+	var name_label := Label.new()
+	name_label.text = "YOUR NAME"
+	name_label.add_theme_font_size_override("font_size", 9)
+	name_label.add_theme_color_override("font_color", COPPER)
+	form.add_child(name_label)
+	var name_input := LineEdit.new()
+	name_input.text = "Elise"
+	name_input.max_length = 14
+	name_input.custom_minimum_size = Vector2(0, 44)
+	form.add_child(name_input)
+	var coat_label := Label.new()
+	coat_label.text = "WORK COAT"
+	coat_label.add_theme_font_size_override("font_size", 9)
+	coat_label.add_theme_color_override("font_color", COPPER)
+	form.add_child(coat_label)
+	var coat := OptionButton.new()
+	coat.add_item("Kiln copper")
+	coat.add_item("Cellar teal")
+	coat.add_item("Oxblood plum")
+	coat.custom_minimum_size = Vector2(0, 44)
+	form.add_child(coat)
+	var begin := Button.new()
+	begin.text = "Begin the first real brew  →"
+	begin.custom_minimum_size = Vector2(0, 54)
+	begin.add_theme_font_size_override("font_size", 15)
+	begin.add_theme_stylebox_override("normal", _button_style(Color(0.37,0.19,0.09,0.98), COPPER_BRIGHT, 1))
+	begin.pressed.connect(begin_campaign_with.bind(name_input, coat))
+	form.add_child(begin)
+	ui.top_bar.visible = false
+	ui.command_dock.visible = false
+	ui.guidance_panel.visible = false
+	name_input.grab_focus()
+
+func begin_campaign_with(name_source, coat_source = null) -> void:
+	var display_name := str(name_source.text if name_source is LineEdit else name_source).strip_edges()
+	var coat_index := int(coat_source.selected if coat_source is OptionButton else coat_source)
+	if display_name.is_empty(): display_name = "Brewmaster"
+	simulation.new_campaign(display_name, coat_index)
+	started = true
+	speed = 0
+	$World.customize_player(display_name, coat_index)
+	$World.set_story_scene("appointment")
+	if ui.has("customization") and is_instance_valid(ui.customization): ui.customization.queue_free()
+	_refresh(true)
+	ui.top_bar.visible = false
+	ui.command_dock.visible = false
+	ui.guidance_panel.visible = false
+	_start_prologue()
+
+func _start_prologue() -> void:
+	prologue_active = true
+	awaiting_first_light = false
+	var prologue: Control = PrologueCinematicScene.new()
+	prologue.name = "PrologueCinematic"
+	prologue.finished.connect(_on_prologue_finished)
+	prologue.beat.connect(_play_cue)
+	add_child(prologue)
+	ui.prologue = prologue
+	prologue.start($World)
+
+func _on_prologue_finished(_was_skipped: bool) -> void:
+	if not prologue_active:
+		return
+	prologue_active = false
+	if ui.has("prologue") and is_instance_valid(ui.prologue):
+		ui.prologue.queue_free()
+	var result := simulation.accept_stable_key()
+	if not result.ok and str(simulation.state.stage) != "recommission":
+		_show_result(result)
+		return
+	awaiting_first_light = true
+	$World.begin_first_light()
+	_show_first_light_handoff()
+	_play_cue("key")
+	_refresh(true)
+	ui.top_bar.visible = false
+	ui.command_dock.visible = false
+	ui.guidance_panel.visible = false
+
+func _show_first_light_handoff() -> void:
+	if ui.has("first_light_card") and is_instance_valid(ui.first_light_card):
+		ui.first_light_card.queue_free()
+	var card := PanelContainer.new()
+	card.name = "FirstLightObjective"
+	card.anchor_left = 0.61
+	card.anchor_top = 0.14
+	card.anchor_right = 0.965
+	card.anchor_bottom = 0.32
+	card.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card.add_theme_stylebox_override("panel", _panel_style(0.94, 10, 18))
+	add_child(card)
+	ui.first_light_card = card
+	var copy := VBoxContainer.new()
+	copy.add_theme_constant_override("separation", 5)
+	card.add_child(copy)
+	var eyebrow := Label.new()
+	eyebrow.text = "YOUR FIRST ACT AS CASTLE BREWMASTER"
+	eyebrow.add_theme_font_size_override("font_size", 9)
+	eyebrow.add_theme_color_override("font_color", COPPER)
+	copy.add_child(eyebrow)
+	var title := Label.new()
+	title.name = "Title"
+	title.text = "Light the Old Stables"
+	title.add_theme_font_size_override("font_size", 25)
+	title.add_theme_color_override("font_color", CREAM)
+	copy.add_child(title)
+	ui.first_light_title = title
+	var instruction := Label.new()
+	instruction.name = "Instruction"
+	instruction.text = "Click the glowing brass work lamp. Wake the room before you wake the copper."
+	instruction.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	instruction.add_theme_font_size_override("font_size", 12)
+	instruction.add_theme_color_override("font_color", Color("#d5c7b4"))
+	copy.add_child(instruction)
+	ui.first_light_instruction = instruction
+	_reveal(card)
+
+func _on_first_light_activated() -> void:
+	if not awaiting_first_light:
+		return
+	awaiting_first_light = false
+	_play_cue("lamp")
+	if ui.has("first_light_title") and is_instance_valid(ui.first_light_title):
+		ui.first_light_title.text = "The Old Stables awaken"
+	if ui.has("first_light_instruction") and is_instance_valid(ui.first_light_instruction):
+		ui.first_light_instruction.text = "Your first real brew begins now."
+	await get_tree().create_timer(1.15).timeout
+	if ui.has("first_light_card") and is_instance_valid(ui.first_light_card):
+		var fade := create_tween()
+		fade.tween_property(ui.first_light_card, "modulate:a", 0.0, 0.32)
+		fade.tween_callback(ui.first_light_card.queue_free)
+	ui.top_bar.visible = true
+	ui.command_dock.visible = true
+	ui.guidance_panel.visible = true
+	speed = 1
+	_set_status("The lamps are lit. Select the copper brewhouse and begin its recommissioning.", true)
+	$World.show_feedback("The Old Stables awaken. Your first brew begins now.", true)
+	simulation.save_game()
+	_refresh(true)
+
+func _refresh(force_structure := false) -> void:
+	last_revision = simulation.revision
+	var state := simulation.state
+	if str(state.stage) in ["week_planning", "ready_to_package", "ready_to_serve", "council", "complete"]: selected_station = ""
+	ui.cash.text = "¤ %s" % _format_number(int(state.cash))
+	ui.confidence.text = "%d / 100" % int(state.count_confidence)
+	ui.community.text = "%d / 100" % int(state.community_trust)
+	ui.restoration.text = "%d%%" % int(state.restoration)
+	ui.runway.text = "%d DAYS" % int(state.runway_days)
+	ui.rank.text = str(state.authority_role).to_upper()
+	ui.stage.text = _stage_label(state)
+	ui.stage.tooltip_text = _stage_label(state)
+	ui.time.text = simulation.format_time() + (" · PAUSED" if speed == 0 else " · %d×" % speed)
+	var judgment_pending := str(state.pending_issue) != "" or str(state.stage) in ["week_planning", "council", "complete"]
+	for clock_control in ui.clock_buttons:
+		clock_control.button.disabled = judgment_pending and int(clock_control.speed) > 0
+	ui.context.text = _context_eyebrow(state)
+	ui.title.text = _context_title()
+	ui.objective.text = _decision_objective() if str(state.pending_issue) != "" else simulation.objective_text()
+	ui.batch.text = "%s · %.1f L · QUALITY %d · SAFETY %d" % [state.batch.recipe, float(state.batch.volume_l), int(state.batch.quality), int(state.batch.safety)]
+	ui.inventory.text = "Malt %.1f kg · Yeast %.0f · Herbs %.2f kg · Kegs %.0f" % [float(state.inventory.malt.quantity), float(state.inventory.yeast.quantity), float(state.inventory.garden_herbs.quantity), float(state.inventory.empty_keg.quantity)]
+	ui.jobs.text = _jobs_text()
+	ui.jobs.tooltip_text = _jobs_tooltip()
+	ui.wait_button.visible = not simulation.get_active_jobs().is_empty()
+	ui.role.text = "%s · %s" % [str(state.player.name).to_upper(), str(state.authority_role).to_upper()]
+	ui.decision_title.text = _decision_title()
+	ui.decision_objective.text = _decision_objective()
+	ui.consequence.text = _consequence_text()
+	ui.guidance.text = _guidance_text()
+	ui.guidance_panel.visible = started and int(state.get("week_number", 1)) == 1 and str(state.stage) in ["appointment","recommission","ready_to_mash"] and str(state.pending_issue) == ""
+	var signature := JSON.stringify([state.stage, state.pending_issue, state.courtyard_prepared, state.labels_prepared, state.jobs, state.staff, state.campaign_lost, selected_station])
+	if force_structure or signature != last_structure_signature:
+		last_structure_signature = signature
+		_rebuild_staff()
+		_rebuild_actions()
+		_rebuild_choices()
+	$World.set_management_state(state)
+	$World.set_story_state(state)
+	_handle_story_transition(state)
+	last_stage = str(state.stage)
+	last_issue = str(state.pending_issue)
+
+func _stage_label(state: Dictionary) -> String:
+	if state.pending_issue == "mash_drift": return "BREWING ALERT · MASH"
+	if state.pending_issue == "missing_hops": return "BREWING ALERT · INGREDIENTS"
+	if state.pending_issue == "amber_lauter_stall": return "BREWING ALERT · AMBER RUNOFF"
+	var jobs := simulation.get_active_jobs()
+	if jobs.size() == 1: return "IN PROGRESS · %s" % str(jobs[0].label).to_upper()
+	if jobs.size() > 1: return "%d WORK ORDERS ACTIVE" % jobs.size()
+	if state.stage == "week_planning": return "WEEK %d · PRODUCTION PLAN" % int(state.week_number)
+	return str(state.stage).replace("_", " ").to_upper()
+
+func _context_eyebrow(state: Dictionary) -> String:
+	if state.pending_issue != "": return "YOUR JUDGMENT"
+	if not selected_station.is_empty(): return "%s · SELECTED WORK ZONE" % selected_station.replace("_"," ").to_upper()
+	if state.stage == "week_planning": return "WEEK %d · YOUR COMMITMENT" % int(state.week_number)
+	return "THE FIRST REAL BREW" if int(state.get("week_number", 1)) == 1 else "THE NEXT BREWING WEEK"
+
+func _rebuild_staff() -> void:
+	var picker: OptionButton = ui.staff_picker
+	picker.clear()
+	var selected_index := -1
+	var first_available_index := -1
+	var summaries := simulation.get_staff_summary()
+	for index in range(summaries.size()):
+		var member: Dictionary = summaries[index]
+		var status := "ON TASK" if str(member.assignment) != "" else ("AVAILABLE" if member.available else "OFF SHIFT")
+		picker.add_item("%s · %s" % [str(member.name).split(" ")[0], status])
+		picker.set_item_metadata(index, member.id)
+		picker.set_item_disabled(index, not member.available)
+		if bool(member.available) and first_available_index < 0: first_available_index = index
+		if member.id == selected_staff_id and bool(member.available): selected_index = index
+	if picker.item_count == 0: return
+	if selected_index < 0: selected_index = first_available_index if first_available_index >= 0 else 0
+	picker.select(selected_index)
+	selected_staff_id = str(picker.get_item_metadata(selected_index))
+	picker.disabled = first_available_index < 0 or str(simulation.state.stage) in ["week_planning", "council", "complete"] or str(simulation.state.pending_issue) != ""
+	picker.tooltip_text = "No worker can be assigned during this decision." if picker.disabled else "Choose an available worker for the next work order."
+	_update_selected_staff_summary(summaries)
+
+func _update_selected_staff_summary(summaries: Array) -> void:
+	for member in summaries:
+		if str(member.id) != selected_staff_id: continue
+		var skills: Dictionary = simulation.state.staff[selected_staff_id].skills
+		var strongest := "service"
+		var level := -1
+		for skill in skills:
+			if int(skills[skill]) > level:
+				strongest = skill
+				level = int(skills[skill])
+		ui.staff_summary.text = "%s · %s %d · energy %d\nShift %02d:%02d–%02d:%02d" % [member.role, str(strongest).capitalize(), level, int(member.energy), int(member.shift_start)/60, int(member.shift_start)%60, int(member.shift_end)/60, int(member.shift_end)%60]
+		return
+
+func _rebuild_actions() -> void:
+	_clear_children(ui.actions)
+	var available := simulation.get_available_actions()
+	var shown := 0
+	var world_selection_required := str(simulation.state.stage) in ["recommission", "ready_to_mash", "ready_to_boil", "ready_to_transfer", "fermenting"]
+	for action in available:
+		if world_selection_required and selected_station.is_empty(): continue
+		if not selected_station.is_empty() and str(action.station) != selected_station: continue
+		var button := Button.new()
+		button.text = "%s\n%s · %d MIN" % [action.label, str(action.station).replace("_"," ").to_upper(), int(action.duration)]
+		button.custom_minimum_size = Vector2(164, 84)
+		var availability := _action_availability(action)
+		button.disabled = not bool(availability.ok)
+		button.tooltip_text = str(availability.reason) if button.disabled else "Assign %s and begin this work order" % simulation.state.staff[selected_staff_id].name
+		button.pressed.connect(_start_action.bind(action.id))
+		ui.actions.add_child(button)
+		shown += 1
+	if shown == 0:
+		var empty := VBoxContainer.new()
+		empty.custom_minimum_size = Vector2(250, 80)
+		var heading := Label.new()
+		if simulation.state.pending_issue != "": heading.text = "PRODUCTION PAUSED"
+		elif simulation.state.stage == "week_planning": heading.text = "CHOOSE THIS WEEK'S COMMITMENT"
+		elif simulation.state.stage == "council": heading.text = "THE LEDGER IS OPEN"
+		elif simulation.state.stage == "complete": heading.text = "THE NEXT INVESTMENT"
+		else: heading.text = "ACTIVE WORK" if not simulation.get_active_jobs().is_empty() else ("NO COMMAND AT THIS STATION" if not selected_station.is_empty() else "CHOOSE A WORK ZONE")
+		heading.add_theme_font_size_override("font_size", 11)
+		heading.add_theme_color_override("font_color", COPPER)
+		empty.add_child(heading)
+		var copy := Label.new()
+		if simulation.state.pending_issue != "": copy.text = "Read the equipment and choose a response in the decision panel."
+		elif simulation.state.stage == "week_planning": copy.text = "Compare the two promises in the planning panel before assigning workers."
+		elif simulation.state.stage == "council": copy.text = "Choose how the estate answers in the council panel."
+		elif simulation.state.stage == "complete": copy.text = "Choose a restoration proposal or preserve the remaining cash."
+		else: copy.text = "Watch the progress ring or jump to its completion." if not simulation.get_active_jobs().is_empty() else ("Select another equipment marker or press Esc to show all commands." if not selected_station.is_empty() else "Select a glowing equipment marker in the brewery.")
+		copy.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		copy.add_theme_font_size_override("font_size", 11)
+		copy.add_theme_color_override("font_color", MUTED)
+		empty.add_child(copy)
+		ui.actions.add_child(empty)
+
+func _action_availability(action: Dictionary) -> Dictionary:
+	if not simulation.state.staff.has(selected_staff_id):
+		return {"ok": false, "reason": "Choose a worker before starting this work order."}
+	if not simulation.is_staff_available(selected_staff_id):
+		return {"ok": false, "reason": "%s is off shift or already assigned." % simulation.state.staff[selected_staff_id].name}
+	var required_skill := str(action.get("skill", ""))
+	if not required_skill.is_empty() and int(simulation.state.staff[selected_staff_id].skills.get(required_skill, 0)) <= 0:
+		return {"ok": false, "reason": "%s lacks the required %s skill." % [simulation.state.staff[selected_staff_id].name, required_skill]}
+	var station_id := str(action.get("station", ""))
+	if simulation.state.stations.has(station_id) and bool(simulation.state.stations[station_id].busy):
+		return {"ok": false, "reason": "%s is already occupied." % simulation.state.stations[station_id].name}
+	return {"ok": true, "reason": ""}
+
+func _rebuild_choices() -> void:
+	_clear_children(ui.choices)
+	var choices: Array = []
+	var planning: bool = simulation.state.stage == "week_planning"
+	var council: bool = simulation.state.stage == "council"
+	var restoration: bool = simulation.state.stage == "complete"
+	if simulation.state.pending_issue != "": choices = simulation.get_issue_options()
+	elif planning: choices = simulation.get_week_plan_options()
+	elif council: choices = simulation.get_council_options()
+	elif restoration: choices = simulation.get_restoration_options()
+	for choice in choices:
+		var button := Button.new()
+		button.text = "%s\n%s" % [choice.label, choice.effect]
+		button.custom_minimum_size = Vector2(0, 60)
+		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		button.tooltip_text = "Commit the Old Stables to %s" % choice.label if planning else str(choice.effect)
+		button.pressed.connect((_choose_week_plan if planning else _choose_council if council else _fund_restoration if restoration else _choose_issue).bind(choice.id))
+		ui.choices.add_child(button)
+	ui.decision_panel.visible = not choices.is_empty() or planning or council or restoration
+	if ui.decision_panel.visible: _reveal(ui.decision_panel)
+
+func _start_action(action_id: String) -> void:
+	var action := {}
+	for candidate in simulation.get_available_actions():
+		if str(candidate.id) == action_id: action = candidate; break
+	var result := simulation.start_action(action_id, selected_staff_id)
+	if result.ok and action_id != "accept_key" and speed == 0: speed = 1
+	if result.ok and not action.is_empty():
+		selected_station = str(action.station) if str(action.station) != "estate" else ""
+		if selected_station != "": $World.focus_station(selected_station)
+		_play_cue("work")
+	_show_result(result)
+	if result.ok: simulation.save_game()
+
+func _choose_issue(option_id: String) -> void:
+	var result := simulation.choose_issue(option_id)
+	_play_cue("decision" if result.ok else "error")
+	_show_result(result)
+	if result.ok: simulation.save_game()
+
+func _choose_council(option_id: String) -> void:
+	var result := simulation.resolve_council(option_id)
+	_play_cue("appointment" if result.ok else "error")
+	_show_result(result)
+	if result.ok: simulation.save_game()
+
+func _choose_week_plan(plan_id: String) -> void:
+	var result := simulation.choose_week_plan(plan_id)
+	_play_cue("decision" if result.ok else "error")
+	if result.ok:
+		speed = 1
+		selected_station = ""
+	_show_result(result)
+	if result.ok: simulation.save_game()
+
+func _fund_restoration(project_id: String) -> void:
+	var begins_next_week := project_id == "begin_next_week"
+	var result := simulation.begin_next_week() if begins_next_week else simulation.fund_restoration(project_id)
+	_play_cue("work" if result.ok else "error")
+	if result.ok and begins_next_week:
+		selected_station = ""
+		speed = 0
+	_show_result(result)
+	if result.ok: simulation.save_game()
+
+func _advance_to_milestone() -> void:
+	_show_result(simulation.advance_to_next_milestone())
+	_play_cue("decision")
+
+func _on_staff_selected(index: int) -> void:
+	selected_staff_id = str(ui.staff_picker.get_item_metadata(index))
+	_update_selected_staff_summary(simulation.get_staff_summary())
+	_rebuild_actions()
+	$World.show_feedback("%s is ready for assignment." % simulation.state.staff[selected_staff_id].name, true)
+	_play_cue("select")
+
+func _on_world_station_selected(id: String) -> void:
+	selected_station = id
+	last_structure_signature = ""
+	_refresh(true)
+	$World.show_feedback("%s selected — available commands are below." % id.replace("_"," ").capitalize(), true)
+	_play_cue("select")
+
+func _on_world_station_hovered(id: String, entered: bool) -> void:
+	if entered: ui.context.text = "%s · CLICK TO FOCUS" % id.replace("_"," ").to_upper()
+	else: ui.context.text = _context_eyebrow(simulation.state)
+
+func _set_speed(value: int) -> void:
+	if value > 0 and (str(simulation.state.pending_issue) != "" or str(simulation.state.stage) in ["week_planning", "council", "complete"]):
+		speed = 0
+		_set_status("Resolve the current judgment before restarting the estate clock.", false)
+		_refresh()
+		return
+	speed = value
+	_set_status("Estate clock paused." if value == 0 else "Estate clock running at %d×." % value, true)
+	_refresh()
+
+func _save_game() -> void: _show_result(simulation.save_game())
+
+func _load_game() -> void:
+	var result := simulation.load_game()
+	if result.ok:
+		started = true
+		var player: Dictionary = simulation.state.player
+		$World.customize_player(player.name, int(player.coat_index))
+		_refresh(true)
+	_show_result(result)
+
+func _show_result(result: Dictionary) -> void:
+	_set_status(str(result.message), bool(result.ok))
+	$World.show_feedback(str(result.message), bool(result.ok))
+	if not result.ok: _play_cue("error")
+	_refresh()
+
+func _set_status(message: String, positive: bool) -> void:
+	ui.status.text = message
+	ui.status.add_theme_color_override("font_color", SAGE if positive else Color("#d57a68"))
+
+func _jobs_text() -> String:
+	var lines := []
+	for job in simulation.get_active_jobs():
+		lines.append("%s · %d MIN" % [str(job.label).to_upper(), max(0, int(job.ends) - int(simulation.state.game_minute))])
+	return "\n".join(lines) if not lines.is_empty() else "No active work order"
+
+func _jobs_tooltip() -> String:
+	var lines := []
+	for job in simulation.get_active_jobs():
+		var staff_name := str(simulation.state.staff.get(str(job.staff_id), {}).get("name", "Unassigned"))
+		lines.append("%s at %s · %s · %d minutes remaining" % [job.label, str(job.station).replace("_", " ").capitalize(), staff_name, max(0, int(job.ends) - int(simulation.state.game_minute))])
+	return "\n".join(lines) if not lines.is_empty() else "No active work orders."
+
+func _context_title() -> String:
+	if simulation.state.pending_issue == "amber_lauter_stall": return "Amber runoff stalled"
+	var issue_title := _issue_title()
+	if not issue_title.is_empty(): return issue_title
+	if simulation.state.stage == "week_planning": return "Choose a promise"
+	if simulation.state.stage == "council": return "Apolline opens the ledger"
+	if simulation.state.stage == "complete": return "The first account closes"
+	if not selected_station.is_empty(): return selected_station.replace("_"," ").capitalize()
+	return "The First Real Brew" if int(simulation.state.get("week_number", 1)) == 1 else str(simulation.state.batch.recipe)
+
+func _decision_title() -> String:
+	var issue_title := _issue_title()
+	if not issue_title.is_empty(): return issue_title
+	if simulation.state.stage == "week_planning": return "Two promises, one brewhouse"
+	if simulation.state.stage == "council": return "The first weekly council"
+	if simulation.state.stage == "complete": return "The estate answers"
+	return "A decision is waiting"
+
+func _decision_objective() -> String:
+	if simulation.state.pending_issue == "amber_lauter_stall":
+		return "Stable Amber's toasted grain bed has compacted. Choose how to restore its runoff."
+	return simulation.objective_text()
+
+func _consequence_text() -> String:
+	var state := simulation.state
+	if state.stage == "week_planning":
+		return "FESTIVAL · more cash, more guests, tighter deadline\nRESERVE · higher quality target, more preparation time"
+	if state.stage == "complete":
+		return "SERVICE · %d guests · ¤%d revenue\nCOUNCIL · score %d · %s" % [int(state.service_result.get("guests_served", 0)), int(state.service_result.get("revenue", 0)), int(state.council_result.get("score", 0)), state.authority_role]
+	if state.pending_issue == "mash_drift":
+		return "LANTERN BLONDE · protect its crisp finish\nTrade time and confidence against volume and body."
+	if state.pending_issue == "missing_hops":
+		return "LANTERN BLONDE · bitterness is unresolved\nChoose estate identity, costly quality, or a softer beer."
+	if state.pending_issue == "amber_lauter_stall":
+		return "STABLE AMBER · quality target %d\nProtect its toasted depth without forcing a harsh runoff." % int(state.promise.get("quality_target", 72))
+	if state.pending_issue != "":
+		return "%s · production judgment\nEvery response changes flavor, schedule, cash, or trust." % str(state.batch.get("recipe", "Batch")).to_upper()
+	if state.stage == "council": return "Apolline weighs delivery, cash, trust, and the Count’s confidence. Your answer defines the next week."
+	var deadline := int(state.promise.get("deadline_minute", 0))
+	var deadline_day := deadline / 1440 + 1
+	var deadline_minute := deadline % 1440
+	return "PROMISE · %d guests · quality %d\nDEADLINE · Day %d at %02d:%02d" % [int(state.promise.get("guests", 0)), int(state.promise.get("quality_target", state.batch.get("quality", 0))), deadline_day, deadline_minute / 60, deadline_minute % 60]
+
+func _issue_title() -> String:
+	match str(simulation.state.pending_issue):
+		"mash_drift": return "The copper runs hot"
+		"missing_hops": return "The road is empty"
+		"amber_lauter_stall": return "The amber runoff has stalled"
+		_: return ""
+
+func _guidance_text() -> String:
+	match str(simulation.state.stage):
+		"appointment": return "1 · Accept the stable key below — your first authority is the brewery itself."
+		"recommission": return "2 · Select the copper brewhouse, choose a worker, then recommission it."
+		"ready_to_mash": return "3 · Return to the brewhouse and begin the %s mash." % simulation.state.batch.recipe
+		_: return ""
+
+func _handle_story_transition(state: Dictionary) -> void:
+	var stage := str(state.stage)
+	var issue := str(state.pending_issue)
+	if last_stage != stage:
+		match stage:
+			"week_planning":
+				$World.show_feedback("Two promises compete for the Old Stables.", true)
+				_set_status("Time is paused until you choose this week's production commitment.", true)
+			"recommission":
+				if not awaiting_first_light:
+					$World.show_feedback("The stable key is yours. Wake the copper brewhouse.", true)
+					_set_status("Select the brewhouse marker and assign its recommissioning.", true)
+			"ready_to_mash":
+				$World.show_feedback("The copper is ready. %s can begin." % state.batch.recipe, true)
+				_set_status("The brewhouse is ready for the next mash.", true)
+			"fermenting":
+				$World.show_feedback("Yeast takes the night watch. Prepare the estate while it works.", true)
+				_set_status("Fermentation is active; courtyard and packaging preparation can proceed.", true)
+			"ready_to_package":
+				$World.show_feedback("Fermentation is complete. The first keg can be filled.", true)
+				_set_status("Assign Maëlle or another packager to fill the first keg.", true)
+			"ready_to_serve":
+				$World.show_feedback("The keg is ready. Open the courtyard before the promise expires.", true)
+				_set_status("The first keg and courtyard are ready for service.", true)
+			"council":
+				$World.show_feedback("The courtyard falls quiet. Apolline opens the ledger.", true)
+				_set_status("Time is paused for the first weekly council.", true)
+			"complete":
+				$World.show_feedback("The Count has made his judgment.", true)
+				_set_status("The first account is closed; choose the estate’s next investment.", true)
+	if last_issue == "" and issue != "":
+		var alert_title := _issue_title()
+		$World.show_feedback(("%s — choose a response." % alert_title) if not alert_title.is_empty() else "A brewing problem needs your judgment.", false)
+		_set_status("Production paused — choose a response in the decision panel.", false)
+		_play_cue("alert")
+
+func _reveal(node: CanvasItem) -> void:
+	node.modulate.a = 0.0
+	var tween := create_tween()
+	tween.tween_property(node, "modulate:a", 1.0, 0.24).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+
+func _play_cue(kind: String) -> void:
+	var frequency := 360.0
+	var duration := 0.10
+	match kind:
+		"select": frequency = 440.0; duration = 0.06
+		"work": frequency = 280.0; duration = 0.12
+		"decision": frequency = 520.0; duration = 0.13
+		"alert": frequency = 185.0; duration = 0.24
+		"appointment": frequency = 620.0; duration = 0.22
+		"bell": frequency = 82.0; duration = 0.72
+		"ledger": frequency = 190.0; duration = 0.14
+		"key": frequency = 880.0; duration = 0.34
+		"lamp": frequency = 330.0; duration = 0.62
+		"error": frequency = 145.0; duration = 0.16
+	if not cue_streams.has(kind):
+		cue_streams[kind] = _make_tone(frequency, duration)
+	cue_player.stream = cue_streams[kind]
+	cue_player.play()
+
+func _make_tone(frequency: float, duration: float) -> AudioStreamWAV:
+	var sample_rate := 22050
+	var sample_count := int(sample_rate * duration)
+	var bytes := PackedByteArray()
+	bytes.resize(sample_count * 2)
+	for index in range(sample_count):
+		var t := float(index) / float(sample_rate)
+		var envelope := sin(PI * float(index) / float(sample_count))
+		var value := int(sin(TAU * frequency * t) * envelope * 4200.0)
+		bytes[index * 2] = value & 0xff
+		bytes[index * 2 + 1] = (value >> 8) & 0xff
+	var stream := AudioStreamWAV.new()
+	stream.format = AudioStreamWAV.FORMAT_16_BITS
+	stream.mix_rate = sample_rate
+	stream.stereo = false
+	stream.data = bytes
+	return stream
+
+func _clear_children(node: Node) -> void:
+	for child in node.get_children(): child.queue_free()
+
+func _format_number(value: int) -> String:
+	var raw := str(value)
+	var output := ""
+	var count := 0
+	for index in range(raw.length() - 1, -1, -1):
+		if count > 0 and count % 3 == 0: output = "," + output
+		output = raw[index] + output
+		count += 1
+	return output

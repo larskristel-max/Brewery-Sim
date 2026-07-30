@@ -1,0 +1,41 @@
+{
+  "recipes": [
+    {
+      "id":"lantern_blonde_v1",
+      "name":"Lantern Blonde",
+      "style":"estate blonde ale",
+      "batch_l":20,
+      "mash_target_c":66,
+      "original_gravity_band":[1.044,1.048],
+      "ingredients":[
+        {"material_id":"malt_pale_estate","quantity":4.2},
+        {"material_id":"hop_citrus","quantity":38},
+        {"material_id":"yeast_house_ale","quantity":1}
+      ],
+      "production_risks":[
+        {"id":"mash_drift","cause":"Direct-fired mash temperature overshoot"},
+        {"id":"missing_hops","cause":"Delayed citrus-hop delivery"}
+      ],
+      "allowed_substitutions":[{"replace":"hop_citrus","with":"herbs_walled_garden","sensory_tag":"wild_green"}],
+      "provenance":{"evidence_class":"synthetic","transform":"generalized_from_process_patterns"}
+    },
+    {
+      "id":"stable_amber_v1",
+      "name":"Stable Amber",
+      "style":"toasted estate amber ale",
+      "batch_l":20,
+      "mash_target_c":68,
+      "original_gravity_band":[1.052,1.057],
+      "ingredients":[
+        {"material_id":"malt_pale_estate","quantity":5.4},
+        {"material_id":"hop_citrus","quantity":30},
+        {"material_id":"yeast_house_ale","quantity":1}
+      ],
+      "production_risks":[
+        {"id":"amber_lauter_stall","cause":"The heavier amber grain bill compacts over the false bottom"}
+      ],
+      "allowed_substitutions":[{"replace":"hop_citrus","with":"herbs_walled_garden","sensory_tag":"woodland_spice"}],
+      "provenance":{"evidence_class":"synthetic","transform":"designed_for_week_two_quality_contract"}
+    }
+  ]
+}

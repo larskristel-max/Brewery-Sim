@@ -1,0 +1,169 @@
+{
+  "finished_lots": [
+    {
+      "beer": "Courtyard Pils",
+      "condition": "available",
+      "lot_id": "FG-b2f0650ad4",
+      "package": "bottle",
+      "provenance": {
+        "evidence_class": "reconciled",
+        "transform": "id_hash+quantity_band"
+      },
+      "stock_band": "cellar"
+    },
+    {
+      "beer": "Courtyard Pils",
+      "condition": "available",
+      "lot_id": "FG-ccc047be99",
+      "package": "bottle",
+      "provenance": {
+        "evidence_class": "reconciled",
+        "transform": "id_hash+quantity_band"
+      },
+      "stock_band": "small"
+    },
+    {
+      "beer": "Stable Amber",
+      "condition": "available",
+      "lot_id": "FG-70e15c3cb1",
+      "package": "bottle",
+      "provenance": {
+        "evidence_class": "reconciled",
+        "transform": "id_hash+quantity_band"
+      },
+      "stock_band": "cellar"
+    },
+    {
+      "beer": "Stable Amber",
+      "condition": "available",
+      "lot_id": "FG-faa2fc6a02",
+      "package": "bottle",
+      "provenance": {
+        "evidence_class": "reconciled",
+        "transform": "id_hash+quantity_band"
+      },
+      "stock_band": "medium"
+    },
+    {
+      "beer": "Stable Amber",
+      "condition": "available",
+      "lot_id": "FG-0979c5f741",
+      "package": "bottle",
+      "provenance": {
+        "evidence_class": "reconciled",
+        "transform": "id_hash+quantity_band"
+      },
+      "stock_band": "large"
+    },
+    {
+      "beer": "Orchard Pale",
+      "condition": "available",
+      "lot_id": "FG-856a0d9791",
+      "package": "bottle",
+      "provenance": {
+        "evidence_class": "reconciled",
+        "transform": "id_hash+quantity_band"
+      },
+      "stock_band": "cellar"
+    },
+    {
+      "beer": "Stable Amber",
+      "condition": "available",
+      "lot_id": "FG-a9d04b7970",
+      "package": "bottle",
+      "provenance": {
+        "evidence_class": "reconciled",
+        "transform": "id_hash+quantity_band"
+      },
+      "stock_band": "large"
+    },
+    {
+      "beer": "Orchard Pale",
+      "condition": "available",
+      "lot_id": "FG-bfeea87f44",
+      "package": "bottle",
+      "provenance": {
+        "evidence_class": "reconciled",
+        "transform": "id_hash+quantity_band"
+      },
+      "stock_band": "medium"
+    },
+    {
+      "beer": "Courtyard Pils",
+      "condition": "available",
+      "lot_id": "FG-94c31a363a",
+      "package": "keg",
+      "provenance": {
+        "evidence_class": "reconciled",
+        "transform": "id_hash+quantity_band"
+      },
+      "stock_band": "small"
+    },
+    {
+      "beer": "Stable Amber",
+      "condition": "available",
+      "lot_id": "FG-ca618cd548",
+      "package": "keg",
+      "provenance": {
+        "evidence_class": "reconciled",
+        "transform": "id_hash+quantity_band"
+      },
+      "stock_band": "medium"
+    },
+    {
+      "beer": "Lantern Blonde",
+      "condition": "available",
+      "lot_id": "FG-0645cb1dfc",
+      "package": "bottle",
+      "provenance": {
+        "evidence_class": "reconciled",
+        "transform": "id_hash+quantity_band"
+      },
+      "stock_band": "cellar"
+    },
+    {
+      "beer": "Lantern Blonde",
+      "condition": "available",
+      "lot_id": "FG-0645cb1dfc",
+      "package": "keg",
+      "provenance": {
+        "evidence_class": "reconciled",
+        "transform": "id_hash+quantity_band"
+      },
+      "stock_band": "small"
+    },
+    {
+      "beer": "Orchard Pale",
+      "condition": "available",
+      "lot_id": "FG-b2e3978446",
+      "package": "bottle",
+      "provenance": {
+        "evidence_class": "reconciled",
+        "transform": "id_hash+quantity_band"
+      },
+      "stock_band": "cellar"
+    },
+    {
+      "beer": "Courtyard Pils",
+      "condition": "available",
+      "lot_id": "FG-f2d5b7d1da",
+      "package": "keg",
+      "provenance": {
+        "evidence_class": "reconciled",
+        "transform": "id_hash+quantity_band"
+      },
+      "stock_band": "small"
+    },
+    {
+      "beer": "Stable Amber",
+      "condition": "available",
+      "lot_id": "FG-70e15c3cb1",
+      "package": "bottle",
+      "provenance": {
+        "evidence_class": "reconciled",
+        "transform": "id_hash+quantity_band"
+      },
+      "stock_band": "cellar"
+    }
+  ]
+}

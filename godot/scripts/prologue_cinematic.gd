@@ -1,0 +1,244 @@
+class_name PrologueCinematic
+extends Control
+
+signal finished(skipped: bool)
+signal beat(kind: String)
+
+const CREAM := Color("#efe4d2")
+const COPPER := Color("#d79a5b")
+const MUTED := Color("#b8aa98")
+
+const SHOTS := [
+	{
+		"duration": 8.0,
+		"focus": Vector2(0.88, 0.42),
+		"zoom": 1.62,
+		"eyebrow": "THE VALENNE ESTATE · FIRST NIGHT",
+		"speaker": "",
+		"line": "For three hundred years, the house of Valenne endured.",
+		"beat": "bell"
+	},
+	{
+		"duration": 8.0,
+		"focus": Vector2(0.28, 0.76),
+		"zoom": 1.72,
+		"eyebrow": "ONE SEASON REMAINS",
+		"speaker": "",
+		"line": "Now its creditors are leaving with more than promises.",
+		"beat": "ledger"
+	},
+	{
+		"duration": 10.0,
+		"focus": Vector2(0.27, 0.43),
+		"zoom": 1.48,
+		"eyebrow": "THE APPOINTMENT",
+		"speaker": "COUNT ARMAND DE VALENNE",
+		"line": "The Valennes have held this land for three hundred years. We may not hold it for one more.",
+		"beat": "appointment"
+	},
+	{
+		"duration": 10.0,
+		"focus": Vector2(0.78, 0.49),
+		"zoom": 1.58,
+		"eyebrow": "THE LEDGER",
+		"speaker": "APOLLINE DE VALENNE",
+		"line": "The estate has one season left. Every barrel—and every coin—must count.",
+		"beat": "ledger"
+	},
+	{
+		"duration": 11.0,
+		"focus": Vector2(0.52, 0.48),
+		"zoom": 1.30,
+		"eyebrow": "THE MANDATE",
+		"speaker": "COUNT ARMAND DE VALENNE",
+		"line": "You were hired to brew. Restore these stables, earn the trust of our people… and you may yet become steward of everything that remains.",
+		"beat": "appointment"
+	},
+	{
+		"duration": 8.0,
+		"focus": Vector2(0.48, 0.64),
+		"zoom": 1.84,
+		"eyebrow": "THE LAST BREWER OF VALENNE",
+		"speaker": "",
+		"line": "The stable key passes into your hands.",
+		"beat": "key"
+	}
+]
+
+var world: Control
+var shot_index := -1
+var shot_elapsed := 0.0
+var complete := false
+var eyebrow: Label
+var speaker: Label
+var dialogue: Label
+var progress: Label
+var transition: ColorRect
+var subtitle_panel: PanelContainer
+
+func start(target_world: Control) -> void:
+	world = target_world
+	set_process(true)
+	_set_shot(0)
+
+func _ready() -> void:
+	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	mouse_filter = Control.MOUSE_FILTER_STOP
+	_build_interface()
+	set_process(false)
+
+func _process(delta: float) -> void:
+	if complete or shot_index < 0:
+		return
+	shot_elapsed += delta
+	var shot: Dictionary = SHOTS[shot_index]
+	var reveal_duration: float = clampf(str(shot.line).length() * 0.026, 0.7, 2.6)
+	dialogue.visible_ratio = clampf(shot_elapsed / reveal_duration, 0.0, 1.0)
+	progress.text = "%02d:%02d  ·  SPACE ADVANCE  ·  ESC SKIP" % [int(_remaining_time()) / 60, int(_remaining_time()) % 60]
+	if shot_elapsed >= float(shot.duration):
+		advance()
+
+func _unhandled_input(event: InputEvent) -> void:
+	if complete or not visible:
+		return
+	if event is InputEventKey and event.pressed and not event.echo:
+		if event.keycode == KEY_ESCAPE:
+			finish(true)
+			get_viewport().set_input_as_handled()
+		elif event.keycode in [KEY_SPACE, KEY_ENTER]:
+			advance()
+			get_viewport().set_input_as_handled()
+
+func advance() -> void:
+	if complete:
+		return
+	if shot_index + 1 >= SHOTS.size():
+		finish(false)
+	else:
+		_set_shot(shot_index + 1)
+
+func finish(was_skipped: bool) -> void:
+	if complete:
+		return
+	complete = true
+	set_process(false)
+	finished.emit(was_skipped)
+
+func _set_shot(index: int) -> void:
+	shot_index = index
+	shot_elapsed = 0.0
+	var shot: Dictionary = SHOTS[index]
+	eyebrow.text = str(shot.eyebrow)
+	speaker.text = str(shot.speaker)
+	speaker.visible = not speaker.text.is_empty()
+	dialogue.text = str(shot.line)
+	dialogue.visible_ratio = 0.0
+	if is_instance_valid(world) and world.has_method("set_cinematic_camera"):
+		world.set_cinematic_camera("appointment", shot.focus, float(shot.zoom))
+	transition.color.a = 0.72 if index == 0 else 0.46
+	var fade := create_tween()
+	fade.tween_property(transition, "color:a", 0.0, 1.0).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	beat.emit(str(shot.beat))
+
+func _remaining_time() -> float:
+	var remaining := maxf(0.0, float(SHOTS[shot_index].duration) - shot_elapsed)
+	for index in range(shot_index + 1, SHOTS.size()):
+		remaining += float(SHOTS[index].duration)
+	return remaining
+
+func _build_interface() -> void:
+	var wash := ColorRect.new()
+	wash.color = Color(0.015, 0.025, 0.045, 0.14)
+	wash.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	wash.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(wash)
+
+	for top in [true, false]:
+		var bar := ColorRect.new()
+		bar.color = Color(0.012, 0.012, 0.014, 0.98)
+		bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		bar.anchor_right = 1.0
+		if top:
+			bar.anchor_bottom = 0.095
+		else:
+			bar.anchor_top = 0.895
+			bar.anchor_bottom = 1.0
+		add_child(bar)
+
+	var skip := Button.new()
+	skip.name = "SkipPrologue"
+	skip.text = "SKIP  »"
+	skip.anchor_left = 1.0
+	skip.anchor_right = 1.0
+	skip.offset_left = -142
+	skip.offset_top = 24
+	skip.offset_right = -30
+	skip.offset_bottom = 64
+	skip.focus_mode = Control.FOCUS_ALL
+	skip.pressed.connect(finish.bind(true))
+	add_child(skip)
+
+	var chapter := Label.new()
+	chapter.text = "PROLOGUE"
+	chapter.offset_left = 34
+	chapter.offset_top = 29
+	chapter.offset_right = 250
+	chapter.offset_bottom = 60
+	chapter.add_theme_font_size_override("font_size", 11)
+	chapter.add_theme_color_override("font_color", COPPER)
+	add_child(chapter)
+
+	subtitle_panel = PanelContainer.new()
+	subtitle_panel.anchor_left = 0.13
+	subtitle_panel.anchor_top = 0.665
+	subtitle_panel.anchor_right = 0.87
+	subtitle_panel.anchor_bottom = 0.88
+	var panel_style := StyleBoxFlat.new()
+	panel_style.bg_color = Color(0.018, 0.017, 0.019, 0.91)
+	panel_style.border_color = Color(0.63, 0.42, 0.24, 0.82)
+	panel_style.border_width_top = 1
+	panel_style.set_corner_radius_all(7)
+	panel_style.content_margin_left = 30
+	panel_style.content_margin_right = 30
+	panel_style.content_margin_top = 17
+	panel_style.content_margin_bottom = 16
+	subtitle_panel.add_theme_stylebox_override("panel", panel_style)
+	add_child(subtitle_panel)
+
+	var copy := VBoxContainer.new()
+	copy.add_theme_constant_override("separation", 5)
+	subtitle_panel.add_child(copy)
+	eyebrow = Label.new()
+	eyebrow.add_theme_font_size_override("font_size", 10)
+	eyebrow.add_theme_color_override("font_color", COPPER)
+	copy.add_child(eyebrow)
+	speaker = Label.new()
+	speaker.add_theme_font_size_override("font_size", 12)
+	speaker.add_theme_color_override("font_color", Color("#e5bd8a"))
+	copy.add_child(speaker)
+	dialogue = Label.new()
+	dialogue.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	dialogue.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	dialogue.add_theme_font_size_override("font_size", 23)
+	dialogue.add_theme_color_override("font_color", CREAM)
+	copy.add_child(dialogue)
+
+	progress = Label.new()
+	progress.anchor_left = 0.5
+	progress.anchor_top = 1.0
+	progress.anchor_right = 0.5
+	progress.anchor_bottom = 1.0
+	progress.offset_left = -240
+	progress.offset_top = -67
+	progress.offset_right = 240
+	progress.offset_bottom = -36
+	progress.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	progress.add_theme_font_size_override("font_size", 9)
+	progress.add_theme_color_override("font_color", MUTED)
+	add_child(progress)
+
+	transition = ColorRect.new()
+	transition.color = Color(0.005, 0.008, 0.015, 1.0)
+	transition.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	transition.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(transition)
