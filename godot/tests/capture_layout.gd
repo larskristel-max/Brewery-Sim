@@ -11,8 +11,10 @@ func _capture() -> void:
 	var instance = scene.instantiate()
 	root.add_child(instance)
 	await process_frame
-	instance.begin_campaign_with("Elise", 0)
+	instance._start_opening_story()
 	instance.ui.prologue.finish(true)
+	await process_frame
+	instance.begin_campaign_with("Elise", 0)
 	await process_frame
 	var first_light := instance.get_node_or_null("World/FirstLightHotspot") as Button
 	if first_light: first_light.pressed.emit()

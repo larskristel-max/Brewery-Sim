@@ -13,21 +13,27 @@ func _run() -> void:
 	await process_frame
 	root.size = Vector2i(1280, 720)
 	await process_frame
-	var begin := _find_button(instance.ui.customization, "Begin the first real brew")
-	_expect(begin != null, "Customization start button was not rendered")
-	if begin: begin.pressed.emit()
+	var opening := _find_button(instance.ui.title_screen, "Begin the story")
+	_expect(opening != null, "Opening title did not expose the story")
+	if opening: opening.pressed.emit()
 	await process_frame
 	await process_frame
-	_expect(instance.started, "Customization button did not start the campaign")
-	_expect(instance.prologue_active, "Campaign did not begin with the story prologue")
+	_expect(instance.prologue_active, "Opening title did not begin the story prologue")
 	_expect(instance.speed == 0, "Estate clock ran underneath the prologue")
 	var skip := _find_button(instance.ui.prologue, "SKIP")
 	_expect(skip != null, "Prologue did not expose a skip control")
 	if skip: skip.pressed.emit()
 	await process_frame
 	await process_frame
-	_expect(instance.simulation.state.stage == "recommission", "Prologue handoff did not accept the stable key")
-	_expect(instance.awaiting_first_light, "Prologue did not hand control to the first lamp")
+	_expect(instance.ui.has("customization") and is_instance_valid(instance.ui.customization), "Prologue did not hand off to the appointment")
+	var begin := _find_button(instance.ui.customization, "Take the stable key")
+	_expect(begin != null, "Appointment did not expose the stable-key decision")
+	if begin: begin.pressed.emit()
+	await process_frame
+	await process_frame
+	_expect(instance.started, "Appointment did not start the campaign")
+	_expect(instance.simulation.state.stage == "recommission", "Appointment did not accept the stable key")
+	_expect(instance.awaiting_first_light, "Appointment did not hand control to the first lamp")
 	var first_light := instance.get_node_or_null("World/FirstLightHotspot") as Button
 	_expect(first_light != null and first_light.visible, "First lamp did not expose an interactive hotspot")
 	if first_light: first_light.pressed.emit()

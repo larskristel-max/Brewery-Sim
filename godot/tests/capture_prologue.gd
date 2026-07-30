@@ -12,7 +12,7 @@ func _capture() -> void:
 	var instance = scene.instantiate()
 	root.add_child(instance)
 	await _settle(0.2)
-	instance.begin_campaign_with("Elise", 0)
+	instance._start_opening_story()
 	await _settle(1.2)
 	await _save("01-estate-arrival.png")
 
@@ -27,6 +27,8 @@ func _capture() -> void:
 
 	instance.ui.prologue.finish(true)
 	await _settle(0.5)
+	instance.begin_campaign_with("Elise", 0)
+	await _settle(0.2)
 	await _save("04-first-light-prompt.png")
 
 	var first_light := instance.get_node_or_null("World/FirstLightHotspot") as Button

@@ -39,7 +39,7 @@ func _ready() -> void:
 	$World.station_hovered.connect(_on_world_station_hovered)
 	$World.first_light_activated.connect(_on_first_light_activated)
 	_refresh(true)
-	_show_customization()
+	_show_title_screen()
 	_apply_responsive_layout()
 
 func _process(delta: float) -> void:
@@ -622,6 +622,13 @@ func _layout_decision_panel() -> void:
 		ui.decision_panel.offset_bottom = -446 if str(simulation.state.stage) == "operations_council" else -224
 
 func _layout_story_overlays() -> void:
+	if ui.has("title_card") and is_instance_valid(ui.title_card):
+		if portrait_layout:
+			_set_anchor_rect(ui.title_card, 0.06, 0.26, 0.94, 0.74)
+		elif compact_layout:
+			_set_anchor_rect(ui.title_card, 0.25, 0.10, 0.75, 0.90)
+		else:
+			_set_anchor_rect(ui.title_card, 0.31, 0.23, 0.69, 0.77)
 	if ui.has("customization_story") and is_instance_valid(ui.customization_story):
 		ui.customization_story.visible = not portrait_layout
 		if compact_layout and not portrait_layout:
@@ -663,6 +670,71 @@ func _exit_tree() -> void:
 		cue_player.stop()
 		cue_player.stream = null
 	cue_streams.clear()
+
+func _show_title_screen() -> void:
+	var shade := ColorRect.new()
+	shade.name = "OpeningTitle"
+	shade.color = Color("#071018")
+	shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	add_child(shade)
+	ui.title_screen = shade
+	var card := PanelContainer.new()
+	card.add_theme_stylebox_override("panel", _panel_style(0.98, 12, 28))
+	shade.add_child(card)
+	ui.title_card = card
+	var copy := VBoxContainer.new()
+	copy.alignment = BoxContainer.ALIGNMENT_CENTER
+	copy.add_theme_constant_override("separation", 14)
+	card.add_child(copy)
+	var estate := Label.new()
+	estate.text = "CHÂTEAU DE VALENNE"
+	estate.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	estate.add_theme_font_size_override("font_size", 11)
+	estate.add_theme_color_override("font_color", COPPER)
+	copy.add_child(estate)
+	var title := Label.new()
+	title.text = "OLD STABLES"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 38)
+	title.add_theme_color_override("font_color", CREAM)
+	copy.add_child(title)
+	var subtitle := Label.new()
+	subtitle.text = "A brewery management story"
+	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	subtitle.add_theme_font_size_override("font_size", 16)
+	subtitle.add_theme_color_override("font_color", SAGE)
+	copy.add_child(subtitle)
+	copy.add_child(HSeparator.new())
+	var invitation := Label.new()
+	invitation.text = "Enter the estate. The story begins before the first brew."
+	invitation.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	invitation.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	invitation.add_theme_font_size_override("font_size", 13)
+	invitation.add_theme_color_override("font_color", Color("#d2c4b0"))
+	copy.add_child(invitation)
+	var begin := Button.new()
+	begin.text = "Begin the story"
+	begin.custom_minimum_size = Vector2(0, 58)
+	begin.add_theme_font_size_override("font_size", 16)
+	begin.add_theme_stylebox_override("normal", _button_style(Color(0.37,0.19,0.09,0.98), COPPER_BRIGHT, 1))
+	begin.pressed.connect(_start_opening_story)
+	copy.add_child(begin)
+	var note := Label.new()
+	note.text = "The cinematic can be skipped at any time."
+	note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	note.add_theme_font_size_override("font_size", 10)
+	note.add_theme_color_override("font_color", MUTED)
+	copy.add_child(note)
+	ui.top_bar.visible = false
+	ui.command_dock.visible = false
+	ui.guidance_panel.visible = false
+	begin.grab_focus()
+	_apply_responsive_layout()
+
+func _start_opening_story() -> void:
+	if ui.has("title_screen") and is_instance_valid(ui.title_screen):
+		ui.title_screen.queue_free()
+	_start_prologue()
 
 func _show_customization() -> void:
 	$World.set_story_scene("appointment")
@@ -728,7 +800,7 @@ func _show_customization() -> void:
 	title.add_theme_color_override("font_color", CREAM)
 	form.add_child(title)
 	var copy := Label.new()
-	copy.text = "You arrive as Castle Brewmaster. Restore the brewery, keep the Count’s confidence, and prove you can steward more than copper and grain."
+	copy.text = "The Count offers you the stable key. Name the brewer who will answer for its copper, grain, and promises."
 	copy.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	copy.add_theme_font_size_override("font_size", 13)
 	copy.add_theme_color_override("font_color", Color("#d2c4b0"))
@@ -755,7 +827,7 @@ func _show_customization() -> void:
 	coat.custom_minimum_size = Vector2(0, 44)
 	form.add_child(coat)
 	var begin := Button.new()
-	begin.text = "Begin the first real brew  →"
+	begin.text = "Take the stable key"
 	begin.custom_minimum_size = Vector2(0, 54)
 	begin.add_theme_font_size_override("font_size", 15)
 	begin.add_theme_stylebox_override("normal", _button_style(Color(0.37,0.19,0.09,0.98), COPPER_BRIGHT, 1))
@@ -776,12 +848,20 @@ func begin_campaign_with(name_source, coat_source = null) -> void:
 	speed = 0
 	$World.customize_player(display_name, coat_index)
 	$World.set_story_scene("appointment")
+	if ui.has("title_screen") and is_instance_valid(ui.title_screen): ui.title_screen.queue_free()
 	if ui.has("customization") and is_instance_valid(ui.customization): ui.customization.queue_free()
+	var result := simulation.accept_stable_key()
+	if not result.ok and str(simulation.state.stage) != "recommission":
+		_show_result(result)
+		return
+	awaiting_first_light = true
+	$World.begin_first_light()
+	_show_first_light_handoff()
+	_play_cue("key")
 	_refresh(true)
 	ui.top_bar.visible = false
 	ui.command_dock.visible = false
 	ui.guidance_panel.visible = false
-	_start_prologue()
 
 func _start_prologue() -> void:
 	prologue_active = true
@@ -800,18 +880,7 @@ func _on_prologue_finished(_was_skipped: bool) -> void:
 	prologue_active = false
 	if ui.has("prologue") and is_instance_valid(ui.prologue):
 		ui.prologue.queue_free()
-	var result := simulation.accept_stable_key()
-	if not result.ok and str(simulation.state.stage) != "recommission":
-		_show_result(result)
-		return
-	awaiting_first_light = true
-	$World.begin_first_light()
-	_show_first_light_handoff()
-	_play_cue("key")
-	_refresh(true)
-	ui.top_bar.visible = false
-	ui.command_dock.visible = false
-	ui.guidance_panel.visible = false
+	_show_customization()
 
 func _show_first_light_handoff() -> void:
 	if ui.has("first_light_card") and is_instance_valid(ui.first_light_card):
