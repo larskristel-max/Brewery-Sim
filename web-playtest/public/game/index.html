@@ -211,6 +211,10 @@ const engine = new Engine(GODOT_CONFIG);
 			},
 		}).then(() => {
 			setStatusMode('hidden');
+			window.parent.postMessage(
+				{ type: 'old-stables-game-ready' },
+				window.location.origin,
+			);
 		}, displayFailureNotice);
 	}
 }());

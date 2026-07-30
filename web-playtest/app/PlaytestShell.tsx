@@ -1,15 +1,22 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
 export function PlaytestShell() {
   const [ready, setReady] = useState(false);
-  const frameRef = useRef<HTMLIFrameElement>(null);
 
   useEffect(() => {
-    if (frameRef.current?.contentDocument?.readyState === "complete") {
-      setReady(true);
-    }
+    const handleMessage = (event: MessageEvent) => {
+      if (
+        event.origin === window.location.origin &&
+        event.data?.type === "old-stables-game-ready"
+      ) {
+        setReady(true);
+      }
+    };
+
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
   }, []);
 
   return (
@@ -47,12 +54,11 @@ export function PlaytestShell() {
           The first load can take a moment while the brewery arrives.
         </div>
         <iframe
-          ref={frameRef}
           className="game-frame"
           src="/game/index.html"
           title="Old Stables browser game"
           allow="autoplay; fullscreen; gamepad"
-          onLoad={() => setReady(true)}
+          onLoad={() => setReady(false)}
         />
       </section>
     </main>

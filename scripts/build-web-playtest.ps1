@@ -161,6 +161,16 @@ $exportHtml = [System.Text.RegularExpressions.Regex]::Replace(
     '"index\.wasm":\d+',
     ($partSizeEntries -join ',')
 )
+$exportHtml = $exportHtml.Replace(
+    "setStatusMode('hidden');",
+    @"
+setStatusMode('hidden');
+			window.parent.postMessage(
+				{ type: 'old-stables-game-ready' },
+				window.location.origin,
+			);
+"@.TrimEnd()
+)
 [System.IO.File]::WriteAllText($exportPath, $exportHtml)
 
 Remove-Item -LiteralPath $wasmPath -Force
