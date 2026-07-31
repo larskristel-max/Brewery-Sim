@@ -20,6 +20,10 @@ func _run() -> void:
 	await process_frame
 	_expect(instance.prologue_active, "Opening title did not begin the story prologue")
 	_expect(instance.speed == 0, "Estate clock ran underneath the prologue")
+	var prologue_index := int(instance.ui.prologue.shot_index)
+	instance.ui.prologue.shot_elapsed = 999.0
+	await process_frame
+	_expect(int(instance.ui.prologue.shot_index) == prologue_index, "Prologue advanced without player input")
 	var skip := _find_button(instance.ui.prologue, "SKIP")
 	_expect(skip != null, "Prologue did not expose a skip control")
 	if skip: skip.pressed.emit()
@@ -33,20 +37,23 @@ func _run() -> void:
 	await process_frame
 	_expect(instance.started, "Appointment did not start the campaign")
 	_expect(instance.simulation.state.stage == "recommission", "Appointment did not accept the stable key")
-	_expect(instance.awaiting_first_light, "Appointment did not hand control to the stable doors")
+	_expect(not instance.awaiting_first_light, "Appointment retained the duplicate stable-door interlude")
 	var first_light := instance.get_node_or_null("World/FirstLightHotspot") as Button
-	_expect(first_light != null and first_light.visible, "Stable doors did not expose an interactive hotspot")
-	if first_light: first_light.pressed.emit()
-	await create_timer(0.65).timeout
-	await process_frame
-	_expect(instance.awakening_active, "Opening the stable doors did not begin the awakening cinematic")
+	_expect(first_light != null and not first_light.visible, "Duplicate stable-door hotspot remained visible after the appointment")
+	_expect(instance.awakening_active, "Appointment did not move directly into the awakening cinematic")
 	_expect(instance.speed == 0, "Estate clock ran underneath the awakening cinematic")
+	_expect(not instance.get_node("World").visible, "Gameplay world remained visible underneath the awakening cinematic")
+	var awakening_index := int(instance.ui.awakening.shot_index)
+	instance.ui.awakening.shot_elapsed = 999.0
+	await process_frame
+	_expect(int(instance.ui.awakening.shot_index) == awakening_index, "Awakening cinematic advanced without player input")
 	var awakening_skip := _find_button(instance.ui.awakening, "SKIP")
 	_expect(awakening_skip != null, "Awakening cinematic did not expose a skip control")
 	if awakening_skip: awakening_skip.pressed.emit()
 	await process_frame
 	await process_frame
 	_expect(not instance.awaiting_first_light and not instance.awakening_active, "Awakening cinematic did not complete the first-light handoff")
+	_expect(instance.get_node("World").visible, "Gameplay world did not return after the awakening cinematic")
 	_expect(instance.speed == 1, "Estate clock did not begin after the awakening cinematic")
 	_expect(_fits_horizontally(instance.ui.command_header, instance.ui.clock_group), "Command-dock clock and save controls overflowed at 1280x720")
 	_expect(instance.ui.command_dock.position.x >= 0.0 and instance.ui.command_dock.position.x + instance.ui.command_dock.size.x <= instance.size.x, "Command dock extended outside the responsive viewport")

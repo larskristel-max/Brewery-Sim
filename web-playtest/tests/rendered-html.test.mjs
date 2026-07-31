@@ -32,6 +32,7 @@ test("server-renders the Old Stables browser launcher", async () => {
   assert.match(html, /<title>Old Stables — Browser Playtest<\/title>/i);
   assert.match(html, /Browser playtest/);
   assert.match(html, /Open game only/);
+  assert.match(html, /Turn your phone sideways/);
   assert.match(html, /\/game\/index\.html/);
 });
 

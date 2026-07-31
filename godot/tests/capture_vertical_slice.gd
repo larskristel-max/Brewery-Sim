@@ -15,11 +15,7 @@ func _capture_gallery() -> void:
 	await _save("01-appointment.png")
 
 	instance.begin_campaign_with("Elise", 0)
-	instance.ui.prologue.finish(true)
 	await _settle(0.1)
-	var first_light := instance.get_node_or_null("World/FirstLightHotspot") as Button
-	if first_light: first_light.pressed.emit()
-	await _settle(0.65)
 	if instance.ui.has("awakening") and is_instance_valid(instance.ui.awakening):
 		instance.ui.awakening.finish(true)
 	await _settle(0.2)

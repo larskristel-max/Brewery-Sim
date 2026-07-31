@@ -164,6 +164,48 @@ h1 {
   background: #050b10;
 }
 
+.orientation-gate {
+  display: none;
+}
+
+.orientation-card {
+  width: min(420px, calc(100% - 36px));
+  padding: 28px 24px;
+  border: 1px solid rgba(211, 138, 74, 0.52);
+  border-radius: 12px;
+  background: rgba(7, 16, 24, 0.98);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5);
+  text-align: center;
+}
+
+.orientation-mark {
+  width: 50px;
+  height: 50px;
+  margin: 0 auto 18px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(211, 138, 74, 0.72);
+  border-radius: 50%;
+  color: #f2b16f;
+  font-family: Georgia, serif;
+  font-size: 20px;
+}
+
+.orientation-card strong {
+  display: block;
+  color: var(--cream);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(24px, 7vw, 34px);
+  font-weight: 500;
+}
+
+.orientation-card p {
+  margin: 12px 0 0;
+  color: var(--cream-muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
 .load-note {
   position: absolute;
   inset: 50% auto auto 50%;
@@ -226,6 +268,24 @@ h1 {
 
   .game-frame {
     min-height: 0;
+  }
+}
+
+@media (orientation: portrait) and (pointer: coarse) {
+  .orientation-gate {
+    position: absolute;
+    inset: 0;
+    z-index: 4;
+    display: grid;
+    place-items: center;
+    padding:
+      18px
+      max(18px, env(safe-area-inset-right))
+      18px
+      max(18px, env(safe-area-inset-left));
+    background:
+      radial-gradient(circle at 50% 15%, rgba(185, 108, 49, 0.18), transparent 23rem),
+      #071018;
   }
 }
 

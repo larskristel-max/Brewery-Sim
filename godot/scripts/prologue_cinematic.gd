@@ -7,6 +7,7 @@ signal beat(kind: String)
 const CREAM := Color("#efe4d2")
 const COPPER := Color("#d79a5b")
 const MUTED := Color("#b8aa98")
+const MIN_ADVANCE_DELAY := 0.28
 
 const SHOTS := [
 	{
@@ -98,10 +99,7 @@ func _process(delta: float) -> void:
 	var shot: Dictionary = SHOTS[shot_index]
 	var reveal_duration: float = clampf(str(shot.line).length() * 0.026, 0.7, 2.6)
 	dialogue.visible_ratio = clampf(shot_elapsed / reveal_duration, 0.0, 1.0)
-	var controls_hint := "TAP ADVANCE  ·  SKIP ABOVE" if size.y > size.x * 1.28 else "SPACE ADVANCE  ·  ESC SKIP"
-	progress.text = "%02d:%02d  ·  %s" % [int(_remaining_time()) / 60, int(_remaining_time()) % 60, controls_hint]
-	if shot_elapsed >= float(shot.duration):
-		advance()
+	progress.text = "TAP TO CONTINUE  ·  SKIP ABOVE" if size.y > size.x * 1.28 else "SPACE TO CONTINUE  ·  ESC TO SKIP"
 
 func _unhandled_input(event: InputEvent) -> void:
 	if complete or not visible:
@@ -116,6 +114,12 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func advance() -> void:
 	if complete:
+		return
+	if shot_elapsed < MIN_ADVANCE_DELAY:
+		return
+	if dialogue.visible_ratio < 0.999:
+		dialogue.visible_ratio = 1.0
+		shot_elapsed = _reveal_duration()
 		return
 	if shot_index + 1 >= SHOTS.size():
 		finish(false)
@@ -145,11 +149,8 @@ func _set_shot(index: int) -> void:
 	fade.tween_property(transition, "color:a", 0.0, 1.0).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	beat.emit(str(shot.beat))
 
-func _remaining_time() -> float:
-	var remaining := maxf(0.0, float(SHOTS[shot_index].duration) - shot_elapsed)
-	for index in range(shot_index + 1, SHOTS.size()):
-		remaining += float(SHOTS[index].duration)
-	return remaining
+func _reveal_duration() -> float:
+	return clampf(str(SHOTS[shot_index].line).length() * 0.026, 0.7, 2.6)
 
 func _build_interface() -> void:
 	var wash := ColorRect.new()
@@ -200,6 +201,7 @@ func _build_interface() -> void:
 	chapter.offset_bottom = 60
 	chapter.add_theme_font_size_override("font_size", 11)
 	chapter.add_theme_color_override("font_color", COPPER)
+	chapter.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(chapter)
 	chapter_label = chapter
 
@@ -218,24 +220,29 @@ func _build_interface() -> void:
 	panel_style.content_margin_top = 17
 	panel_style.content_margin_bottom = 16
 	subtitle_panel.add_theme_stylebox_override("panel", panel_style)
+	subtitle_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(subtitle_panel)
 
 	var copy := VBoxContainer.new()
 	copy.add_theme_constant_override("separation", 5)
+	copy.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	subtitle_panel.add_child(copy)
 	eyebrow = Label.new()
 	eyebrow.add_theme_font_size_override("font_size", 10)
 	eyebrow.add_theme_color_override("font_color", COPPER)
+	eyebrow.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	copy.add_child(eyebrow)
 	speaker = Label.new()
 	speaker.add_theme_font_size_override("font_size", 12)
 	speaker.add_theme_color_override("font_color", Color("#e5bd8a"))
+	speaker.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	copy.add_child(speaker)
 	dialogue = Label.new()
 	dialogue.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	dialogue.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	dialogue.add_theme_font_size_override("font_size", 23)
 	dialogue.add_theme_color_override("font_color", CREAM)
+	dialogue.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	copy.add_child(dialogue)
 
 	progress = Label.new()
@@ -250,6 +257,7 @@ func _build_interface() -> void:
 	progress.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	progress.add_theme_font_size_override("font_size", 9)
 	progress.add_theme_color_override("font_color", MUTED)
+	progress.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(progress)
 
 	transition = ColorRect.new()
@@ -270,7 +278,7 @@ func _apply_responsive_layout() -> void:
 		subtitle_panel.anchor_bottom = 0.88
 		progress.offset_left = -210
 		progress.offset_right = 210
-		progress.text = "TAP TO ADVANCE  ·  SKIP AT TOP RIGHT"
+		progress.text = "TAP TO CONTINUE  ·  SKIP AT TOP RIGHT"
 		skip_button.offset_left = -126
 		skip_button.offset_top = 18
 		skip_button.offset_right = -18
