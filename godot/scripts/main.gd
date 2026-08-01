@@ -1038,7 +1038,7 @@ func _refresh(force_structure := false) -> void:
 	ui.objective.text = _decision_objective() if str(state.pending_issue) != "" else simulation.objective_text()
 	ui.batch.text = "%s · %.1f L · QUALITY %d · SAFETY %d" % [state.batch.recipe, float(state.batch.volume_l), int(state.batch.quality), int(state.batch.safety)]
 	ui.inventory.visible = operations_mode
-	ui.inventory.text = "FREE STOCK · malt %.1f kg · hops %.0f g · yeast %.0f · kegs %.0f" % [float(state.inventory.malt.quantity), float(state.inventory.citrus_hops.quantity) * 1000.0, float(state.inventory.yeast.quantity), float(state.inventory.empty_keg.quantity)]
+	ui.inventory.text = "FREE STOCK · malt %.1f kg · hops %.0f g · yeast %.0f · casks %.0f" % [float(state.inventory.malt.quantity), float(state.inventory.citrus_hops.quantity) * 1000.0, float(state.inventory.yeast.quantity), float(state.inventory.empty_keg.quantity)]
 	ui.jobs.text = _jobs_text()
 	ui.jobs.tooltip_text = _jobs_tooltip()
 	ui.wait_button.visible = not simulation.get_active_jobs().is_empty()
@@ -1109,7 +1109,7 @@ func _rebuild_batch_rail() -> void:
 		if int(station.get("condition", 100)) < lowest_condition:
 			lowest_condition = int(station.get("condition", 100))
 			worn_station = str(station.get("name", "station"))
-	ui.operations_forecast.text = "FREE · malt %.1f kg · hops %.0f g\nPACK · yeast %d · kegs %d\nDEMAND · local %d · premium %d · reliability %d\nCAPACITY · %d / 4 occupied" % [
+	ui.operations_forecast.text = "FREE · malt %.1f kg · hops %.0f g\nPACK · yeast %d · casks %d\nDEMAND · local %d · premium %d · reliability %d\nCAPACITY · %d / 4 occupied" % [
 		float(resources.get("malt_kg", 0.0)),
 		float(resources.get("hops_kg", 0.0)) * 1000.0,
 		int(resources.get("yeast", 0)),
@@ -1331,7 +1331,7 @@ func _rebuild_capacity_choices() -> void:
 		card.add_child(heading)
 		var terms := Label.new()
 		var resources: Dictionary = opportunity.get("resources", {})
-		terms.text = "%s\nNEEDS · %.1f kg malt · %.0f g hops · %d yeast · %d keg · %d staff hours · ¤%d\nCURRENT RESPONSE · %s" % [
+		terms.text = "%s\nNEEDS · %.1f kg malt · %.0f g hops · %d yeast · %d cask · %d staff hours · ¤%d\nCURRENT RESPONSE · %s" % [
 			str(opportunity.effect),
 			float(resources.get("malt_kg", 0.0)),
 			float(resources.get("hops_kg", 0.0)) * 1000.0,
@@ -1556,7 +1556,7 @@ func _decision_objective() -> String:
 	if simulation.state.stage == "delivery_recovery":
 		return "Choose how the estate responds before the result reaches the council ledger."
 	if simulation.state.stage == "capacity_planning":
-		return "Respond to both opportunities, balancing malt, kegs, staff hours, cash, and fermenter overlap."
+		return "Respond to both opportunities, balancing malt, casks, staff hours, cash, and fermenter overlap."
 	if simulation.state.stage == "operations_council":
 		return "Compare every delivery, rejected promise, demand shift, and resource cost before setting the estate's priority."
 	return simulation.objective_text()
@@ -1579,7 +1579,7 @@ func _consequence_text() -> String:
 		var board: Dictionary = state.get("capacity_board", {})
 		var constraints: Dictionary = board.get("constraints", {})
 		var pressure: Dictionary = board.get("pressure", {})
-		return "AVAILABLE · %.1f kg malt · %.0f g hops · %d yeast · %d kegs · %d staff hours · ¤%d\nPRESSURE · %s · fermenter overlap %s" % [float(constraints.get("malt_kg", 0.0)), float(constraints.get("hops_kg", 0.0)) * 1000.0, int(constraints.get("yeast", 0)), int(constraints.get("kegs", 0)), int(constraints.get("staff_hours", pressure.get("staff_hours_available", 0))), int(constraints.get("cash", 0)), "simultaneous commitments" if bool(pressure.get("simultaneous", false)) else "single commitment", "yes" if bool(pressure.get("fermenter_overlap", false)) else "no"]
+		return "AVAILABLE · %.1f kg malt · %.0f g hops · %d yeast · %d casks · %d staff hours · ¤%d\nPRESSURE · %s · fermenter overlap %s" % [float(constraints.get("malt_kg", 0.0)), float(constraints.get("hops_kg", 0.0)) * 1000.0, int(constraints.get("yeast", 0)), int(constraints.get("kegs", 0)), int(constraints.get("staff_hours", pressure.get("staff_hours_available", 0))), int(constraints.get("cash", 0)), "simultaneous commitments" if bool(pressure.get("simultaneous", false)) else "single commitment", "yes" if bool(pressure.get("fermenter_overlap", false)) else "no"]
 	if state.stage == "operations_council":
 		var fulfilled := 0
 		var strained := 0
@@ -1667,13 +1667,13 @@ func _handle_story_transition(state: Dictionary) -> void:
 				_set_status("Opening Commission · fermentation is active; loading-court and packaging preparation can proceed.", true)
 			"conditioning":
 				$World.show_feedback("Seven days of fermentation are complete. The beer settles for packaging on Day 10.", true)
-				_set_status("Opening Commission · the first keg can be packaged on Day 10.", true)
+				_set_status("Opening Commission · the first cask can be packaged on Day 10.", true)
 			"ready_to_package":
-				$World.show_feedback("Fermentation is complete. The first keg can be filled.", true)
-				_set_status("Assign Maëlle or another packager to fill the first keg.", true)
+				$World.show_feedback("Fermentation is complete. The first cask can be filled.", true)
+				_set_status("Assign Maëlle or another packager to fill the first cask.", true)
 			"ready_to_serve":
-				$World.show_feedback("The keg is ready for the loading court and the village inn.", true)
-				_set_status("Opening Commission · load the keg, then deliver it on Day 11.", true)
+				$World.show_feedback("The cask is ready for the loading court and the village inn.", true)
+				_set_status("Opening Commission · load the cask, then deliver it on Day 11.", true)
 			"council":
 				$World.show_feedback("The village-inn account is settled. Apolline opens the ledger.", true)
 				_set_status("Time is paused for the Opening Commission financial review." if str(state.get("campaign_phase", "")) == "opening_commission" else "Time is paused for the Week %d council." % int(state.get("week_number", 1)), true)

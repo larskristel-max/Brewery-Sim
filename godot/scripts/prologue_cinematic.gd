@@ -20,6 +20,15 @@ const SHOTS := [
 		"beat": "bell"
 	},
 	{
+		"focus": Vector2(0.90, 0.42),
+		"zoom": 1.38,
+		"eyebrow": "WHAT THE BAILIFF LEFT",
+		"speaker": "COUNTESS CÉCILE DE VALENNE",
+		"role": "COUNTESS OF VALENNE",
+		"line": "He left the harness. It bears our crest; no buyer wants another family’s pride.",
+		"beat": "ledger"
+	},
+	{
 		"focus": Vector2(0.79, 0.27),
 		"zoom": 1.30,
 		"eyebrow": "THE ESTATE LEDGER",
@@ -44,6 +53,15 @@ const SHOTS := [
 		"speaker": "APOLLINE DE VALENNE",
 		"role": "",
 		"line": "The brewery? It needs repairs, fuel, ingredients, labour, and a brewmaster. None of those comes cheaply.",
+		"beat": "ledger"
+	},
+	{
+		"focus": Vector2(0.90, 0.42),
+		"zoom": 1.18,
+		"eyebrow": "THE COUNTESS’S RELATIONS",
+		"speaker": "COUNTESS CÉCILE DE VALENNE",
+		"role": "COUNTESS OF VALENNE",
+		"line": "The Three Lanterns will take one trial cask. Saint-Odile will spare us a fresh yeast pitch. I can open those doors. I cannot make the beer.",
 		"beat": "ledger"
 	},
 	{
@@ -79,7 +97,7 @@ const SHOTS := [
 		"eyebrow": "CASTLE BREWMASTER",
 		"speaker": "COUNT ARMAND DE VALENNE",
 		"role": "",
-		"line": "The brewery is yours to run. You may direct its staff, request supplies, and decide how the beer is made.",
+		"line": "The brewery is yours to run. In brewery work, its staff answer to you. The estate does not—not yet.",
 		"beat": "appointment"
 	},
 	{
@@ -88,7 +106,7 @@ const SHOTS := [
 		"eyebrow": "THE ACCOUNTS",
 		"speaker": "APOLLINE DE VALENNE",
 		"role": "ACTING ADMINISTRATOR",
-		"line": "Bring me the cost of the first batch before you spend a franc. I will decide what Valenne can risk.",
+		"line": "Bring me the cost of the first batch before you spend a franc. Name the risk and I may defend it. Hide it and I will stop you.",
 		"beat": "ledger"
 	},
 	{

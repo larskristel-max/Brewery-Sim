@@ -18,7 +18,7 @@ Staff have shifts, skills, energy, rapport and visible assignments. The campaign
 
 “Nocturne in the Old Stables” combines blue-hour exteriors with tungsten work light, damp limestone, burnished copper, cream paper, oxblood seals, and ink-black UI. Every key scene should show named people doing visible work with their hands. The courtyard becomes warmer and more populated as community trust rises.
 
-The vertical slice uses six staged 2.5D environments rather than one static background: Count Armand’s appointment, the working brewery floor, a hands-on mash intervention, tactile keg packaging, Night of First Lights in the courtyard, and the weekly council. Dynamic station hotspots, truthful named-worker assignment cards, camera focus and parallax, job progress, steam, liquid, transfer flow, condensation, lantern flicker, and trust-responsive courtyard warmth reveal the live simulation state while painted people remain atmospheric.
+The vertical slice uses six staged 2.5D environments rather than one static background: Count Armand’s appointment, the working brewery floor, a hands-on mash intervention, tactile cask packaging, Night of First Lights in the courtyard, and the weekly council. Dynamic station hotspots, truthful named-worker assignment cards, camera focus and parallax, job progress, steam, liquid, transfer flow, condensation, lantern flicker, and trust-responsive courtyard warmth reveal the live simulation state while painted people remain atmospheric.
 
 The ink-and-cream management interface stays in compact edge docks during normal work. The brewery floor is the primary interaction surface: selecting equipment focuses the camera and reveals only that station’s valid commands. A right-side judgment panel appears for brewing problems and council choices. The canvas scales at 1280×720 and 1600×900 and expands instead of distorting on 21:9 displays.
 
@@ -36,7 +36,7 @@ Imported packs are calibration/reference material. Game balance and authored fic
 2. **Old Stables in Motion** — fixed 2.5D gameplay view with four readable work zones and named staff.
 3. **Lantern Blonde Decision** — close hands-on brewing intervention: valve, thermometer, gravity sample, steam, copper.
 4. **Night of First Lights** — blue-hour courtyard service with Noor, Inez, Maëlle, Jules, the Count, and Apolline.
-5. **First Keg** — Maëlle, Inez, and the Brewmaster package the first 20 L keg by hand.
+5. **First Cask** — Maëlle, Inez, and the Brewmaster package the first 20 L returnable cask by hand.
 6. **Weekly Council** — Apolline opens the ledger while the Count weighs the Brewmaster’s first promotion.
 
 Generated plates must use fictional heraldry and contain no readable generated labels, real logo, collage, grid, or watermark.

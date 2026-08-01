@@ -30,7 +30,7 @@ const SHOTS := [
 		"eyebrow": "THE BREWHOUSE",
 		"speaker": "NARRATION",
 		"role": "",
-		"line": "Dust covers the copper. Soot cakes the hearth, and debris blocks the chimney above it.",
+		"line": "Dust covers the copper. Soot cakes the hearth. Beneath the grime, an old hammered repair still holds.",
 		"beat": "lamp"
 	},
 	{
@@ -38,7 +38,7 @@ const SHOTS := [
 		"eyebrow": "THE ESTATE STAFF",
 		"speaker": "NARRATION",
 		"role": "",
-		"line": "Footsteps cross the yard. On Apolline’s orders, four members of the estate staff report to the Old Stables.",
+		"line": "Four lanterns cross the yard. On Apolline’s orders, four members of the estate staff report to the Old Stables.",
 		"beat": "arrival"
 	},
 	{
@@ -54,7 +54,7 @@ const SHOTS := [
 		"eyebrow": "MAËLLE RENARD",
 		"speaker": "MAËLLE",
 		"role": "PACKAGING AND SALES",
-		"line": "The village innkeeper will take one trial keg. Make it worth serving, and I’ll see it casked and delivered.",
+		"line": "The Three Lanterns will take one trial cask. Make it worth serving, and I’ll see it filled and delivered.",
 		"beat": "arrival"
 	},
 	{
@@ -70,7 +70,7 @@ const SHOTS := [
 		"eyebrow": "INEZ DE WILDE",
 		"speaker": "INEZ",
 		"role": "ESTATE QUARTERMASTER",
-		"line": "Brewmaster [PLAYER NAME], the bakehouse can spare eighteen kilos of malt and one crock of fresh yeast.",
+		"line": "Brewmaster [PLAYER NAME], the estate granary holds eighteen kilos of sound pale malt. Saint-Odile’s morning cart will bring one fresh yeast pitch.",
 		"beat": "ledger"
 	},
 	{
@@ -78,7 +78,7 @@ const SHOTS := [
 		"eyebrow": "THE MISSING HOPS",
 		"speaker": "INEZ",
 		"role": "ESTATE QUARTERMASTER",
-		"line": "There are no hops in store. Wild vines grow beside the millstream, but their cones must be inspected before use.",
+		"line": "There are no hops in store. Old vines grow beside the millstream, but every usable cone must be inspected.",
 		"beat": "ledger"
 	},
 	{
@@ -94,7 +94,7 @@ const SHOTS := [
 		"eyebrow": "THE COPPER BREWHOUSE",
 		"speaker": "JULES",
 		"role": "CELLAR HAND AND MAINTENANCE",
-		"line": "I’ll see to the chimney. Inspect the copper, Brewmaster, then decide what repairs to order.",
+		"line": "I’ll see to the chimney. The old copper patch is ugly, but it held before. Inspect it, Brewmaster, then decide what we can trust.",
 		"beat": "work"
 	}
 ]

@@ -59,7 +59,7 @@ func new_campaign(player_name := "Henri", coat_index := 0) -> void:
 		},
 		"promise": {
 			"plan_id": "first_lights",
-			"name": "Village Inn First Keg",
+			"name": "Village Inn First Cask",
 			"venue": "village_inn",
 			"guests": 40,
 			"deadline_minute": 10 * 24 * 60 + 20 * 60,
@@ -67,11 +67,11 @@ func new_campaign(player_name := "Henri", coat_index := 0) -> void:
 			"status": "accepted"
 		},
 		"inventory": {
-			"malt": {"lot_id":"LOT-MALT-BAKEHOUSE", "quantity":18.0, "unit":"kg", "quality":82, "source":"estate_bakehouse"},
-			"yeast": {"lot_id":"LOT-YEAST-BAKEHOUSE", "quantity":1.0, "unit":"crock", "quality":78, "source":"estate_bakehouse"},
+			"malt": {"lot_id":"LOT-MALT-GRANARY", "quantity":18.0, "unit":"kg", "quality":82, "source":"estate_granary"},
+			"yeast": {"lot_id":"LOT-YEAST-SAINT-ODILE", "quantity":1.0, "unit":"pitch", "quality":78, "source":"brasserie_saint_odile"},
 			"citrus_hops": {"lot_id":"LOT-HOP-WILD", "quantity":0.0, "unit":"kg", "quality":0, "source":"millstream_wild_vines", "status":"requires_inspection"},
 			"garden_herbs": {"lot_id":"LOT-GARDEN-001", "quantity":0.12, "unit":"kg", "quality":88},
-			"empty_keg": {"lot_id":"LOT-KEG-001", "quantity":2.0, "unit":"keg", "quality":74}
+			"empty_keg": {"lot_id":"LOT-CASK-001", "quantity":2.0, "unit":"cask", "quality":74}
 		},
 		"stations": {
 			"brewhouse": {"name":"Copper brewhouse", "cleanliness":38, "condition":62, "busy":false},
@@ -151,20 +151,20 @@ func get_available_actions() -> Array:
 		"fermenting", "conditioning":
 			if not state.courtyard_prepared:
 				actions.append(_action("prepare_courtyard", "Arrange delivery to the village inn" if _is_opening_commission() else "Prepare the long table", "courtyard", 180, "service"))
-			if not state.labels_prepared: actions.append(_action("prepare_labels", "Prepare keg collars", "packaging", 60, "packaging"))
+			if not state.labels_prepared: actions.append(_action("prepare_labels", "Prepare cask collars", "packaging", 60, "packaging"))
 			if int(state.stations.packaging.cleanliness) < 75: actions.append(_action("clean_packaging", "Clean and sanitize the filler", "packaging", 45, "maintenance"))
 			if not state.get("production_queue", []).is_empty() and not bool(state.production_queue[0].get("prepared", false)):
 				actions.append(_action("prepare_next_batch", "Stage the next grain bill", "brewhouse", 120, "brewing"))
 		"ready_to_package":
 			if int(state.stations.packaging.cleanliness) < 75: actions.append(_action("clean_packaging", "Clean and sanitize the filler", "packaging", 45, "maintenance"))
-			else: actions.append(_action("package", "Fill the first 20 L keg", "packaging", 120, "packaging"))
+			else: actions.append(_action("package", "Fill the first 20 L cask", "packaging", 120, "packaging"))
 		"ready_to_serve":
 			if not state.courtyard_prepared:
 				actions.append(_action("prepare_courtyard", "Arrange delivery to the village inn" if _is_opening_commission() else "Prepare the long table", "courtyard", 180, "service"))
 			if _is_opening_commission() and state.courtyard_prepared and not bool(state.get("first_keg_loaded", false)):
-				actions.append(_action("load_first_keg", "Load the first keg", "courtyard", 45, "service"))
+				actions.append(_action("load_first_keg", "Load the first cask", "courtyard", 45, "service"))
 			elif _is_opening_commission() and bool(state.get("opening_delivery_window_open", false)) and state.courtyard_prepared:
-				actions.append(_action("serve", "Deliver the first keg to the village inn", "courtyard", 90, "service"))
+				actions.append(_action("serve", "Deliver the first cask to the village inn", "courtyard", 90, "service"))
 			elif not _is_opening_commission() and state.courtyard_prepared:
 				actions.append(_action("serve", "Serve %s" % str(state.promise.name), "courtyard", 90, "service"))
 	return actions
@@ -315,13 +315,13 @@ func _validate_action_start(action_id: String) -> Dictionary:
 			if state.inventory.yeast.quantity < 1: return _fail("No viable yeast pitch remains.")
 			if state.stations.fermenter.cleanliness < 75: return _fail("The fermenter must be cleaned and purged first.")
 		"package":
-			if state.inventory.empty_keg.quantity < 1: return _fail("No empty keg is available.")
+			if state.inventory.empty_keg.quantity < 1: return _fail("No empty cask is available.")
 			if state.stations.packaging.cleanliness < 75: return _fail("The filler must be cleaned and sanitized first.")
 		"load_first_keg":
-			if float(state.batch.get("packaged_l", 0.0)) <= 0.0: return _fail("Package the first keg before loading it.")
-			if not bool(state.courtyard_prepared): return _fail("Arrange the village-inn delivery before loading the keg.")
+			if float(state.batch.get("packaged_l", 0.0)) <= 0.0: return _fail("Package the first cask before loading it.")
+			if not bool(state.courtyard_prepared): return _fail("Arrange the village-inn delivery before loading the cask.")
 		"serve":
-			if _is_opening_commission() and not bool(state.get("first_keg_loaded", false)): return _fail("Load the first keg before delivery.")
+			if _is_opening_commission() and not bool(state.get("first_keg_loaded", false)): return _fail("Load the first cask before delivery.")
 			if _is_opening_commission() and not bool(state.get("opening_delivery_window_open", false)): return _fail("The village inn delivery is scheduled for Day 11.")
 	return _ok("")
 
@@ -417,7 +417,7 @@ func _complete_failed_job(job: Dictionary) -> void:
 			message = "The process fails before completion. Quality and equipment condition suffer, and the work must be repeated."
 		"package":
 			state.batch.safety = maxi(0, int(state.batch.safety) - 4)
-			message = "The kegging run fails its seal check. The committed keg is lost and packaging must be attempted again."
+			message = "The casking run fails its seal check. The committed cask is lost and packaging must be attempted again."
 		"prepare_courtyard", "load_first_keg", "serve", "deliver":
 			message = "The village-inn delivery preparation breaks down. Time and energy are spent, but the objective remains incomplete."
 	state.last_job_result = {"status":"failed","action":action_id,"message":message,"minute":int(state.game_minute),"risk":int(job.get("failure_risk", 0)),"roll":int(job.get("resolution_roll", 100))}
@@ -823,7 +823,7 @@ func choose_week_plan(plan_id: String) -> Dictionary:
 	if selected.is_empty(): return _fail("That production commitment is not available.")
 	state.active_week_plan = plan_id
 	state.cash += int(selected.advance)
-	# Each weekly patron supplies the dedicated culture and returnable keg needed
+	# Each weekly patron supplies the dedicated culture and returnable cask needed
 	# for their commission; malt remains the estate's binding production input.
 	state.inventory.yeast.quantity += 1.0
 	state.inventory.empty_keg.quantity += 1.0
@@ -944,7 +944,7 @@ func begin_next_week() -> Dictionary:
 	return _ok("Week %d is ready for a production commitment." % int(state.week_number))
 
 func _open_capacity_board() -> void:
-	# The prospective partners send one shared returnable keg and two fresh
+	# The prospective partners send one shared returnable cask and two fresh
 	# yeast crocks with their proposals. This makes accepted + renegotiated terms operationally possible
 	# after two real deliveries, while two full contracts still exceed staff and
 	# (on the reserve route) malt capacity.
@@ -982,7 +982,7 @@ func _capacity_opportunity_definitions() -> Array:
 	return [
 		{
 			"id":"abbey_table",
-			"label":"Abbey harvest table",
+			"label":"Abbey winter table",
 			"recipe":"Lantern Blonde",
 			"effect":"Due in 8 days · community trust · overlaps inn preparation",
 			"advance":360,
@@ -1056,7 +1056,7 @@ func respond_to_capacity_opportunity(opportunity_id: String, decision: String) -
 		return _ok("%s declined." % definition.label)
 	var resources: Dictionary = definition.resources.duplicate(true)
 	if decision == "renegotiate": resources = _renegotiated_resources(resources)
-	if not _capacity_can_reserve(resources): return _fail("The estate lacks malt, hops, yeast, kegs, staff hours, or working cash for those terms.")
+	if not _capacity_can_reserve(resources): return _fail("The estate lacks malt, hops, yeast, casks, staff hours, or working cash for those terms.")
 	for resource_id in resources:
 		state.capacity_board.reserved[resource_id] = float(state.capacity_board.reserved[resource_id]) + float(resources[resource_id])
 	state.capacity_board.reserved.kegs = int(state.capacity_board.reserved.kegs)
@@ -1728,8 +1728,8 @@ func load_game(path := "user://old_stables_save.json") -> Dictionary:
 	if not state.promise.has("plan_id"): state.promise.plan_id = str(state.active_week_plan)
 	if not state.promise.has("quality_target"): state.promise.quality_target = 58
 	if not state.promise.has("venue") and (_is_opening_commission() or int(state.get("week_number", 1)) == 1): state.promise.venue = "village_inn"
-	if state.inventory.has("malt") and not state.inventory.malt.has("source"): state.inventory.malt.source = "estate_bakehouse"
-	if state.inventory.has("yeast") and not state.inventory.yeast.has("source"): state.inventory.yeast.source = "estate_bakehouse"
+	if state.inventory.has("malt") and not state.inventory.malt.has("source"): state.inventory.malt.source = "estate_granary"
+	if state.inventory.has("yeast") and not state.inventory.yeast.has("source"): state.inventory.yeast.source = "brasserie_saint_odile"
 	if state.inventory.has("citrus_hops") and not state.inventory.citrus_hops.has("status"): state.inventory.citrus_hops.status = "requires_inspection" if float(state.inventory.citrus_hops.quantity) <= 0.0 else "usable"
 	if bool(state.operations_active): _sync_active_batch_legacy()
 	_touch()
@@ -1761,7 +1761,7 @@ func objective_text() -> String:
 		"recommission": return "SELECT THE COPPER BREWHOUSE TO INSPECT ITS CONDITION." if not bool(state.get("brewhouse_inspected", false)) else "Review the copper’s condition, then assign its recommissioning work."
 		"awaiting_brew_day": return "The copper is being made safe. Advance to Day 2 for the first mash and boil."
 		"week_planning": return "Choose which Week %d commitment the Old Stables will accept." % int(state.week_number)
-		"capacity_planning": return "Answer both overlapping opportunities within the estate's malt, keg, staff, and cash limits."
+		"capacity_planning": return "Answer both overlapping opportunities within the estate's malt, cask, staff, and cash limits."
 		"operations": return "Choose which batch, worker, and station receives the next block of capacity."
 		"operations_council": return "Review every fulfilled, strained, and rejected commitment."
 		"ready_to_mash": return "Commit %.1f kg of malt and begin %s." % [float(state.batch.get("malt_kg", 4.2)), str(state.batch.recipe)]
@@ -1769,11 +1769,11 @@ func objective_text() -> String:
 		"ready_to_transfer": return "Transfer, pitch the house yeast, and seal the fermenter."
 		"fermenting": return "Arrange delivery to the village inn while fermentation works." if _is_opening_commission() else "Prepare the estate while fermentation works."
 		"conditioning": return "The seven-day fermentation is complete. Let the opening batch settle until Day 10."
-		"ready_to_package": return "Package the finished beer into the first 20 L keg."
+		"ready_to_package": return "Package the finished beer into the first 20 L cask."
 		"ready_to_serve":
-			if _is_opening_commission() and not bool(state.get("first_keg_loaded", false)): return "Load the first keg in the loading court."
-			if _is_opening_commission() and not bool(state.get("opening_delivery_window_open", false)): return "The first keg is loaded. Advance to the Day 11 village-inn delivery."
-			return "Deliver the first keg through the village inn." if _is_opening_commission() else "Keep the promise: open the courtyard and serve the batch."
+			if _is_opening_commission() and not bool(state.get("first_keg_loaded", false)): return "Load the first cask in the loading court."
+			if _is_opening_commission() and not bool(state.get("opening_delivery_window_open", false)): return "The first cask is loaded. Advance to the Day 11 village-inn delivery."
+			return "Deliver the first cask through the village inn." if _is_opening_commission() else "Keep the promise: open the courtyard and serve the batch."
 		"delivery_recovery": return "Choose how the Old Stables will recover the strained delivery."
 		"council": return "Complete the Opening Commission financial review." if _is_opening_commission() else "Face Apolline and the Count at the weekly council."
 		"complete": return "Choose any restoration investment, then begin the next brewing week."

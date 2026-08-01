@@ -21,22 +21,35 @@ Constraints: Preserve character ages, costumes, and noble-workshop tone from the
 Avoid: Villainous expressions, modern objects, fantasy magic, excessive luxury, empty generic boardroom, cropped hands.
 ```
 
-## First keg packaging
+## Countess Cécile at the appointment
+
+Output: `godot/assets/scenes/appointment.png`
+
+```text
+Use case: precise-object-edit
+Asset type: 16:9 historical narrative game scene set in fictional Valenne in 1901
+Primary request: Add Countess Cécile de Valenne as a distinct fourth character near the stable doorway, visually separate from Apolline's ledger work. She is a composed aristocratic woman in her late fifties holding two sealed correspondence packets: one from the Three Lanterns and one from Saint-Odile. Her bearing and the letters should communicate that her relationships create access, while the Count retains the key and Apolline retains the accounts.
+Input image: The existing appointment image is the edit target and identity, composition, lighting, costume and texture reference.
+Composition/framing: Preserve the key exchange, all existing figures and the ledger. Keep all four heads inside the cinematic safe area and leave the lower subtitle area readable.
+Constraints: Exactly four people; period-appropriate clothing; fictional heraldry; no readable text, modern objects, captions, watermark, duplicated figures or cropped heads.
+```
+
+## First cask packaging
 
 Output: `godot/assets/scenes/packaging.png`
 
 ```text
 Use case: stylized-concept
 Asset type: 16:9 background plate for a PC-first 2.5D brewery management game
-Primary request: Create a hands-on packaging scene in the Old Stables brewery. Maëlle Renard, the capable taproom lead, fills the first 20-liter stainless keg from a compact transfer line while Inez De Wilde, the estate quartermaster, checks a cream paper keg collar and the Brewmaster steadies the hose connection. Their named-character identities should be visually distinct even though no text appears. The work is careful, practical, communal, and visibly authentic.
+Primary request: Create a hands-on packaging scene in the Old Stables brewery. Maëlle Renard, the capable packaging lead, fills a small returnable coopered transport cask from the brewery's copper outlet while Inez De Wilde, the estate quartermaster, checks a cream paper cask collar and the Brewmaster steadies the connection. Their named-character identities should be visually distinct even though no text appears. The work is careful, practical, communal, and visibly authentic to 1901.
 Input images: Old Stables in Motion is the stable architecture, equipment, cast-world, and blue-hour reference. Mash Intervention is the close-up hands, tactile realism, copper-lighting, and cinematic-detail reference.
-Scene/backdrop: Restored stone stable packaging bench beside copper and stainless brewing equipment, crates and clean keg hardware, glimpses of the blue-hour courtyard beyond.
+Scene/backdrop: Restored stone stable packaging bench beside copper brewing equipment, wooden crates, clean cask hardware and hand tools, with glimpses of the blue-hour courtyard beyond.
 Style/medium: Richly detailed cinematic painterly realism matching the supplied references, polished game background.
-Composition/framing: Wide 16:9; the filling keg, three pairs of working hands, hose clamp, and keg collar are the visual focus in the center-left; far right 30 percent quieter and darker for a compact contextual UI panel; faces and critical hands remain outside that UI-safe zone.
+Composition/framing: Wide 16:9; the filling cask, three pairs of working hands, connection, bung and cask collar are the visual focus in the center-left; far right 30 percent quieter and darker for a compact contextual UI panel; faces and critical hands remain outside that UI-safe zone.
 Lighting/mood: Warm lantern and copper reflections against deep blue stable shadows, purposeful, intimate, satisfying completion.
-Color palette: Cream paper, ink black, burnished copper, cool stainless steel, restrained oxblood accent, deep blue shadows.
-Materials/textures: Damp limestone, scratched oak, brushed stainless keg, braided hose, condensation, wet copper reflections, cloth work coats.
-Constraints: Accurate brewery packaging equipment and connections; expressive anatomically correct hands; same grounded period-workshop world; fictional heraldry only; no readable text; no labels; no UI; no collage; no grid; no watermark.
+Color palette: Cream paper, ink black, burnished copper, warm oak, restrained oxblood accent, deep blue shadows.
+Materials/textures: Damp limestone, scratched oak, coopered transport cask, dark iron hoops, braided hose, wet copper reflections, cloth work coats.
+Constraints: Accurate small-brewery packaging equipment and a returnable coopered cask appropriate to 1901; expressive anatomically correct hands; same grounded period-workshop world; fictional heraldry only; no readable text; no labels; no UI; no collage; no grid; no watermark.
 Avoid: Modern industrial factory, glossy advertisement staging, plastic disposable cups, unsafe open transfer, floating tools, extra fingers, cropped primary hands.
 ```
 

@@ -4,17 +4,20 @@ const WORLD_SCRIPT := preload("res://scripts/concept_world.gd")
 const PROLOGUE_SCRIPT := preload("res://scripts/prologue_cinematic.gd")
 const FACE_POINTS := {
 	"count": Vector2(0.29, 0.19),
-	"apolline": Vector2(0.80, 0.25)
+	"apolline": Vector2(0.78, 0.25),
+	"cecile": Vector2(0.92, 0.27)
 }
 const SPEAKER_SHOTS := {
-	1: "apolline",
-	2: "count",
-	3: "apolline",
-	4: "count",
-	5: "apolline",
+	1: "cecile",
+	2: "apolline",
+	3: "count",
+	4: "apolline",
+	5: "cecile",
 	6: "count",
-	7: "count",
-	8: "apolline"
+	7: "apolline",
+	8: "count",
+	9: "count",
+	10: "apolline"
 }
 const VIEWPORT_CASES := [
 	Vector2(1280, 720),

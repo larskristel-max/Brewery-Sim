@@ -32,7 +32,7 @@
   "capacity_opportunities": [
     {
       "id": "abbey_table",
-      "name": "Abbey harvest table",
+      "name": "Abbey winter table",
       "recipe": "Lantern Blonde",
       "advance": 360,
       "deadline_days": 8,

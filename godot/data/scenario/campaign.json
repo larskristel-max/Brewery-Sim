@@ -7,8 +7,8 @@
   "rival":{"id":"apolline","name":"Apolline de Valenne","position":"acting_administrator","motive":"save_the_estate_through_financial_discipline"},
   "opening_runway":{"days":42,"precision":"approximate","basis":"current_estate_cash"},
   "opening_supplies":{
-    "malt":{"quantity":18,"unit":"kg","source":"estate_bakehouse"},
-    "yeast":{"quantity":1,"unit":"crock","source":"estate_bakehouse"},
+    "malt":{"quantity":18,"unit":"kg","source":"estate_granary"},
+    "yeast":{"quantity":1,"unit":"pitch","source":"brasserie_saint_odile"},
     "hops":{"quantity":0,"unit":"kg","source":"millstream_wild_vines","status":"requires_inspection"}
   },
   "initial_sales_venue":"village_inn",

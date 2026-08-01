@@ -24,9 +24,10 @@ func _capture() -> void:
 		return
 	instance._start_opening_story()
 	var prologue_names := [
-		"01-last-carriage-horse.png", "02-estate-ledger.png", "03-one-asset-remains.png",
-		"04-old-brewery.png", "05-count-proposal.png", "06-apolline-warning.png",
-		"07-why-summoned.png", "08-castle-brewmaster.png", "09-accounts.png", "10-appointment.png"
+		"01-last-carriage-horse.png", "02-bailiff-left.png", "03-estate-ledger.png",
+		"04-one-asset-remains.png", "05-old-brewery.png", "06-countess-relations.png",
+		"07-count-proposal.png", "08-apolline-warning.png", "09-why-summoned.png",
+		"10-castle-brewmaster.png", "11-accounts.png", "12-appointment.png"
 	]
 	for index in range(prologue_names.size()):
 		await _settle(2.8)
@@ -35,16 +36,17 @@ func _capture() -> void:
 
 	instance.ui.prologue.finish(true)
 	await _settle(0.5)
-	await _save("11-appointment-ledger.png")
+	await _save("13-appointment-ledger.png")
 	instance.begin_campaign_with("Éloïse", 0)
 	await _settle(2.8)
-	await _save("12-stable-doors-closed.png")
+	await _save("14-stable-doors-closed.png")
 	instance.ui.awakening._open_doors()
 	await _settle(1.2)
 
 	var awakening_names := [
-		"13-brewhouse.png", "14-jules.png", "15-maelle.png", "16-noor.png",
-		"17-inez-supplies.png", "18-missing-hops.png", "19-work-begins.png", "20-copper-brewhouse.png"
+		"15-brewhouse.png", "16-estate-staff.png", "17-jules.png", "18-maelle.png",
+		"19-noor.png", "20-inez-supplies.png", "21-missing-hops.png",
+		"22-work-begins.png", "23-copper-brewhouse.png"
 	]
 	for index in range(awakening_names.size()):
 		await _settle(2.8)

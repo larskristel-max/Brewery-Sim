@@ -19,7 +19,7 @@ func _run() -> void:
 	await process_frame
 	await process_frame
 	_expect(instance.prologue_active, "Opening title did not begin the story prologue")
-	_expect(instance.ui.prologue.SHOTS.size() == 10, "Approved ten-beat opening script was not loaded")
+	_expect(instance.ui.prologue.SHOTS.size() == 12, "Approved twelve-beat opening script was not loaded")
 	_expect(instance.speed == 0, "Estate clock ran underneath the prologue")
 	var prologue_index := int(instance.ui.prologue.shot_index)
 	instance.ui.prologue.shot_elapsed = 999.0
@@ -176,8 +176,8 @@ func _run() -> void:
 	await _settle()
 	_expect(_select_staff(instance, "inez"), "Could not select Inez for label preparation")
 	await _settle()
-	var labels := _find_button(instance.ui.actions, "Prepare keg collars")
-	_expect(labels != null, "Packaging hotspot did not expose keg-collar preparation")
+	var labels := _find_button(instance.ui.actions, "Prepare cask collars")
+	_expect(labels != null, "Packaging hotspot did not expose cask-collar preparation")
 	if labels: labels.pressed.emit()
 	await _settle()
 	var fermentation_guard := 0
@@ -190,18 +190,18 @@ func _run() -> void:
 
 	_expect(_select_staff(instance, "maelle"), "Could not select Maëlle for packaging")
 	await _settle()
-	var package := _find_button(instance.ui.actions, "Fill the first 20 L keg")
-	_expect(package != null, "Packaging scene did not expose keg filling")
+	var package := _find_button(instance.ui.actions, "Fill the first 20 L cask")
+	_expect(package != null, "Packaging scene did not expose cask filling")
 	if package: package.pressed.emit()
 	await _settle()
 	instance.ui.wait_button.pressed.emit()
 	await _settle()
 	_expect(instance.simulation.state.stage == "ready_to_serve", "Packaging did not prepare village-inn delivery")
-	_expect(await _complete_station_action(instance, "World/CourtyardHotspot", "Load the first keg", "player"), "The first keg could not be loaded in the loading court")
+	_expect(await _complete_station_action(instance, "World/CourtyardHotspot", "Load the first cask", "player"), "The first cask could not be loaded in the loading court")
 	if not bool(instance.simulation.state.opening_delivery_window_open):
 		instance.ui.wait_button.pressed.emit()
 		await _settle()
-	_expect(await _complete_station_action(instance, "World/CourtyardHotspot", "Deliver the first keg to the village inn", "player"), "Village-inn delivery command was not usable")
+	_expect(await _complete_station_action(instance, "World/CourtyardHotspot", "Deliver the first cask to the village inn", "player"), "Village-inn delivery command was not usable")
 	_expect(instance.simulation.state.stage == "council", "Courtyard service did not reach the weekly council")
 	var council_choice := _find_button(instance.ui.choices, "Restore stable lighting")
 	_expect(council_choice != null, "Weekly council choices were not rendered")
@@ -286,7 +286,7 @@ func _run() -> void:
 	if not bool(instance.simulation.state.courtyard_prepared):
 		_expect(await _complete_station_action(instance, "World/CourtyardHotspot", "Prepare the long table", "noor"), "Week 2 courtyard preparation could not be completed")
 	if not bool(instance.simulation.state.labels_prepared):
-		_expect(await _complete_station_action(instance, "World/PackagingHotspot", "Prepare keg collars", "inez"), "Week 2 packaging preparation could not be completed")
+		_expect(await _complete_station_action(instance, "World/PackagingHotspot", "Prepare cask collars", "inez"), "Week 2 packaging preparation could not be completed")
 	if int(instance.simulation.state.stations.packaging.cleanliness) < 75 and instance.simulation.state.stage == "fermenting":
 		_expect(await _complete_station_action(instance, "World/PackagingHotspot", "Clean and sanitize the filler", "inez"), "Week 2 filler cleaning could not be completed")
 	var week_two_fermentation_guard := 0
@@ -298,7 +298,7 @@ func _run() -> void:
 	_expect(instance.simulation.state.stage == "ready_to_package", "Stable Amber fermentation did not reach packaging")
 	if int(instance.simulation.state.stations.packaging.cleanliness) < 75:
 		_expect(await _complete_station_action(instance, "World/PackagingHotspot", "Clean and sanitize the filler", "inez"), "Week 2 filler was not recoverable before packaging")
-	_expect(await _complete_station_action(instance, "World/PackagingHotspot", "Fill the first 20 L keg", "maelle"), "Stable Amber packaging could not be completed")
+	_expect(await _complete_station_action(instance, "World/PackagingHotspot", "Fill the first 20 L cask", "maelle"), "Stable Amber packaging could not be completed")
 	_expect(instance.simulation.state.stage == "ready_to_serve", "Stable Amber packaging did not reach delivery")
 	var recovery_seed: Dictionary = instance.simulation.state.duplicate(true)
 	_expect(await _complete_station_action(instance, "World/CourtyardHotspot", "Serve Count's Cellar Reserve", "maelle"), "The Count's reserve could not be delivered")
@@ -319,7 +319,7 @@ func _run() -> void:
 	_expect(instance.simulation.state.stage == "capacity_planning", "Week 2 did not open the capacity board")
 	_expect(instance.speed == 0, "Estate clock ran underneath capacity negotiation")
 	_expect(instance.ui.decision_title.text == "Two opportunities, finite capacity", "Capacity conflict did not receive a player-facing title")
-	_expect(instance.ui.consequence.text.contains("malt") and instance.ui.consequence.text.contains("kegs") and instance.ui.consequence.text.contains("staff hours"), "Capacity board did not expose its limiting resources")
+	_expect(instance.ui.consequence.text.contains("malt") and instance.ui.consequence.text.contains("casks") and instance.ui.consequence.text.contains("staff hours"), "Capacity board did not expose its limiting resources")
 	_expect(_fits_in_viewport(instance, instance.ui.decision_panel), "Capacity board overflowed the 1280x720 viewport")
 	if instance.simulation.state.stage == "capacity_planning":
 		await _finish_opening_route_test(instance)
@@ -344,7 +344,7 @@ func _run() -> void:
 	_expect(instance.simulation.state.production_batches.size() == 2, "Capacity plan did not create two independent production batches")
 	_expect(instance.ui.batch_rail_panel.visible and instance.ui.batch_rail.get_child_count() == 2, "Live production did not render two selectable batch cards")
 	_expect(instance.ui.operations_forecast.text.contains("DEMAND") and instance.ui.operations_forecast.text.contains("CAPACITY"), "Production board did not expose demand and station capacity")
-	_expect(instance.ui.inventory.visible and instance.ui.inventory.text.contains("yeast") and instance.ui.inventory.text.contains("kegs"), "Production board did not expose free ingredient and packaging stock")
+	_expect(instance.ui.inventory.visible and instance.ui.inventory.text.contains("yeast") and instance.ui.inventory.text.contains("casks"), "Production board did not expose free ingredient and packaging stock")
 	_expect(_fits_in_viewport(instance, instance.ui.command_dock), "Expanded production board overflowed the 1280x720 viewport: dock pos=%s size=%s viewport=%s" % [instance.ui.command_dock.position, instance.ui.command_dock.size, instance.size])
 	await _verify_save_load(instance, "live multi-batch operations")
 	_expect(_select_staff(instance, "player"), "Could not select the Brewmaster for live production")
