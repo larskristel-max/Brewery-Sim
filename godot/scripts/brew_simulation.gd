@@ -1,8 +1,13 @@
 class_name BrewSimulation
 extends RefCounted
 
-const SAVE_VERSION := 1
+const SAVE_VERSION := 2
 const FERMENTATION_MINUTES := 7 * 24 * 60
+const OPENING_BREW_DAY_MINUTE := 1 * 24 * 60 + 7 * 60
+const OPENING_PACKAGE_DAY_MINUTE := 9 * 24 * 60 + 7 * 60
+const OPENING_DELIVERY_DAY_MINUTE := 10 * 24 * 60 + 7 * 60
+const BASE_FAILURE_RISK := {0: 60, 1: 25, 2: 8, 3: 2}
+const DIFFICULTY_FAILURE_MODIFIER := {1: 0, 2: 5, 3: 10}
 
 var state: Dictionary = {}
 var revision := 0
@@ -20,7 +25,8 @@ func new_campaign(player_name := "Henri", coat_index := 0) -> void:
 		"restoration": 8,
 		"authority_rank": 1,
 		"authority_role": "Castle Brewmaster",
-		"week_number": 1,
+		"campaign_phase": "opening_commission",
+		"week_number": 0,
 		"active_week_plan": "first_lights",
 		"authority_unlocks": ["brew", "clean", "ingredient_requests", "release_recommendations"],
 		"authority_ladder": [
@@ -35,6 +41,12 @@ func new_campaign(player_name := "Henri", coat_index := 0) -> void:
 		"campaign_lost": false,
 		"stage": "appointment",
 		"brewhouse_inspected": false,
+		"opening_brew_day_ready": false,
+		"opening_delivery_window_open": false,
+		"first_keg_loaded": false,
+		"opening_commission_result": {},
+		"resolution_cursor": 0,
+		"last_job_result": {},
 		"batch": {
 			"id": "BATCH-LANTERN-001",
 			"recipe": "Lantern Blonde",
@@ -50,14 +62,14 @@ func new_campaign(player_name := "Henri", coat_index := 0) -> void:
 			"name": "Village Inn First Keg",
 			"venue": "village_inn",
 			"guests": 40,
-			"deadline_minute": 11 * 24 * 60 + 20 * 60,
+			"deadline_minute": 10 * 24 * 60 + 20 * 60,
 			"quality_target": 58,
 			"status": "accepted"
 		},
 		"inventory": {
 			"malt": {"lot_id":"LOT-MALT-BAKEHOUSE", "quantity":18.0, "unit":"kg", "quality":82, "source":"estate_bakehouse"},
 			"yeast": {"lot_id":"LOT-YEAST-BAKEHOUSE", "quantity":1.0, "unit":"crock", "quality":78, "source":"estate_bakehouse"},
-			"citrus_hops": {"lot_id":"LOT-HOP-WILD", "quantity":0.0, "unit":"kg", "quality":0, "source":"millstream_vines", "status":"requires_inspection"},
+			"citrus_hops": {"lot_id":"LOT-HOP-WILD", "quantity":0.0, "unit":"kg", "quality":0, "source":"millstream_wild_vines", "status":"requires_inspection"},
 			"garden_herbs": {"lot_id":"LOT-GARDEN-001", "quantity":0.12, "unit":"kg", "quality":88},
 			"empty_keg": {"lot_id":"LOT-KEG-001", "quantity":2.0, "unit":"keg", "quality":74}
 		},
@@ -65,13 +77,13 @@ func new_campaign(player_name := "Henri", coat_index := 0) -> void:
 			"brewhouse": {"name":"Copper brewhouse", "cleanliness":38, "condition":62, "busy":false},
 			"fermenter": {"name":"Stable fermenter 01", "cleanliness":64, "condition":71, "busy":false},
 			"packaging": {"name":"Manual filler", "cleanliness":58, "condition":54, "busy":false},
-			"courtyard": {"name":"Estate loading court", "cleanliness":70, "condition":45, "busy":false}
+			"courtyard": {"name":"Loading court", "cleanliness":70, "condition":45, "busy":false}
 		},
 		"staff": {
 			"player": _staff(player_name, "Castle Brewmaster", 360, 1380, {"brewing":3,"maintenance":2,"packaging":2,"service":1}),
-			"jules": _staff("Jules Lambert", "Cellar hand", 360, 960, {"brewing":2,"maintenance":3,"packaging":1,"service":1}),
-			"maelle": _staff("Maëlle Renard", "Taproom and packaging", 600, 1320, {"brewing":1,"maintenance":1,"packaging":3,"service":3}),
-			"noor": _staff("Noor Benali", "Hospitality cook", 720, 1320, {"brewing":0,"maintenance":1,"packaging":1,"service":3}),
+			"jules": _staff("Jules Lambert", "Cellar hand and maintenance", 360, 960, {"brewing":2,"maintenance":3,"packaging":1,"service":1}),
+			"maelle": _staff("Maëlle Renard", "Packaging and sales", 600, 1320, {"brewing":1,"maintenance":1,"packaging":3,"service":3}),
+			"noor": _staff("Noor Benali", "Hospitality cook", 720, 1320, {"brewing":0,"maintenance":0,"packaging":1,"service":3}),
 			"inez": _staff("Inez De Wilde", "Estate quartermaster", 420, 1020, {"brewing":1,"maintenance":2,"packaging":2,"service":2})
 		},
 		"jobs": [],
@@ -128,7 +140,7 @@ func get_available_actions() -> Array:
 	if state.pending_issue != "": return actions
 	match state.stage:
 		"appointment": actions.append(_action("accept_key", "Accept the stable key", "estate", 0, "service"))
-		"recommission": actions.append(_action("recommission", "Clean and recommission brewhouse", "brewhouse", 75, "maintenance"))
+		"recommission": actions.append(_action("recommission", "Recommission the copper brewhouse", "brewhouse", 75, "maintenance"))
 		"ready_to_mash":
 			if int(state.stations.brewhouse.cleanliness) < 70: actions.append(_action("clean_brewhouse", "Clean and sanitize the brewhouse", "brewhouse", 60, "maintenance"))
 			else: actions.append(_action("mash", "Mash in %s" % str(state.batch.recipe), "brewhouse", 90, "brewing"))
@@ -136,9 +148,9 @@ func get_available_actions() -> Array:
 		"ready_to_transfer":
 			if int(state.stations.fermenter.cleanliness) < 75: actions.append(_action("clean_fermenter", "Clean and purge fermenter", "fermenter", 45, "maintenance"))
 			else: actions.append(_action("transfer", "Transfer and pitch yeast", "fermenter", 45, "brewing"))
-		"fermenting":
+		"fermenting", "conditioning":
 			if not state.courtyard_prepared:
-				actions.append(_action("prepare_courtyard", "Arrange the village inn delivery" if int(state.week_number) == 1 else "Prepare the long table", "courtyard", 180, "service"))
+				actions.append(_action("prepare_courtyard", "Arrange delivery to the village inn" if _is_opening_commission() else "Prepare the long table", "courtyard", 180, "service"))
 			if not state.labels_prepared: actions.append(_action("prepare_labels", "Prepare keg collars", "packaging", 60, "packaging"))
 			if int(state.stations.packaging.cleanliness) < 75: actions.append(_action("clean_packaging", "Clean and sanitize the filler", "packaging", 45, "maintenance"))
 			if not state.get("production_queue", []).is_empty() and not bool(state.production_queue[0].get("prepared", false)):
@@ -148,13 +160,107 @@ func get_available_actions() -> Array:
 			else: actions.append(_action("package", "Fill the first 20 L keg", "packaging", 120, "packaging"))
 		"ready_to_serve":
 			if not state.courtyard_prepared:
-				actions.append(_action("prepare_courtyard", "Arrange the village inn delivery" if int(state.week_number) == 1 else "Prepare the long table", "courtyard", 180, "service"))
-			else:
-				actions.append(_action("serve", "Deliver the first keg to the village inn" if int(state.week_number) == 1 else "Serve %s" % str(state.promise.name), "courtyard", 90, "service"))
+				actions.append(_action("prepare_courtyard", "Arrange delivery to the village inn" if _is_opening_commission() else "Prepare the long table", "courtyard", 180, "service"))
+			if _is_opening_commission() and state.courtyard_prepared and not bool(state.get("first_keg_loaded", false)):
+				actions.append(_action("load_first_keg", "Load the first keg", "courtyard", 45, "service"))
+			elif _is_opening_commission() and bool(state.get("opening_delivery_window_open", false)) and state.courtyard_prepared:
+				actions.append(_action("serve", "Deliver the first keg to the village inn", "courtyard", 90, "service"))
+			elif not _is_opening_commission() and state.courtyard_prepared:
+				actions.append(_action("serve", "Serve %s" % str(state.promise.name), "courtyard", 90, "service"))
 	return actions
 
 func _action(id: String, label: String, station: String, duration: int, skill: String) -> Dictionary:
-	return {"id":id,"label":label,"station":station,"duration":duration,"skill":skill}
+	var profile := _task_profile(id, skill)
+	return {
+		"id":id,
+		"label":label,
+		"station":station,
+		"duration":duration,
+		"skill":skill,
+		"required_skill":str(profile.required_skill),
+		"difficulty":int(profile.difficulty),
+		"safety_critical":bool(profile.safety_critical),
+		"failure_consequence":str(profile.failure_consequence)
+	}
+
+func _task_profile(action_id: String, fallback_skill: String) -> Dictionary:
+	var base_action := action_id
+	if action_id.begins_with("ops::"):
+		base_action = action_id.get_slice("::", 2)
+	var profile := {
+		"required_skill":fallback_skill,
+		"difficulty":1,
+		"safety_critical":false,
+		"failure_consequence":"Time and staff energy are spent; the work must be attempted again."
+	}
+	match base_action:
+		"recommission":
+			profile.difficulty = 2
+			profile.safety_critical = true
+			profile.failure_consequence = "The safety check fails and brewhouse condition falls by 2."
+		"clean_fermenter":
+			profile.difficulty = 2
+			profile.safety_critical = true
+			profile.failure_consequence = "Sanitation remains incomplete; time, energy, and cleaning supplies are spent."
+		"repair_brewhouse", "repair_fermenter", "repair_packaging":
+			profile.difficulty = 2
+			profile.safety_critical = true
+			profile.failure_consequence = "The equipment remains unsafe and loses 2 condition."
+		"boil", "transfer", "package":
+			profile.difficulty = 2
+			profile.failure_consequence = "Committed time and materials are lost; quality or equipment condition may suffer."
+		"mash":
+			profile.failure_consequence = "The committed malt is lost and the mash must be attempted again."
+		"clean_brewhouse", "clean_packaging":
+			profile.failure_consequence = "Cleaning remains incomplete and the spent supplies cannot be recovered."
+		"prepare_courtyard", "load_first_keg", "serve", "deliver":
+			profile.failure_consequence = "The delivery preparation remains incomplete and must be attempted again."
+	return profile
+
+func _is_opening_commission() -> bool:
+	return str(state.get("campaign_phase", "weekly_management")) == "opening_commission"
+
+func get_assignment_preview(action: Dictionary, staff_id: String) -> Dictionary:
+	if not state.staff.has(staff_id):
+		return {"blocked":true,"block_reason":"Choose a worker before starting this work order.","duration":int(action.get("duration", 0)),"failure_risk":0,"skill_level":0,"required_skill":str(action.get("required_skill", action.get("skill", "")))}
+	var required_skill := str(action.get("required_skill", action.get("skill", "")))
+	var skill_level := int(state.staff[staff_id].skills.get(required_skill, 0))
+	var safety_critical := bool(action.get("safety_critical", false))
+	var blocked := safety_critical and skill_level == 0
+	var block_reason := ""
+	if blocked:
+		block_reason = "This work requires %s experience. Assign a qualified worker." % required_skill
+	return {
+		"blocked":blocked,
+		"block_reason":block_reason,
+		"duration":estimate_action_duration(action, staff_id),
+		"failure_risk":_failure_risk(skill_level, int(action.get("difficulty", 1))),
+		"skill_level":skill_level,
+		"required_skill":required_skill,
+		"safety_critical":safety_critical,
+		"failure_consequence":str(action.get("failure_consequence", "Time and energy are spent; the work must be attempted again."))
+	}
+
+func _failure_risk(skill_level: int, difficulty: int) -> int:
+	var safe_skill := clampi(skill_level, 0, 3)
+	var safe_difficulty := clampi(difficulty, 1, 3)
+	return mini(80, int(BASE_FAILURE_RISK.get(safe_skill, 60)) + int(DIFFICULTY_FAILURE_MODIFIER.get(safe_difficulty, 0)))
+
+func _duration_multiplier(skill_level: int) -> float:
+	match clampi(skill_level, 0, 3):
+		3: return 0.733333
+		2: return 0.88
+		1: return 1.20
+		_: return 1.50
+
+func _next_resolution_roll() -> int:
+	if state.has("next_resolution_roll_override"):
+		var overridden := clampi(int(state.next_resolution_roll_override), 1, 100)
+		state.erase("next_resolution_roll_override")
+		return overridden
+	var cursor := int(state.get("resolution_cursor", 0))
+	state.resolution_cursor = cursor + 1
+	return ((90 + cursor * 17) % 100) + 1
 
 func start_action(action_id: String, staff_id := "player") -> Dictionary:
 	if action_id.begins_with("ops::"):
@@ -168,9 +274,9 @@ func start_action(action_id: String, staff_id := "player") -> Dictionary:
 	if definition.station != "estate" and state.stations[definition.station].busy: return _fail("That station is already occupied.")
 	var validation := _validate_action_start(action_id)
 	if not validation.ok: return validation
-	var skill_level := int(state.staff[staff_id].skills.get(definition.skill, 0))
-	if skill_level <= 0: return _fail("%s lacks the required %s skill." % [state.staff[staff_id].name, definition.skill])
-	var adjusted_duration: int = maxi(15, int(definition.duration * (1.12 - skill_level * 0.08)))
+	var preview := get_assignment_preview(definition, staff_id)
+	if bool(preview.blocked): return _fail(str(preview.block_reason))
+	var adjusted_duration := int(preview.duration)
 	var job := {
 		"id": "JOB-%03d" % (state.jobs.size() + 1),
 		"action": action_id,
@@ -179,15 +285,23 @@ func start_action(action_id: String, staff_id := "player") -> Dictionary:
 		"staff_id": staff_id,
 		"started": state.game_minute,
 		"ends": state.game_minute + adjusted_duration,
-		"status": "active"
+		"status": "active",
+		"required_skill":str(definition.required_skill),
+		"skill_level":int(preview.skill_level),
+		"difficulty":int(definition.difficulty),
+		"safety_critical":bool(definition.safety_critical),
+		"failure_risk":int(preview.failure_risk),
+		"resolution_roll":_next_resolution_roll(),
+		"failure_consequence":str(definition.failure_consequence)
 	}
+	job.will_fail = int(job.resolution_roll) <= int(job.failure_risk)
 	state.jobs.append(job)
 	state.staff[staff_id].assignment = job.id
 	state.stations[definition.station].busy = true
 	_apply_start_costs(action_id)
 	_log("%s assigns %s to %s." % [state.player.name, state.staff[staff_id].name, definition.label])
 	_touch()
-	return _ok("%s started; %d game minutes." % [definition.label, adjusted_duration])
+	return _ok("%s started; %d minutes · %d%% failure risk." % [definition.label, adjusted_duration, int(job.failure_risk)])
 
 func _validate_action_start(action_id: String) -> Dictionary:
 	match action_id:
@@ -203,6 +317,12 @@ func _validate_action_start(action_id: String) -> Dictionary:
 		"package":
 			if state.inventory.empty_keg.quantity < 1: return _fail("No empty keg is available.")
 			if state.stations.packaging.cleanliness < 75: return _fail("The filler must be cleaned and sanitized first.")
+		"load_first_keg":
+			if float(state.batch.get("packaged_l", 0.0)) <= 0.0: return _fail("Package the first keg before loading it.")
+			if not bool(state.courtyard_prepared): return _fail("Arrange the village-inn delivery before loading the keg.")
+		"serve":
+			if _is_opening_commission() and not bool(state.get("first_keg_loaded", false)): return _fail("Load the first keg before delivery.")
+			if _is_opening_commission() and not bool(state.get("opening_delivery_window_open", false)): return _fail("The village inn delivery is scheduled for Day 11.")
 	return _ok("")
 
 func _apply_start_costs(action_id: String) -> void:
@@ -244,25 +364,64 @@ func advance_to_next_milestone() -> Dictionary:
 	var next_end := 999999999
 	for job in active: next_end = min(next_end, int(job.ends))
 	advance(max(1, next_end - int(state.game_minute)))
+	var result: Dictionary = state.get("last_job_result", {})
+	if int(result.get("minute", -1)) == int(state.game_minute) and str(result.get("status", "")) == "failed":
+		return _fail(str(result.get("message", "The work order failed and must be attempted again.")))
 	return _ok("Time advanced to the next production milestone.")
 
 func _complete_due_jobs() -> void:
 	for index in range(state.jobs.size()):
 		var job: Dictionary = state.jobs[index]
 		if job.status == "active" and int(job.ends) <= int(state.game_minute):
-			job.status = "complete"
+			var failed := bool(job.get("will_fail", false)) if job.has("failure_risk") else false
+			job.status = "failed" if failed else "complete"
 			state.jobs[index] = job
 			if job.staff_id != "system":
 				state.staff[job.staff_id].assignment = ""
-				var energy_cost := 8
-				if bool(job.get("operations", false)):
-					energy_cost = maxi(5, int(ceil(float(int(job.ends) - int(job.started)) / 60.0 * 6.0)))
+				var energy_cost := _job_energy_cost(job)
 				state.staff[job.staff_id].energy = max(10, int(state.staff[job.staff_id].energy) - energy_cost)
-			if job.station != "fermentation_clock": state.stations[job.station].busy = false
-			if bool(job.get("operations", false)):
+			if state.stations.has(str(job.station)): state.stations[job.station].busy = false
+			if failed:
+				_complete_failed_job(job)
+			elif bool(job.get("operations", false)):
 				_complete_operations_action(job)
 			else:
 				_complete_action(job.action, job.staff_id)
+
+func _job_energy_cost(job: Dictionary) -> int:
+	var minutes := maxi(15, int(job.ends) - int(job.started))
+	var skill_level := int(job.get("skill_level", 1))
+	var skill_factor := 0.72 if skill_level >= 3 else 0.86 if skill_level == 2 else 1.0 if skill_level == 1 else 1.18
+	return maxi(4, int(ceil(float(minutes) / 60.0 * 6.0 * skill_factor)))
+
+func _complete_failed_job(job: Dictionary) -> void:
+	var action_id := str(job.get("base_action", job.get("action", "work")))
+	var message := "The work is incomplete. Time and staff energy are spent, and the task must be attempted again."
+	match action_id:
+		"recommission":
+			state.stations.brewhouse.condition = maxi(0, int(state.stations.brewhouse.condition) - 2)
+			message = "The chimney still draws poorly, and the hearth fails its safety check. The brewhouse cannot be lit yet."
+		"clean_fermenter":
+			state.stations.fermenter.cleanliness = mini(74, int(state.stations.fermenter.cleanliness) + 6)
+			message = "The fermenter fails its sanitation check. Cleaning supplies are spent, but it must be cleaned again."
+		"repair_brewhouse", "repair_fermenter", "repair_packaging":
+			var station_id := str(job.station)
+			state.stations[station_id].condition = maxi(0, int(state.stations[station_id].condition) - 2)
+			message = "%s remains unsafe and loses 2 condition during the failed repair." % str(state.stations[station_id].name)
+		"mash":
+			state.batch.quality = maxi(0, int(state.batch.quality) - 4)
+			message = "The mash cannot be recovered. The committed malt, time, and staff energy are lost."
+		"boil", "transfer":
+			state.batch.quality = maxi(0, int(state.batch.quality) - 3)
+			state.stations[str(job.station)].condition = maxi(0, int(state.stations[str(job.station)].condition) - 1)
+			message = "The process fails before completion. Quality and equipment condition suffer, and the work must be repeated."
+		"package":
+			state.batch.safety = maxi(0, int(state.batch.safety) - 4)
+			message = "The kegging run fails its seal check. The committed keg is lost and packaging must be attempted again."
+		"prepare_courtyard", "load_first_keg", "serve", "deliver":
+			message = "The village-inn delivery preparation breaks down. Time and energy are spent, but the objective remains incomplete."
+	state.last_job_result = {"status":"failed","action":action_id,"message":message,"minute":int(state.game_minute),"risk":int(job.get("failure_risk", 0)),"roll":int(job.get("resolution_roll", 100))}
+	_log("Failed: %s — %s" % [str(job.get("label", action_id)), message])
 
 func _complete_action(action_id: String, staff_id: String) -> void:
 	var skill_bonus := 0
@@ -275,6 +434,13 @@ func _complete_action(action_id: String, staff_id: String) -> void:
 			state.stations.packaging.cleanliness = 78
 			state.batch.safety += 6
 			state.restoration += 4
+			if _is_opening_commission() and int(state.game_minute) < OPENING_BREW_DAY_MINUTE:
+				state.stage = "awaiting_brew_day"
+				state.jobs.append(_system_job("opening_brew_day", "Brew day preparation", OPENING_BREW_DAY_MINUTE))
+			else:
+				state.stage = "ready_to_mash"
+		"opening_brew_day":
+			state.opening_brew_day_ready = true
 			state.stage = "ready_to_mash"
 		"clean_brewhouse":
 			state.stations.brewhouse.cleanliness = 92
@@ -301,10 +467,18 @@ func _complete_action(action_id: String, staff_id: String) -> void:
 			state.stage = "fermenting"
 			state.jobs.append({"id":"JOB-FERMENT","action":"fermentation","label":"Fermentation","station":"fermentation_clock","staff_id":"system","started":state.game_minute,"ends":state.game_minute+FERMENTATION_MINUTES,"status":"active"})
 		"fermentation":
-			state.stations.fermenter.busy = false
 			state.stations.fermenter.cleanliness = maxi(0, int(state.stations.fermenter.cleanliness) - 10)
 			state.batch.quality += 5
 			state.batch.flavor_tags.append("clean_fermentation")
+			if _is_opening_commission() and int(state.game_minute) < OPENING_PACKAGE_DAY_MINUTE:
+				state.stage = "conditioning"
+				state.stations.fermenter.busy = true
+				state.jobs.append(_system_job("opening_conditioning", "Opening batch settling", OPENING_PACKAGE_DAY_MINUTE))
+			else:
+				state.stations.fermenter.busy = false
+				state.stage = "ready_to_package"
+		"opening_conditioning":
+			state.stations.fermenter.busy = false
 			state.stage = "ready_to_package"
 		"prepare_courtyard":
 			state.courtyard_prepared = true
@@ -328,9 +502,20 @@ func _complete_action(action_id: String, staff_id: String) -> void:
 			state.batch.status = "packaged"
 			state.stations.packaging.cleanliness = maxi(0, int(state.stations.packaging.cleanliness) - 20)
 			state.stage = "ready_to_serve"
+			if _is_opening_commission() and not bool(state.get("opening_delivery_window_open", false)):
+				state.jobs.append(_system_job("opening_delivery_window", "Village inn delivery window", maxi(int(state.game_minute) + 1, OPENING_DELIVERY_DAY_MINUTE)))
 			state.staff.maelle.relationship = mini(100, int(state.staff.maelle.relationship) + 2)
+		"load_first_keg":
+			state.first_keg_loaded = true
+			state.staff.maelle.relationship = mini(100, int(state.staff.maelle.relationship) + 2)
+		"opening_delivery_window":
+			state.opening_delivery_window_open = true
 		"serve": _resolve_service()
+	state.last_job_result = {"status":"complete","action":action_id,"message":"Completed: %s." % action_id.replace("_", " ").capitalize(),"minute":int(state.game_minute)}
 	_log("Completed: %s." % action_id.replace("_", " ").capitalize())
+
+func _system_job(action_id: String, label: String, ends_at: int) -> Dictionary:
+	return {"id":"JOB-%03d" % (state.jobs.size() + 1),"action":action_id,"label":label,"station":"schedule_clock","staff_id":"system","started":int(state.game_minute),"ends":ends_at,"status":"active"}
 
 func choose_issue(option_id: String) -> Dictionary:
 	var issue := str(state.pending_issue)
@@ -418,7 +603,7 @@ func get_issue_options() -> Array:
 func _resolve_service(skip_recovery := false) -> void:
 	var quality: int = int(state.batch.quality)
 	var late: bool = int(state.game_minute) > int(state.promise.deadline_minute)
-	if int(state.get("week_number", 1)) >= 2 and not skip_recovery:
+	if not _is_opening_commission() and not skip_recovery:
 		var reasons: Array[String] = []
 		if quality < int(state.promise.get("quality_target", 58)): reasons.append("missed_quality")
 		if late: reasons.append("late_delivery")
@@ -544,7 +729,8 @@ func choose_delivery_recovery(option_id: String) -> Dictionary:
 	return _ok("The contract has been settled through %s." % option_id.replace("_", " "))
 
 func resolve_council(option_id: String) -> Dictionary:
-	if state.stage != "council": return _fail("The weekly council is not in session.")
+	if state.stage != "council": return _fail("The financial review is not in session.")
+	var closing_opening_commission := _is_opening_commission()
 	state.review_count += 1
 	var score := int(state.count_confidence) + int(state.community_trust) + int(state.restoration) + clampi(int(state.cash / 200), 0, 35)
 	match option_id:
@@ -567,7 +753,23 @@ func resolve_council(option_id: String) -> Dictionary:
 		evaluate_authority(score)
 	state.council_result = {"score":score,"choice":option_id,"probation":state.probation,"authority_rank":state.authority_rank}
 	state.stage = "complete"
-	_log("Apolline records the first weekly council decision.")
+	if closing_opening_commission:
+		state.opening_commission_result = {
+			"batch":state.batch.duplicate(true),
+			"promise":state.promise.duplicate(true),
+			"service_result":state.service_result.duplicate(true),
+			"issue_history":state.issue_history.duplicate(true),
+			"financial_review":state.council_result.duplicate(true),
+			"completed_minute":int(state.game_minute)
+		}
+		state.campaign_phase = "weekly_management"
+		state.week_number = 0
+		state.stations.courtyard.name = "Courtyard"
+		_log("Apolline closes the Opening Commission account.")
+		var weekly_start := begin_next_week()
+		if not bool(weekly_start.ok): return weekly_start
+		return _ok("Opening Commission complete. Week 1 management is ready for planning.")
+	_log("Apolline records the weekly council decision.")
 	_touch()
 	return _ok("Council review complete: %s." % state.authority_role)
 
@@ -621,7 +823,7 @@ func choose_week_plan(plan_id: String) -> Dictionary:
 	if selected.is_empty(): return _fail("That production commitment is not available.")
 	state.active_week_plan = plan_id
 	state.cash += int(selected.advance)
-	# Each Week 2 patron supplies the dedicated culture and returnable keg needed
+	# Each weekly patron supplies the dedicated culture and returnable keg needed
 	# for their commission; malt remains the estate's binding production input.
 	state.inventory.yeast.quantity += 1.0
 	state.inventory.empty_keg.quantity += 1.0
@@ -677,7 +879,8 @@ func begin_next_week() -> Dictionary:
 	if state.campaign_lost: return _fail("The estate must be recovered before brewing can continue.")
 	var completed_week := int(state.get("week_number", 1))
 	if not state.has("week_history"): state.week_history = []
-	state.week_history.append({
+	if completed_week > 0:
+		state.week_history.append({
 		"week_number": completed_week,
 		"batch": state.batch.duplicate(true),
 		"promise": state.promise.duplicate(true),
@@ -690,7 +893,7 @@ func begin_next_week() -> Dictionary:
 		"production_batches": state.get("production_batches", []).duplicate(true),
 		"operations_results": state.get("operations_results", []).duplicate(true),
 		"demand": state.get("demand", {}).duplicate(true)
-	})
+		})
 	state.week_number = completed_week + 1
 	state.batch = {
 		"id": "BATCH-UNSCHEDULED-%03d" % int(state.week_number),
@@ -729,13 +932,14 @@ func begin_next_week() -> Dictionary:
 		state.staff[staff_id].assignment = ""
 	for station_id in state.stations:
 		state.stations[station_id].busy = false
-	if completed_week >= 2:
+	var capacity_management_ready := completed_week >= 1 and int(state.get("review_count", 0)) >= 2
+	if capacity_management_ready:
 		_open_capacity_board()
 	else:
 		state.stage = "week_planning"
 		_log("Week %d begins with two competing production commitments." % int(state.week_number))
 	_touch()
-	if completed_week >= 2:
+	if capacity_management_ready:
 		return _ok("Week %d is ready for capacity planning." % int(state.week_number))
 	return _ok("Week %d is ready for a production commitment." % int(state.week_number))
 
@@ -981,6 +1185,7 @@ func _operations_actions_for_batch(batch_index: int) -> Array:
 	return actions
 
 func _operations_action(batch_id: String, base_action: String, label: String, station: String, duration: int, skill: String) -> Dictionary:
+	var profile := _task_profile(base_action, skill)
 	return {
 		"id":"ops::%s::%s" % [batch_id, base_action],
 		"base_action":base_action,
@@ -989,6 +1194,10 @@ func _operations_action(batch_id: String, base_action: String, label: String, st
 		"station":station,
 		"duration":duration,
 		"skill":skill,
+		"required_skill":str(profile.required_skill),
+		"difficulty":int(profile.difficulty),
+		"safety_critical":bool(profile.safety_critical),
+		"failure_consequence":str(profile.failure_consequence),
 		"cash_cost":_operations_action_cost(base_action)
 	}
 
@@ -1005,10 +1214,10 @@ func _start_operations_action(action_id: String, staff_id: String) -> Dictionary
 	if bool(state.stations[definition.station].busy): return _fail("%s is occupied by another batch." % state.stations[definition.station].name)
 	var validation := _validate_operations_start(definition)
 	if not bool(validation.ok): return validation
-	var skill_level := int(state.staff[staff_id].skills.get(definition.skill, 0))
-	if skill_level <= 0: return _fail("%s lacks the required %s skill." % [state.staff[staff_id].name, definition.skill])
+	var preview := get_assignment_preview(definition, staff_id)
+	if bool(preview.blocked): return _fail(str(preview.block_reason))
 	var energy := int(state.staff[staff_id].energy)
-	var adjusted_duration := estimate_action_duration(definition, staff_id)
+	var adjusted_duration := int(preview.duration)
 	var job := {
 		"id":"JOB-%03d" % (state.jobs.size() + 1),
 		"action":action_id,
@@ -1020,8 +1229,16 @@ func _start_operations_action(action_id: String, staff_id: String) -> Dictionary
 		"started":state.game_minute,
 		"ends":state.game_minute + adjusted_duration,
 		"status":"active",
-		"operations":true
+		"operations":true,
+		"required_skill":str(definition.required_skill),
+		"skill_level":int(preview.skill_level),
+		"difficulty":int(definition.difficulty),
+		"safety_critical":bool(definition.safety_critical),
+		"failure_risk":int(preview.failure_risk),
+		"resolution_roll":_next_resolution_roll(),
+		"failure_consequence":str(definition.failure_consequence)
 	}
+	job.will_fail = int(job.resolution_roll) <= int(job.failure_risk)
 	state.jobs.append(job)
 	state.staff[staff_id].assignment = job.id
 	state.stations[definition.station].busy = true
@@ -1032,18 +1249,19 @@ func _start_operations_action(action_id: String, staff_id: String) -> Dictionary
 	state.schedule_events.append({"minute":state.game_minute,"kind":"work_started","batch_id":definition.batch_id,"action":definition.base_action,"staff_id":staff_id,"station":definition.station})
 	_log("%s assigns %s to %s." % [state.player.name, state.staff[staff_id].name, definition.label])
 	_touch()
-	return _ok("%s started; %d minutes. Energy %d." % [definition.label, adjusted_duration, energy])
+	return _ok("%s started; %d minutes · %d%% failure risk · energy %d." % [definition.label, adjusted_duration, int(job.failure_risk), energy])
 
 func estimate_action_duration(action: Dictionary, staff_id: String) -> int:
 	var base_duration := int(action.get("duration", 0))
-	if not bool(state.get("operations_active", false)) or not state.staff.has(staff_id):
+	if not state.staff.has(staff_id):
 		return base_duration
-	var skill_level := int(state.staff[staff_id].skills.get(str(action.get("skill", "")), 0))
+	var required_skill := str(action.get("required_skill", action.get("skill", "")))
+	var skill_level := int(state.staff[staff_id].skills.get(required_skill, 0))
 	var fatigue_multiplier := 1.0
 	var energy := int(state.staff[staff_id].energy)
 	if energy < 50: fatigue_multiplier = 1.25
 	if energy < 30: fatigue_multiplier = 1.45
-	return maxi(15, int(float(base_duration) * (1.12 - skill_level * 0.08) * fatigue_multiplier))
+	return maxi(15, int(round(float(base_duration) * _duration_multiplier(skill_level) * fatigue_multiplier)))
 
 func _validate_operations_start(definition: Dictionary) -> Dictionary:
 	var base_action := str(definition.base_action)
@@ -1386,7 +1604,7 @@ func _has_actionable_parallel_work() -> bool:
 
 func _any_staff_can_do(action: Dictionary) -> bool:
 	for staff_id in state.staff:
-		if is_staff_available(staff_id) and int(state.staff[staff_id].skills.get(str(action.skill), 0)) > 0: return true
+		if is_staff_available(staff_id) and not bool(get_assignment_preview(action, staff_id).blocked): return true
 	return false
 
 func fund_restoration(project_id: String) -> Dictionary:
@@ -1424,6 +1642,12 @@ func get_restoration_options() -> Array:
 	return options
 
 func get_council_options() -> Array:
+	if _is_opening_commission():
+		return [
+			{"id":"reinvest","label":"Restore stable lighting","effect":"-¤320 · safer work · restoration gain"},
+			{"id":"pay_creditor","label":"Protect the estate runway","effect":"cash out · +runway · +Count confidence"},
+			{"id":"back_community","label":"Support the village inn launch","effect":"-¤220 · +community trust"}
+		]
 	return [
 		{"id":"reinvest","label":"Restore stable lighting","effect":"-¤320, major restoration gain"},
 		{"id":"pay_creditor","label":"Pay the urgent creditor","effect":"cash out, +runway, +Count confidence"},
@@ -1470,9 +1694,16 @@ func save_game(path := "user://old_stables_save.json") -> Dictionary:
 func load_game(path := "user://old_stables_save.json") -> Dictionary:
 	if not FileAccess.file_exists(path): return _fail("No campaign save exists yet.")
 	var parsed = JSON.parse_string(FileAccess.get_file_as_string(path))
-	if parsed == null or int(parsed.get("save_version", 0)) != SAVE_VERSION: return _fail("The save file is invalid or unsupported.")
+	var loaded_version := int(parsed.get("save_version", 0)) if parsed != null else 0
+	if parsed == null or loaded_version < 1 or loaded_version > SAVE_VERSION: return _fail("The save file is invalid or unsupported.")
 	state = parsed
-	if not state.has("week_number"): state.week_number = 1
+	state.save_version = SAVE_VERSION
+	if not state.has("campaign_phase"):
+		var legacy_opening_stages := ["appointment","recommission","awaiting_brew_day","ready_to_mash","ready_to_boil","ready_to_transfer","fermenting","conditioning","ready_to_package","ready_to_serve","council"]
+		var legacy_first_lights := str(state.get("active_week_plan", state.get("promise", {}).get("plan_id", ""))) == "first_lights"
+		state.campaign_phase = "opening_commission" if legacy_first_lights and int(state.get("review_count", 0)) == 0 and legacy_opening_stages.has(str(state.get("stage", ""))) else "weekly_management"
+	if not state.has("week_number"): state.week_number = 0 if _is_opening_commission() else 1
+	if _is_opening_commission() and int(state.week_number) == 1: state.week_number = 0
 	if not state.has("week_history"): state.week_history = []
 	if not state.has("active_week_plan"): state.active_week_plan = str(state.promise.get("plan_id", ""))
 	if not state.has("delivery_problem"): state.delivery_problem = {}
@@ -1486,10 +1717,17 @@ func load_game(path := "user://old_stables_save.json") -> Dictionary:
 	if not state.has("demand"): state.demand = {"community":50,"premium":45,"reliability":50}
 	if not state.has("last_energy_day"): state.last_energy_day = int(state.game_minute) / 1440
 	if not state.has("schedule_events"): state.schedule_events = []
+	if not state.has("opening_brew_day_ready"): state.opening_brew_day_ready = str(state.stage) not in ["appointment","recommission","awaiting_brew_day"]
+	if not state.has("opening_delivery_window_open"): state.opening_delivery_window_open = int(state.game_minute) >= OPENING_DELIVERY_DAY_MINUTE
+	if not state.has("first_keg_loaded"): state.first_keg_loaded = str(state.stage) in ["council","complete","week_planning","capacity_planning","operations","operations_council"]
+	if not state.has("opening_commission_result"): state.opening_commission_result = {}
+	if not state.has("resolution_cursor"): state.resolution_cursor = state.jobs.size()
+	if not state.has("last_job_result"): state.last_job_result = {}
 	if not state.has("brewhouse_inspected"): state.brewhouse_inspected = str(state.stage) != "appointment" and str(state.stage) != "recommission"
+	if not state.player.has("coat_index"): state.player.coat_index = 0
 	if not state.promise.has("plan_id"): state.promise.plan_id = str(state.active_week_plan)
 	if not state.promise.has("quality_target"): state.promise.quality_target = 58
-	if not state.promise.has("venue") and int(state.get("week_number", 1)) == 1: state.promise.venue = "village_inn"
+	if not state.promise.has("venue") and (_is_opening_commission() or int(state.get("week_number", 1)) == 1): state.promise.venue = "village_inn"
 	if state.inventory.has("malt") and not state.inventory.malt.has("source"): state.inventory.malt.source = "estate_bakehouse"
 	if state.inventory.has("yeast") and not state.inventory.yeast.has("source"): state.inventory.yeast.source = "estate_bakehouse"
 	if state.inventory.has("citrus_hops") and not state.inventory.citrus_hops.has("status"): state.inventory.citrus_hops.status = "requires_inspection" if float(state.inventory.citrus_hops.quantity) <= 0.0 else "usable"
@@ -1521,6 +1759,7 @@ func objective_text() -> String:
 	match state.stage:
 		"appointment": return "Accept the Count's mandate and take the stable key."
 		"recommission": return "SELECT THE COPPER BREWHOUSE TO INSPECT ITS CONDITION." if not bool(state.get("brewhouse_inspected", false)) else "Review the copper’s condition, then assign its recommissioning work."
+		"awaiting_brew_day": return "The copper is being made safe. Advance to Day 2 for the first mash and boil."
 		"week_planning": return "Choose which Week %d commitment the Old Stables will accept." % int(state.week_number)
 		"capacity_planning": return "Answer both overlapping opportunities within the estate's malt, keg, staff, and cash limits."
 		"operations": return "Choose which batch, worker, and station receives the next block of capacity."
@@ -1528,11 +1767,15 @@ func objective_text() -> String:
 		"ready_to_mash": return "Commit %.1f kg of malt and begin %s." % [float(state.batch.get("malt_kg", 4.2)), str(state.batch.recipe)]
 		"ready_to_boil": return "Boil the wort using the chosen ingredient plan."
 		"ready_to_transfer": return "Transfer, pitch the house yeast, and seal the fermenter."
-		"fermenting": return "Arrange the village inn delivery while fermentation works." if int(state.week_number) == 1 else "Prepare the estate while fermentation works."
+		"fermenting": return "Arrange delivery to the village inn while fermentation works." if _is_opening_commission() else "Prepare the estate while fermentation works."
+		"conditioning": return "The seven-day fermentation is complete. Let the opening batch settle until Day 10."
 		"ready_to_package": return "Package the finished beer into the first 20 L keg."
-		"ready_to_serve": return "Deliver the first keg through the village inn." if int(state.week_number) == 1 else "Keep the promise: open the courtyard and serve the batch."
+		"ready_to_serve":
+			if _is_opening_commission() and not bool(state.get("first_keg_loaded", false)): return "Load the first keg in the loading court."
+			if _is_opening_commission() and not bool(state.get("opening_delivery_window_open", false)): return "The first keg is loaded. Advance to the Day 11 village-inn delivery."
+			return "Deliver the first keg through the village inn." if _is_opening_commission() else "Keep the promise: open the courtyard and serve the batch."
 		"delivery_recovery": return "Choose how the Old Stables will recover the strained delivery."
-		"council": return "Face Apolline and the Count at the weekly council."
+		"council": return "Complete the Opening Commission financial review." if _is_opening_commission() else "Face Apolline and the Count at the weekly council."
 		"complete": return "Choose any restoration investment, then begin the next brewing week."
 	return "Restore the estate one batch at a time."
 

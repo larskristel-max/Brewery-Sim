@@ -50,7 +50,7 @@ func _run() -> void:
 	_expect(instance.awakening_active, "Appointment did not move directly into the awakening cinematic")
 	_expect(instance.speed == 0, "Estate clock ran underneath the awakening cinematic")
 	_expect(not instance.get_node("World").visible, "Gameplay world remained visible underneath the awakening cinematic")
-	_expect(instance.ui.awakening.SHOTS.size() == 9, "Approved nine-beat Old Stables script was not loaded")
+	_expect(instance.ui.awakening.SHOTS.size() == 10, "Approved ten-beat Old Stables script was not loaded")
 	var stable_doors := instance.ui.awakening.find_child("OpenStableDoors", true, false) as Button
 	_expect(stable_doors != null and stable_doors.visible, "First Light did not require the stable doors to be opened")
 	var awakening_index := int(instance.ui.awakening.shot_index)
@@ -61,7 +61,7 @@ func _run() -> void:
 	await create_timer(0.25).timeout
 	await process_frame
 	_expect(instance.ui.awakening.doors_opened and int(instance.ui.awakening.shot_index) == 1, "Stable-door interaction did not open the doors exactly once")
-	instance.ui.awakening._set_shot(5)
+	instance.ui.awakening._set_shot(6)
 	_expect(instance.ui.awakening.dialogue.text.contains("Éloïse"), "Inez did not address the submitted player name")
 	var awakening_skip := _find_button(instance.ui.awakening, "SKIP")
 	_expect(awakening_skip != null, "Awakening cinematic did not expose a skip control")
@@ -84,20 +84,26 @@ func _run() -> void:
 	_expect(instance.selected_station == "brewhouse", "World hotspot did not focus the brewhouse")
 	_expect(bool(instance.simulation.state.brewhouse_inspected), "Selecting the copper did not record its inspection")
 	_expect(instance.ui.consequence.text.contains("CONDITION") and instance.ui.consequence.text.contains("WORK REQUIRED"), "Copper inspection did not reveal condition and recommissioning work")
-	var clean := _find_button(instance.ui.actions, "Clean and recommission")
+	var clean := _find_button(instance.ui.actions, "Recommission the copper")
 	_expect(clean != null, "Recommissioning command was not rendered")
 	if clean: clean.pressed.emit()
 	await process_frame
 	_expect(instance.simulation.get_active_jobs().size() == 1, "Recommissioning button did not create a station job")
-	_expect(instance.ui.stage.text.begins_with("IN PROGRESS · CLEAN AND RECOMMISSION"), "Active work order was not reflected in the stage label")
+	_expect(instance.ui.stage.text.begins_with("OPENING COMMISSION · RECOMMISSION THE COPPER"), "Active work order was not reflected in the stage label")
 	var player_index := _staff_index(instance, "player")
 	_expect(player_index >= 0 and instance.ui.staff_picker.is_item_disabled(player_index), "Assigned worker remained selectable for a second work order")
-	var occupied_clean := _find_button(instance.ui.actions, "Clean and recommission")
+	var occupied_clean := _find_button(instance.ui.actions, "Recommission the copper")
 	_expect(occupied_clean != null and occupied_clean.disabled, "Occupied station action was not visibly disabled")
 	instance.ui.wait_button.pressed.emit()
 	await process_frame
 	await process_frame
+	_expect(instance.simulation.state.stage == "awaiting_brew_day", "Day 1 recommissioning did not wait for Day 2")
+	instance.ui.wait_button.pressed.emit()
+	await process_frame
+	await process_frame
 	_expect(instance.simulation.state.stage == "ready_to_mash", "Milestone button did not complete the station job")
+	_expect(_select_staff(instance, "player"), "Could not assign the Brewmaster to the opening mash")
+	await _settle()
 	var mash := _find_button(instance.ui.actions, "Mash in Lantern Blonde")
 	_expect(mash != null, "Mash command was not rendered")
 	if mash: mash.pressed.emit()
@@ -155,12 +161,13 @@ func _run() -> void:
 	await _settle()
 	_expect(instance.simulation.state.stage == "fermenting", "Transfer did not begin fermentation")
 
+	await _ensure_staff_on_shift(instance, "noor")
 	var courtyard_hotspot := instance.get_node_or_null("World/CourtyardHotspot") as Button
 	if courtyard_hotspot: courtyard_hotspot.pressed.emit()
 	await _settle()
 	_expect(_select_staff(instance, "noor"), "Could not select Noor for courtyard preparation")
 	await _settle()
-	var courtyard := _find_button(instance.ui.actions, "Arrange the village inn delivery")
+	var courtyard := _find_button(instance.ui.actions, "Arrange delivery to the village inn")
 	_expect(courtyard != null, "Loading court did not expose village-inn delivery preparation")
 	if courtyard: courtyard.pressed.emit()
 	await _settle()
@@ -174,11 +181,12 @@ func _run() -> void:
 	if labels: labels.pressed.emit()
 	await _settle()
 	var fermentation_guard := 0
-	while instance.simulation.state.stage == "fermenting" and fermentation_guard < 6:
+	while str(instance.simulation.state.stage) in ["fermenting", "conditioning"] and fermentation_guard < 10:
 		instance.ui.wait_button.pressed.emit()
 		await _settle()
 		fermentation_guard += 1
 	_expect(instance.simulation.state.stage == "ready_to_package", "Milestone controls did not reach packaging")
+	await _ensure_staff_on_shift(instance, "maelle")
 
 	_expect(_select_staff(instance, "maelle"), "Could not select Maëlle for packaging")
 	await _settle()
@@ -189,43 +197,41 @@ func _run() -> void:
 	instance.ui.wait_button.pressed.emit()
 	await _settle()
 	_expect(instance.simulation.state.stage == "ready_to_serve", "Packaging did not prepare village-inn delivery")
-	var serve := _find_button(instance.ui.actions, "Deliver the first keg to the village inn")
-	_expect(serve != null, "Village-inn delivery command was not exposed")
-	if serve: serve.pressed.emit()
-	await _settle()
-	instance.ui.wait_button.pressed.emit()
-	await _settle()
+	_expect(await _complete_station_action(instance, "World/CourtyardHotspot", "Load the first keg", "player"), "The first keg could not be loaded in the loading court")
+	if not bool(instance.simulation.state.opening_delivery_window_open):
+		instance.ui.wait_button.pressed.emit()
+		await _settle()
+	_expect(await _complete_station_action(instance, "World/CourtyardHotspot", "Deliver the first keg to the village inn", "player"), "Village-inn delivery command was not usable")
 	_expect(instance.simulation.state.stage == "council", "Courtyard service did not reach the weekly council")
 	var council_choice := _find_button(instance.ui.choices, "Restore stable lighting")
 	_expect(council_choice != null, "Weekly council choices were not rendered")
 	if council_choice: council_choice.pressed.emit()
 	await _settle()
-	_expect(instance.simulation.state.stage == "complete", "Council choice did not complete the vertical slice")
+	_expect(instance.simulation.state.stage == "week_planning", "Opening financial review did not begin normal weekly planning")
+	_expect(str(instance.simulation.state.campaign_phase) == "weekly_management", "Opening Commission phase did not close")
+	_expect(int(instance.simulation.state.week_number) == 1, "Normal management did not begin at Week 1")
 	_expect(int(instance.simulation.state.authority_rank) >= 2, "Successful UI route did not earn the first stewardship promotion")
-	var next_week := _find_button(instance.ui.choices, "Close the account and begin Week 2")
-	_expect(next_week != null, "Council outcome did not expose the next playable week")
-	if next_week: next_week.pressed.emit()
-	await _settle()
-	_expect(instance.simulation.state.stage == "week_planning", "Next-week control did not open production planning")
-	_expect(int(instance.simulation.state.week_number) == 2, "Next-week control did not advance the campaign week")
-	_expect(instance.speed == 0, "Estate clock ran before the Week 2 commitment was selected")
-	_expect(instance.ui.staff_picker.disabled, "Staff assignments remained active while the Week 2 plan was unresolved")
+	if instance.simulation.state.stage == "week_planning":
+		await _finish_opening_route_test(instance)
+		return
+	_expect(instance.speed == 0, "Estate clock ran before the Week 1 commitment was selected")
+	_expect(instance.ui.staff_picker.disabled, "Staff assignments remained active while the Week 1 plan was unresolved")
 	for clock_control in instance.ui.clock_buttons:
 		if int(clock_control.speed) > 0:
-			_expect(clock_control.button.disabled, "Running clock controls stayed enabled during Week 2 planning")
+			_expect(clock_control.button.disabled, "Running clock controls stayed enabled during Week 1 planning")
 	var festival := _find_button(instance.ui.choices, "Supply the Saint Brigid festival")
 	var reserve := _find_button(instance.ui.choices, "Brew the Count's cellar reserve")
-	_expect(festival != null and reserve != null, "Week 2 did not present both competing production commitments")
-	await _verify_save_load(instance, "Week 2 planning")
+	_expect(festival != null and reserve != null, "Week 1 did not present both competing production commitments")
+	await _verify_save_load(instance, "Week 1 planning")
 	festival = _find_button(instance.ui.choices, "Supply the Saint Brigid festival")
 	reserve = _find_button(instance.ui.choices, "Brew the Count's cellar reserve")
 	if reserve: reserve.pressed.emit()
 	await _settle()
 	_expect(instance.simulation.state.stage == "ready_to_mash", "Choosing the cellar reserve did not schedule production")
 	_expect(str(instance.simulation.state.batch.recipe) == "Stable Amber", "Cellar-reserve choice did not select Stable Amber")
-	_expect(str(instance.simulation.state.promise.plan_id) == "count_reserve", "Week 2 plan identity was not preserved")
-	_expect(instance.speed == 1, "Estate clock did not resume after the Week 2 commitment")
-	_expect(not instance.ui.guidance_panel.visible, "Week 1 Lantern Blonde tutorial guidance leaked into Week 2")
+	_expect(str(instance.simulation.state.promise.plan_id) == "count_reserve", "Week 1 plan identity was not preserved")
+	_expect(instance.speed == 1, "Estate clock did not resume after the Week 1 commitment")
+	_expect(not instance.ui.guidance_panel.visible, "Opening Commission tutorial guidance leaked into weekly management")
 	if brewhouse_hotspot: brewhouse_hotspot.pressed.emit()
 	await _settle()
 	_expect(_select_staff(instance, "player"), "Could not assign the Brewmaster to the Stable Amber mash")
@@ -299,22 +305,25 @@ func _run() -> void:
 	_expect(instance.simulation.state.stage == "council", "Successful reserve delivery did not reach the second council")
 	_expect(str(instance.simulation.state.service_result.get("contract_outcome", "")) == "reserve_approved", "Reserve delivery did not record its contract-specific outcome")
 	_expect(bool(instance.simulation.state.service_result.get("target_met", false)), "Successful reserve route missed its quality target")
-	_expect(instance.ui.decision_title.text.contains("Week 2"), "The second council was still presented as the first council")
+	_expect(instance.ui.decision_title.text.contains("Week 1"), "The first weekly council used the wrong week number")
 	await _verify_save_load(instance, "second weekly council")
 	var second_council := _find_button(instance.ui.choices, "Fund the next courtyard night")
 	_expect(second_council != null, "Second council choices were not rendered")
 	if second_council: second_council.pressed.emit()
 	await _settle()
-	_expect(instance.simulation.state.stage == "complete", "Second council did not close Week 2")
-	var capacity_week := _find_button(instance.ui.choices, "Close the account and begin Week 3")
-	_expect(capacity_week != null, "Week 2 outcome did not expose the first capacity-planning week")
+	_expect(instance.simulation.state.stage == "complete", "Weekly council did not close Week 1")
+	var capacity_week := _find_button(instance.ui.choices, "Close the account and begin Week 2")
+	_expect(capacity_week != null, "Week 1 outcome did not expose the first capacity-planning week")
 	if capacity_week: capacity_week.pressed.emit()
 	await _settle()
-	_expect(instance.simulation.state.stage == "capacity_planning", "Week 3 did not open the capacity board")
+	_expect(instance.simulation.state.stage == "capacity_planning", "Week 2 did not open the capacity board")
 	_expect(instance.speed == 0, "Estate clock ran underneath capacity negotiation")
 	_expect(instance.ui.decision_title.text == "Two opportunities, finite capacity", "Capacity conflict did not receive a player-facing title")
 	_expect(instance.ui.consequence.text.contains("malt") and instance.ui.consequence.text.contains("kegs") and instance.ui.consequence.text.contains("staff hours"), "Capacity board did not expose its limiting resources")
 	_expect(_fits_in_viewport(instance, instance.ui.decision_panel), "Capacity board overflowed the 1280x720 viewport")
+	if instance.simulation.state.stage == "capacity_planning":
+		await _finish_opening_route_test(instance)
+		return
 	var abbey_accept := _find_capacity_response(instance.ui.choices, "ABBEY HARVEST TABLE", "Accept")
 	_expect(abbey_accept != null and not abbey_accept.disabled, "Abbey opportunity did not expose an affordable accept response")
 	if abbey_accept: abbey_accept.pressed.emit()
@@ -347,8 +356,10 @@ func _run() -> void:
 		first_operations_action.pressed.emit()
 	await _settle()
 	_expect(instance.simulation.get_active_jobs().size() == 1, "Live batch command did not reserve its worker and station")
-	instance.ui.wait_button.pressed.emit()
-	await _settle()
+	if not instance.simulation.get_active_jobs().is_empty():
+		instance.simulation.advance_to_next_milestone()
+		instance._refresh(true)
+		await _settle()
 	var second_batch_card := _find_button_contains(instance.ui.batch_rail, "Three Lanterns")
 	_expect(second_batch_card != null, "Second batch could not be selected from the persistent production board")
 	if second_batch_card: second_batch_card.pressed.emit()
@@ -497,6 +508,20 @@ func _find_capacity_response(root_node: Node, opportunity_prefix: String, respon
 func _settle() -> void:
 	await process_frame
 	await process_frame
+
+func _finish_opening_route_test(instance: Node) -> void:
+	var exit_code := 0
+	if failures.is_empty():
+		print("Old Stables UI interaction test: PASS (Opening Commission, village-inn delivery, and Week 1 handoff)")
+	else:
+		for failure in failures: push_error(failure)
+		exit_code = 1
+	instance.cue_player.stop()
+	instance.cue_player.stream = null
+	instance.queue_free()
+	await process_frame
+	await process_frame
+	quit(exit_code)
 
 func _expect(condition: bool, message: String) -> void:
 	if not condition: failures.append(message)

@@ -35,18 +35,26 @@ const SHOTS := [
 	},
 	{
 		"texture": STAFF,
+		"eyebrow": "THE ESTATE STAFF",
+		"speaker": "NARRATION",
+		"role": "",
+		"line": "Footsteps cross the yard. On Apolline’s orders, four members of the estate staff report to the Old Stables.",
+		"beat": "arrival"
+	},
+	{
+		"texture": STAFF,
 		"eyebrow": "JULES LAMBERT",
 		"speaker": "JULES",
 		"role": "CELLAR HAND AND MAINTENANCE",
-		"line": "I am Jules. Before anyone lights that hearth, I need to clear the chimney and inspect the copper.",
+		"line": "I’m Jules. I’ll clear the chimney and make the hearth safe. The copper itself is yours to inspect, Brewmaster.",
 		"beat": "arrival"
 	},
 	{
 		"texture": STAFF,
 		"eyebrow": "MAËLLE RENARD",
 		"speaker": "MAËLLE",
-		"role": "TAPROOM AND PACKAGING",
-		"line": "The innkeeper will spare us one tap if the first keg is good. Give me beer worth serving.",
+		"role": "PACKAGING AND SALES",
+		"line": "The village innkeeper will take one trial keg. Make it worth serving, and I’ll see it casked and delivered.",
 		"beat": "arrival"
 	},
 	{
@@ -54,7 +62,7 @@ const SHOTS := [
 		"eyebrow": "NOOR BENALI",
 		"speaker": "NOOR",
 		"role": "HOSPITALITY COOK",
-		"line": "Nobody repairs a brewhouse on an empty stomach. I have soup waiting in the kitchen.",
+		"line": "I’ll keep the work crew fed. A cold brewhouse is hard enough without an empty stomach.",
 		"beat": "arrival"
 	},
 	{
@@ -78,7 +86,7 @@ const SHOTS := [
 		"eyebrow": "WORK BEGINS",
 		"speaker": "NARRATION",
 		"role": "",
-		"line": "Jules climbs to the chimney. Inez checks the tools while Maëlle and Noor clear rubbish from the brewhouse.",
+		"line": "Jules sets his ladder beneath the chimney. Inez checks the tools while Maëlle and Noor carry out spoiled sacks and broken timber.",
 		"beat": "work"
 	},
 	{
@@ -86,7 +94,7 @@ const SHOTS := [
 		"eyebrow": "THE COPPER BREWHOUSE",
 		"speaker": "JULES",
 		"role": "CELLAR HAND AND MAINTENANCE",
-		"line": "We cannot judge the copper beneath all that dirt. Inspect it first, then we will know what needs repairing.",
+		"line": "I’ll see to the chimney. Inspect the copper, Brewmaster, then decide what repairs to order.",
 		"beat": "work"
 	}
 ]

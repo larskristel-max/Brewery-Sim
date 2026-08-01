@@ -141,11 +141,11 @@ func _build_top_bar() -> void:
 	add_child(panel)
 	ui.top_bar = panel
 	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 18)
+	row.add_theme_constant_override("separation", 12)
 	panel.add_child(row)
 	ui.top_row = row
 	var brand := VBoxContainer.new()
-	brand.custom_minimum_size = Vector2(224, 0)
+	brand.custom_minimum_size = Vector2(200, 0)
 	brand.add_theme_constant_override("separation", 0)
 	row.add_child(brand)
 	var title := Label.new()
@@ -171,7 +171,7 @@ func _build_top_bar() -> void:
 		{"id":"runway","label":"RUNWAY"}
 	]:
 		var box := VBoxContainer.new()
-		box.custom_minimum_size = Vector2(108, 0)
+		box.custom_minimum_size = Vector2(220, 0) if metric.id == "runway" else Vector2(96, 0)
 		box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		box.add_theme_constant_override("separation", 1)
 		var caption := Label.new()
@@ -180,14 +180,17 @@ func _build_top_bar() -> void:
 		caption.add_theme_color_override("font_color", COPPER)
 		box.add_child(caption)
 		var value := Label.new()
-		value.add_theme_font_size_override("font_size", 18)
+		value.add_theme_font_size_override("font_size", 12 if metric.id == "runway" else 18)
+		if metric.id == "runway":
+			value.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			value.max_lines_visible = 2
 		value.add_theme_color_override("font_color", CREAM)
 		box.add_child(value)
 		ui[metric.id] = value
 		ui.metric_boxes.append({"box": box, "caption": caption, "value": value})
 		row.add_child(box)
 	var rank := VBoxContainer.new()
-	rank.custom_minimum_size = Vector2(210, 0)
+	rank.custom_minimum_size = Vector2(180, 0)
 	var rank_caption := Label.new()
 	rank_caption.text = "YOUR OFFICE"
 	rank_caption.add_theme_font_size_override("font_size", 9)
@@ -589,15 +592,15 @@ func _layout_top_bar() -> void:
 		ui.top_bar.offset_top = 18
 		ui.top_bar.offset_right = -24
 		ui.top_bar.offset_bottom = 92
-		ui.top_row.add_theme_constant_override("separation", 18)
+		ui.top_row.add_theme_constant_override("separation", 12)
 		ui.brand.visible = true
 		ui.brand_separator.visible = true
 		ui.rank_box.visible = true
 		for metric in ui.metric_boxes:
 			metric.box.visible = true
-			metric.box.custom_minimum_size = Vector2(108, 0)
+			metric.box.custom_minimum_size = Vector2(220, 0) if str(metric.caption.text) == "RUNWAY" else Vector2(96, 0)
 			metric.caption.add_theme_font_size_override("font_size", 9)
-			metric.value.add_theme_font_size_override("font_size", 18)
+			metric.value.add_theme_font_size_override("font_size", 12 if str(metric.caption.text) == "RUNWAY" else 18)
 
 func _layout_guidance() -> void:
 	if portrait_layout:
@@ -625,6 +628,7 @@ func _layout_guidance() -> void:
 func _layout_command_dock() -> void:
 	var operations_mode := bool(simulation.state.get("operations_active", false)) or str(simulation.state.stage) == "operations_council"
 	if portrait_layout:
+		ui.command_dock.add_theme_stylebox_override("panel", _panel_style(0.93, 10, 10))
 		_move_control(ui.objective_box, ui.mobile_command_stack, 0)
 		_move_control(ui.staff_box, ui.mobile_command_stack, 1)
 		_move_control(ui.action_scroll, ui.mobile_command_stack, 2)
@@ -663,6 +667,7 @@ func _layout_command_dock() -> void:
 		ui.jobs.visible = true
 		ui.mobile_close.visible = false
 	elif mobile_landscape_layout:
+		ui.command_dock.add_theme_stylebox_override("panel", _panel_style(0.93, 8, 4))
 		_move_control(ui.objective_box, ui.command_row, 0)
 		_move_control(ui.objective_separator, ui.command_row, 1)
 		_move_control(ui.staff_box, ui.command_row, 2)
@@ -707,6 +712,7 @@ func _layout_command_dock() -> void:
 		ui.operations_forecast.visible = false
 		ui.batch_rail_panel.custom_minimum_size = Vector2(0, 58)
 	else:
+		ui.command_dock.add_theme_stylebox_override("panel", _panel_style(0.93, 12, 14))
 		_move_control(ui.objective_box, ui.command_row, 0)
 		_move_control(ui.objective_separator, ui.command_row, 1)
 		_move_control(ui.staff_box, ui.command_row, 2)
@@ -1005,7 +1011,7 @@ func _complete_first_light_handoff() -> void:
 	selected_station = ""
 	$World.focus_station("brewhouse")
 	_set_status("CASTLE BREWMASTER APPOINTED · Select the copper brewhouse to inspect its condition.", true)
-	$World.show_feedback("DAY ONE · OLD STABLES · Select the highlighted copper brewhouse.", true)
+	$World.show_feedback("DAY ONE · OPENING COMMISSION · Select the highlighted copper brewhouse.", true)
 	simulation.save_game()
 	_refresh(true)
 
@@ -1019,7 +1025,7 @@ func _refresh(force_structure := false) -> void:
 	ui.confidence.text = "%d / 100" % int(state.count_confidence)
 	ui.community.text = "%d / 100" % int(state.community_trust)
 	ui.restoration.text = "%d%%" % int(state.restoration)
-	ui.runway.text = "APPROX. %d DAYS" % int(state.runway_days)
+	ui.runway.text = "ESTATE FUNDS · APPROXIMATELY %d DAYS REMAINING" % int(state.runway_days)
 	ui.rank.text = str(state.authority_role).to_upper()
 	ui.stage.text = _stage_label(state)
 	ui.stage.tooltip_text = _stage_label(state)
@@ -1041,7 +1047,8 @@ func _refresh(force_structure := false) -> void:
 	ui.decision_objective.text = _decision_objective()
 	ui.consequence.text = _consequence_text()
 	ui.guidance.text = _guidance_text()
-	ui.guidance_panel.visible = started and not portrait_layout and not mobile_landscape_layout and int(state.get("week_number", 1)) == 1 and str(state.stage) in ["appointment","recommission","ready_to_mash"] and str(state.pending_issue) == ""
+	var opening_guidance := str(state.get("campaign_phase", "weekly_management")) == "opening_commission"
+	ui.guidance_panel.visible = started and not portrait_layout and not mobile_landscape_layout and opening_guidance and str(state.stage) in ["appointment","recommission","awaiting_brew_day","ready_to_mash"] and str(state.pending_issue) == ""
 	var signature := JSON.stringify([state.stage, state.pending_issue, state.courtyard_prepared, state.labels_prepared, state.jobs, state.staff, state.stations, state.campaign_lost, state.get("delivery_problem", {}), state.get("delivery_recovery", {}), state.get("capacity_board", {}), state.get("production_batches", []), state.get("active_batch_id", ""), state.get("demand", {}), selected_station])
 	if force_structure or signature != last_structure_signature:
 		last_structure_signature = signature
@@ -1061,9 +1068,10 @@ func _stage_label(state: Dictionary) -> String:
 	if state.pending_issue == "missing_hops": return "BREWING ALERT · INGREDIENTS"
 	if state.pending_issue == "amber_lauter_stall": return "BREWING ALERT · AMBER RUNOFF"
 	var jobs := simulation.get_active_jobs()
-	if jobs.size() == 1: return "IN PROGRESS · %s" % str(jobs[0].label).to_upper()
-	if jobs.size() > 1: return "%d WORK ORDERS ACTIVE" % jobs.size()
-	if state.stage == "recommission": return "DAY ONE · OLD STABLES"
+	var opening := str(state.get("campaign_phase", "weekly_management")) == "opening_commission"
+	if jobs.size() == 1: return "%s · %s" % ["OPENING COMMISSION" if opening else "IN PROGRESS", str(jobs[0].label).to_upper()]
+	if jobs.size() > 1: return "%s · %d WORK ORDERS" % ["OPENING COMMISSION" if opening else "IN PROGRESS", jobs.size()]
+	if opening: return "DAY %d · OPENING COMMISSION" % (int(state.game_minute) / 1440 + 1)
 	if state.stage == "week_planning": return "WEEK %d · PRODUCTION PLAN" % int(state.week_number)
 	if state.stage == "delivery_recovery": return "DELIVERY ALERT · RECOVERY"
 	if state.stage == "capacity_planning": return "WEEK %d · CAPACITY BOARD" % int(state.week_number)
@@ -1073,13 +1081,16 @@ func _stage_label(state: Dictionary) -> String:
 
 func _context_eyebrow(state: Dictionary) -> String:
 	if state.pending_issue != "": return "YOUR JUDGMENT"
+	if str(state.get("campaign_phase", "weekly_management")) == "opening_commission":
+		if not selected_station.is_empty(): return "OPENING COMMISSION · %s" % selected_station.replace("_"," ").to_upper()
+		return "OPENING COMMISSION"
 	if state.stage == "operations_council": return "WEEK %d · PRODUCTION LEDGER" % int(state.week_number)
 	if bool(state.get("operations_active", false)): return "WEEK %d · LIVE PRODUCTION BOARD" % int(state.week_number)
 	if not selected_station.is_empty(): return "%s · SELECTED WORK ZONE" % selected_station.replace("_"," ").to_upper()
 	if state.stage == "week_planning": return "WEEK %d · YOUR COMMITMENT" % int(state.week_number)
 	if state.stage == "delivery_recovery": return "THE PROMISE IS AT RISK"
 	if state.stage == "capacity_planning": return "TWO PROMISES · ONE BREWHOUSE"
-	return "THE FIRST REAL BREW" if int(state.get("week_number", 1)) == 1 else "THE NEXT BREWING WEEK"
+	return "THE FIRST WEEKLY BREW" if int(state.get("week_number", 1)) == 1 else "THE NEXT BREWING WEEK"
 
 func _rebuild_batch_rail() -> void:
 	_clear_children(ui.batch_rail)
@@ -1197,21 +1208,39 @@ func _rebuild_actions() -> void:
 	for action in available:
 		if world_selection_required and selected_station.is_empty(): continue
 		if not operations_mode and not selected_station.is_empty() and str(action.station) != selected_station: continue
+		var card := VBoxContainer.new()
+		card.custom_minimum_size = Vector2(205, 72) if mobile_landscape_layout else Vector2(225, 126)
+		card.add_theme_constant_override("separation", 3)
 		var button := Button.new()
 		var batch_prefix := ""
 		if operations_mode and str(action.get("batch_id", "")) != "":
 			batch_prefix = "%s · " % str(simulation.state.batch.get("recipe", "Batch")).to_upper()
-		var shown_duration := simulation.estimate_action_duration(action, selected_staff_id)
+		var preview := simulation.get_assignment_preview(action, selected_staff_id)
+		var shown_duration := int(preview.duration)
 		var cost_text := " · ¤%d" % int(action.get("cash_cost", 0)) if int(action.get("cash_cost", 0)) > 0 else ""
-		button.text = "%s%s\n%s · %d MIN%s" % [batch_prefix, action.label, str(action.station).replace("_"," ").to_upper(), shown_duration, cost_text]
-		button.custom_minimum_size = Vector2(160, 64) if mobile_landscape_layout else Vector2(190, 84)
 		var availability := _action_availability(action)
 		button.disabled = not bool(availability.ok)
+		var worker_name := str(simulation.state.staff.get(selected_staff_id, {}).get("name", "Choose worker")).to_upper()
+		var skill_name := str(preview.required_skill).capitalize()
+		if bool(preview.blocked):
+			button.text = "%s%s\n%s · %s %d\nCANNOT PERFORM SAFETY-CRITICAL WORK" % [batch_prefix, action.label, worker_name, skill_name, int(preview.skill_level)]
+		else:
+			button.text = "%s%s\n%s · %s %d\n%d MIN · %d%% FAILURE RISK%s" % [batch_prefix, action.label, worker_name, skill_name, int(preview.skill_level), shown_duration, int(preview.failure_risk), cost_text]
+		button.custom_minimum_size = Vector2(0, 48) if mobile_landscape_layout else Vector2(0, 92)
+		if mobile_landscape_layout: button.add_theme_font_size_override("font_size", 10)
 		var energy_text := ""
 		if simulation.state.staff.has(selected_staff_id): energy_text = " · energy %d" % int(simulation.state.staff[selected_staff_id].energy)
 		button.tooltip_text = str(availability.reason) if button.disabled else "Assign %s and begin this work order%s" % [simulation.state.staff[selected_staff_id].name, energy_text]
 		button.pressed.connect(_start_action.bind(action.id))
-		ui.actions.add_child(button)
+		card.add_child(button)
+		var consequence := Label.new()
+		consequence.text = ("BLOCKED · %s" % str(availability.reason)) if bool(preview.blocked) else "IF IT FAILS · %s" % str(preview.failure_consequence)
+		consequence.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		consequence.add_theme_font_size_override("font_size", 8 if mobile_landscape_layout else 9)
+		consequence.max_lines_visible = 2
+		consequence.add_theme_color_override("font_color", Color("#d57a68") if bool(preview.blocked) else MUTED)
+		card.add_child(consequence)
+		ui.actions.add_child(card)
 		shown += 1
 	if shown == 0:
 		var empty := VBoxContainer.new()
@@ -1250,9 +1279,9 @@ func _action_availability(action: Dictionary) -> Dictionary:
 		return {"ok": false, "reason": "Choose a worker before starting this work order."}
 	if not simulation.is_staff_available(selected_staff_id):
 		return {"ok": false, "reason": "%s is off shift or already assigned." % simulation.state.staff[selected_staff_id].name}
-	var required_skill := str(action.get("skill", ""))
-	if not required_skill.is_empty() and int(simulation.state.staff[selected_staff_id].skills.get(required_skill, 0)) <= 0:
-		return {"ok": false, "reason": "%s lacks the required %s skill." % [simulation.state.staff[selected_staff_id].name, required_skill]}
+	var preview := simulation.get_assignment_preview(action, selected_staff_id)
+	if bool(preview.blocked):
+		return {"ok": false, "reason": str(preview.block_reason)}
 	var station_id := str(action.get("station", ""))
 	if simulation.state.stations.has(station_id) and bool(simulation.state.stations[station_id].busy):
 		return {"ok": false, "reason": "%s is already occupied." % simulation.state.stations[station_id].name}
@@ -1503,11 +1532,12 @@ func _context_title() -> String:
 	if simulation.state.stage == "capacity_planning": return "Capacity board"
 	if simulation.state.stage == "operations": return "%s · live work order" % str(simulation.state.batch.recipe)
 	if simulation.state.stage == "operations_council": return "The production ledger"
-	if simulation.state.stage == "council": return "Apolline opens the ledger"
+	if simulation.state.stage == "council": return "Opening Commission accounts" if str(simulation.state.get("campaign_phase", "")) == "opening_commission" else "Apolline opens the ledger"
 	if simulation.state.stage == "complete": return "Week %d closes" % int(simulation.state.get("week_number", 1))
 	if selected_station == "brewhouse": return "Copper brewhouse"
 	if not selected_station.is_empty(): return selected_station.replace("_"," ").capitalize()
-	return "The First Real Brew" if int(simulation.state.get("week_number", 1)) == 1 else str(simulation.state.batch.recipe)
+	if str(simulation.state.get("campaign_phase", "")) == "opening_commission": return "Opening Commission"
+	return "The First Weekly Brew" if int(simulation.state.get("week_number", 1)) == 1 else str(simulation.state.batch.recipe)
 
 func _decision_title() -> String:
 	var issue_title := _issue_title()
@@ -1516,7 +1546,7 @@ func _decision_title() -> String:
 	if simulation.state.stage == "delivery_recovery": return "Who carries the failed promise?"
 	if simulation.state.stage == "capacity_planning": return "Two opportunities, finite capacity"
 	if simulation.state.stage == "operations_council": return "The production council · Week %d" % int(simulation.state.get("week_number", 1))
-	if simulation.state.stage == "council": return "The weekly council · Week %d" % int(simulation.state.get("week_number", 1))
+	if simulation.state.stage == "council": return "The first financial review" if str(simulation.state.get("campaign_phase", "")) == "opening_commission" else "The weekly council · Week %d" % int(simulation.state.get("week_number", 1))
 	if simulation.state.stage == "complete": return "The estate answers"
 	return "A decision is waiting"
 
@@ -1582,7 +1612,7 @@ func _consequence_text() -> String:
 		var outcome := str(state.service_result.get("contract_outcome", "")).replace("_", " ").to_upper()
 		if not outcome.is_empty():
 			return "%s · QUALITY %d / %d · %s\nSETTLEMENT ¤%d · trust %+d · confidence %+d" % [outcome, int(state.service_result.get("quality", 0)), int(state.service_result.get("quality_target", 0)), "LATE" if bool(state.service_result.get("late", false)) else "ON TIME", int(state.service_result.get("revenue", 0)), int(state.service_result.get("trust_delta", 0)), int(state.service_result.get("confidence_delta", 0))]
-		return "Apolline weighs delivery, cash, trust, and the Count’s confidence. Your answer defines the next week."
+		return "Apolline weighs the village-inn delivery, its cost, and the estate’s remaining runway. This closes the Opening Commission." if str(state.get("campaign_phase", "")) == "opening_commission" else "Apolline weighs delivery, cash, trust, and the Count’s confidence. Your answer defines the next week."
 	var deadline := int(state.promise.get("deadline_minute", 0))
 	var deadline_day := deadline / 1440 + 1
 	var deadline_minute := deadline % 1440
@@ -1599,6 +1629,7 @@ func _guidance_text() -> String:
 	match str(simulation.state.stage):
 		"appointment": return "1 · Accept the stable key below — your first authority is the brewery itself."
 		"recommission": return "1 · Select the copper brewhouse to inspect its condition." if not bool(simulation.state.get("brewhouse_inspected", false)) else "Inspection complete · choose a worker and recommission the copper."
+		"awaiting_brew_day": return "2 · The copper is safe. Advance to Day 2 for the first brew."
 		"ready_to_mash": return "3 · Return to the brewhouse and begin the %s mash." % simulation.state.batch.recipe
 		_: return ""
 
@@ -1625,21 +1656,27 @@ func _handle_story_transition(state: Dictionary) -> void:
 			"recommission":
 				$World.show_feedback("The stable key is yours. Inspect the copper brewhouse.", true)
 				_set_status("Select the highlighted copper brewhouse to inspect its condition.", true)
+			"awaiting_brew_day":
+				$World.show_feedback("The chimney and hearth are being made safe for tomorrow’s brew.", true)
+				_set_status("Opening Commission · advance to Day 2 when the copper is ready.", true)
 			"ready_to_mash":
 				$World.show_feedback("The copper is ready. %s can begin." % state.batch.recipe, true)
 				_set_status("The brewhouse is ready for the next mash.", true)
 			"fermenting":
-				$World.show_feedback("Yeast takes the night watch. Prepare the estate while it works.", true)
-				_set_status("Fermentation is active; courtyard and packaging preparation can proceed.", true)
+				$World.show_feedback("Yeast takes the seven-day watch. Arrange the village-inn delivery while it works.", true)
+				_set_status("Opening Commission · fermentation is active; loading-court and packaging preparation can proceed.", true)
+			"conditioning":
+				$World.show_feedback("Seven days of fermentation are complete. The beer settles for packaging on Day 10.", true)
+				_set_status("Opening Commission · the first keg can be packaged on Day 10.", true)
 			"ready_to_package":
 				$World.show_feedback("Fermentation is complete. The first keg can be filled.", true)
 				_set_status("Assign Maëlle or another packager to fill the first keg.", true)
 			"ready_to_serve":
-				$World.show_feedback("The keg is ready. Open the courtyard before the promise expires.", true)
-				_set_status("The first keg and courtyard are ready for service.", true)
+				$World.show_feedback("The keg is ready for the loading court and the village inn.", true)
+				_set_status("Opening Commission · load the keg, then deliver it on Day 11.", true)
 			"council":
-				$World.show_feedback("The courtyard falls quiet. Apolline opens the ledger.", true)
-				_set_status("Time is paused for the Week %d council." % int(state.get("week_number", 1)), true)
+				$World.show_feedback("The village-inn account is settled. Apolline opens the ledger.", true)
+				_set_status("Time is paused for the Opening Commission financial review." if str(state.get("campaign_phase", "")) == "opening_commission" else "Time is paused for the Week %d council." % int(state.get("week_number", 1)), true)
 			"complete":
 				$World.show_feedback("The Count has made his judgment.", true)
 				_set_status("Week %d is closed; choose the estate's next investment." % int(state.get("week_number", 1)), true)

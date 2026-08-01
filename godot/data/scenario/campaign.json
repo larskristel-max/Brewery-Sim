@@ -1,4 +1,7 @@
 {
+  "opening_phase":"opening_commission",
+  "weekly_management_begins_after":"opening_financial_review",
+  "opening_station_labels":{"courtyard":"Loading Court"},
   "house":"House de Valenne",
   "patron":{"id":"count_armand","name":"Count Armand de Valenne","tone":"proud_but_fair"},
   "rival":{"id":"apolline","name":"Apolline de Valenne","position":"acting_administrator","motive":"save_the_estate_through_financial_discipline"},

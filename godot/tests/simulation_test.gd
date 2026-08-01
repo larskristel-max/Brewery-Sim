@@ -6,19 +6,25 @@ func run() -> Array[String]:
 	var failures: Array[String] = []
 	var craft: BrewSimulation = _run_route("cut_heat_stir", "inspect_wild_hops", "reinvest", failures)
 	var economy: BrewSimulation = _run_route("accept_rich_body", "reduce_bitterness", "pay_creditor", failures)
-	_expect(craft.state.stage == "complete", "Craft route did not complete", failures)
-	_expect(economy.state.stage == "complete", "Economy route did not complete", failures)
-	_expect(int(craft.state.service_result.quality) > int(economy.state.service_result.quality), "Brew decisions did not change final quality", failures)
-	_expect(int(craft.state.service_result.revenue) > int(economy.state.service_result.revenue), "Brew decisions did not change revenue", failures)
-	_expect(craft.state.batch.flavor_tags.has("wild_green"), "Estate herb choice did not create its sensory tag", failures)
-	_expect(economy.state.batch.flavor_tags.has("soft_bitterness"), "Reduced bitterness choice did not create its sensory tag", failures)
+	_expect(int(craft.state.player.coat_index) == 0, "New campaigns did not use the fixed default coat", failures)
+	_expect(craft.state.stage == "week_planning" and int(craft.state.week_number) == 1, "Craft route did not begin normal Week 1 planning", failures)
+	_expect(economy.state.stage == "week_planning" and int(economy.state.week_number) == 1, "Economy route did not begin normal Week 1 planning", failures)
+	var craft_opening: Dictionary = craft.state.opening_commission_result
+	var economy_opening: Dictionary = economy.state.opening_commission_result
+	var craft_service: Dictionary = craft_opening.get("service_result", {})
+	var economy_service: Dictionary = economy_opening.get("service_result", {})
+	var craft_batch: Dictionary = craft_opening.get("batch", {})
+	var economy_batch: Dictionary = economy_opening.get("batch", {})
+	_expect(int(craft_service.get("quality", 0)) > int(economy_service.get("quality", 0)), "Brew decisions did not change final quality", failures)
+	_expect(int(craft_service.get("revenue", 0)) > int(economy_service.get("revenue", 0)), "Brew decisions did not change revenue", failures)
+	_expect(craft_batch.get("flavor_tags", []).has("wild_green"), "Estate hop choice did not create its sensory tag", failures)
+	_expect(economy_batch.get("flavor_tags", []).has("soft_bitterness"), "Reduced bitterness choice did not create its sensory tag", failures)
 	_expect(int(craft.state.authority_rank) == 2, "Strong route did not earn Keeper authority", failures)
 	_expect(int(economy.state.authority_rank) == 1, "Compromised route should leave stewardship progression contested", failures)
-	var restoration_before := int(craft.state.restoration)
-	_expect(craft.fund_restoration("pump_reseal").ok, "Keeper could not fund a stable restoration project", failures)
-	_expect(int(craft.state.restoration) > restoration_before and craft.state.restoration_projects.pump_reseal.complete, "Restoration project did not change the estate", failures)
+	_expect(bool(craft.state.restoration_projects.stable_lighting.complete), "Opening reinvestment did not change the estate", failures)
 	_test_save_round_trip(craft, failures)
 	_test_repeatable_week(craft, failures)
+	_test_competency_and_failure(failures)
 	_test_competing_week_two_commitments(failures)
 	_test_amber_lauter_responses(failures)
 	_test_week_two_end_to_end(failures)
@@ -45,6 +51,9 @@ func _run_route(mash_choice: String, hop_choice: String, council_choice: String,
 	_expect(model.start_action("recommission", "jules").ok, "Could not assign Jules to recommissioning", failures)
 	_expect(not model.start_action("recommission", "player").ok, "Busy station accepted a second job", failures)
 	model.advance_to_next_milestone()
+	_expect(model.state.stage == "awaiting_brew_day", "Day 1 recommissioning did not wait for the Day 2 brew", failures)
+	_expect(not _has_action(model, "mash"), "Mashing was exposed on Day 1", failures)
+	model.advance_to_next_milestone()
 	_expect(model.state.stage == "ready_to_mash", "Recommissioning did not unlock mashing", failures)
 	var malt_before := float(model.state.inventory.malt.quantity)
 	_expect(model.start_action("mash", "player").ok, "Could not start mash", failures)
@@ -70,53 +79,62 @@ func _run_route(mash_choice: String, hop_choice: String, council_choice: String,
 	_expect(model.start_action("prepare_courtyard", "noor").ok, "Could not assign Noor to the courtyard", failures)
 	_expect(model.start_action("prepare_labels", "inez").ok, "Could not assign Inez to labels", failures)
 	var wait_guard := 0
-	while model.state.stage == "fermenting" and wait_guard < 8:
+	while str(model.state.stage) in ["fermenting", "conditioning"] and wait_guard < 12:
 		model.advance_to_next_milestone()
 		wait_guard += 1
-	_expect(wait_guard < 8, "Fermentation milestone loop stalled with jobs: %s" % JSON.stringify(model.get_active_jobs()), failures)
+	_expect(wait_guard < 12, "Fermentation milestone loop stalled with jobs: %s" % JSON.stringify(model.get_active_jobs()), failures)
+	_expect(int(model.state.game_minute) >= 9 * 1440, "Packaging became available before Day 10", failures)
 	_expect(model.state.courtyard_prepared, "Courtyard task did not complete", failures)
 	_expect(model.state.labels_prepared, "Label task did not complete", failures)
+	var packaging_minute_of_day := int(model.state.game_minute) % 1440
+	if packaging_minute_of_day < 600: model.advance(600 - packaging_minute_of_day)
 	_expect(model.start_action("package", "maelle").ok, "Could not assign Maëlle to packaging", failures)
 	model.advance_to_next_milestone()
 	_expect(is_equal_approx(float(model.state.batch.packaged_l), 20.0), "Packaging did not produce a 20 L keg", failures)
-	_expect(model.start_action("serve", "maelle").ok, "Could not open the courtyard event", failures)
+	_expect(not _has_action(model, "serve"), "Delivery was exposed before the first keg was loaded and Day 11 began", failures)
+	_expect(model.start_action("load_first_keg", "player").ok, "Could not load the first keg", failures)
+	model.advance_to_next_milestone()
+	_expect(bool(model.state.first_keg_loaded), "Loading-court work did not mark the first keg loaded", failures)
+	if not bool(model.state.opening_delivery_window_open): model.advance_to_next_milestone()
+	_expect(int(model.state.game_minute) >= 10 * 1440, "The first delivery became available before Day 11", failures)
+	_expect(model.start_action("serve", "player").ok, "Could not deliver the first keg", failures)
 	model.advance_to_next_milestone()
 	_expect(model.state.stage == "council", "Service did not lead to weekly council", failures)
-	_expect(int(model.state.service_result.guests_served) == 40, "The 20 L keg did not serve the promised 40 guests", failures)
+	_expect(int(model.state.service_result.get("guests_served", 0)) == 40, "The 20 L keg did not serve the promised 40 guests (stage %s, jobs %s)" % [str(model.state.stage), JSON.stringify(model.get_active_jobs())], failures)
 	_expect(model.resolve_council(council_choice).ok, "Council choice failed", failures)
+	_expect(str(model.state.campaign_phase) == "weekly_management" and int(model.state.week_number) == 1, "Opening review did not hand off to normal Week 1", failures)
+	_expect(model.state.stage == "week_planning", "Opening review did not begin weekly planning", failures)
+	_expect(str(model.state.stations.courtyard.name) == "Courtyard", "Weekly management did not restore courtyard terminology", failures)
 	return model
 
 func _test_save_round_trip(source: BrewSimulation, failures: Array[String]) -> void:
 	var path := "user://old_stables_test_save.json"
+	source.state.player.coat_index = 2
 	_expect(source.save_game(path).ok, "Could not write versioned campaign save", failures)
 	var loaded: BrewSimulation = BrewSimulationModel.new()
 	loaded.new_campaign("Other", 2)
 	_expect(loaded.load_game(path).ok, "Could not load campaign save", failures)
 	_expect(loaded.state.player.name == source.state.player.name, "Save did not preserve customized player", failures)
+	_expect(int(loaded.state.player.coat_index) == 2, "Save did not preserve an existing coat value", failures)
 	_expect(bool(loaded.state.get("brewhouse_inspected", false)), "Save did not preserve the copper inspection", failures)
 	_expect(loaded.state.issue_history == source.state.issue_history, "Save did not preserve brewing decisions", failures)
-	_expect(int(loaded.state.council_result.score) == int(source.state.council_result.score), "Save did not preserve council score", failures)
-	_expect(str(loaded.state.council_result.choice) == str(source.state.council_result.choice), "Save did not preserve council choice", failures)
+	_expect(int(loaded.state.opening_commission_result.financial_review.score) == int(source.state.opening_commission_result.financial_review.score), "Save did not preserve opening review score", failures)
+	_expect(str(loaded.state.opening_commission_result.financial_review.choice) == str(source.state.opening_commission_result.financial_review.choice), "Save did not preserve opening review choice", failures)
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
 
 func _test_repeatable_week(model: BrewSimulation, failures: Array[String]) -> void:
-	var first_batch_id := str(model.state.batch.id)
-	var first_quality := int(model.state.service_result.quality)
+	var first_batch_id := str(model.state.opening_commission_result.batch.id)
 	var malt_before := float(model.state.inventory.malt.quantity)
 	var review_count_before := int(model.state.review_count)
-	_expect(model.begin_next_week().ok, "A completed council could not open the next brewing week", failures)
-	_expect(int(model.state.week_number) == 2, "The campaign did not advance to week two", failures)
-	_expect(model.state.stage == "week_planning", "The next week did not open production planning", failures)
-	_expect(model.state.week_history.size() == 1, "The completed week was not preserved in campaign history", failures)
-	_expect(not model.begin_next_week().ok and model.state.week_history.size() == 1, "A production week could be skipped without another council", failures)
-	_expect(str(model.state.week_history[0].batch.id) == first_batch_id, "Week history lost the completed batch", failures)
-	_expect(int(model.state.week_history[0].service_result.quality) == first_quality, "Week history lost the service outcome", failures)
-	_expect(str(model.state.batch.id) != first_batch_id and model.state.batch.status == "awaiting_plan", "The next week did not wait for a production commitment", failures)
+	_expect(int(model.state.week_number) == 1 and model.state.stage == "week_planning", "Opening Commission did not lead into Week 1 planning", failures)
+	_expect(model.state.week_history.is_empty(), "Opening Commission was incorrectly recorded as a normal week", failures)
+	_expect(not model.begin_next_week().ok, "A production week could be skipped without another council", failures)
+	_expect(str(model.state.batch.id) != first_batch_id and model.state.batch.status == "awaiting_plan", "Week 1 did not wait for a production commitment", failures)
 	_expect(is_equal_approx(float(model.state.inventory.malt.quantity), malt_before), "Starting a week should not replenish or consume persistent inventory", failures)
 	_expect(int(model.state.review_count) == review_count_before, "Starting a week reset campaign progression", failures)
 	_expect(int(model.state.stations.brewhouse.cleanliness) < 70, "Brewday use did not leave sanitation debt for the next week", failures)
-	_expect(model.get_available_actions().is_empty(), "Production actions appeared before a Week 2 commitment was selected", failures)
-	_expect(model.get_week_plan_options().size() == 2, "Week 2 did not present two competing commitments", failures)
+	_expect(model.get_available_actions().is_empty(), "Production actions appeared before a Week 1 commitment was selected", failures)
+	_expect(model.get_week_plan_options().size() == 2, "Week 1 did not present two competing commitments", failures)
 	var planning_minute := int(model.state.game_minute)
 	model.advance(1440)
 	_expect(int(model.state.game_minute) == planning_minute, "Estate time advanced before a Week 2 commitment was selected", failures)
@@ -135,9 +153,60 @@ func _test_repeatable_week(model: BrewSimulation, failures: Array[String]) -> vo
 	model.advance_to_next_milestone()
 	_expect(_has_action(model, "package"), "Sanitizing the filler did not unlock packaging", failures)
 
+func _test_competency_and_failure(failures: Array[String]) -> void:
+	var model: BrewSimulation = BrewSimulationModel.new()
+	model.new_campaign("Henri", 0)
+	model.start_action("accept_key")
+	_expect(model.inspect_brewhouse().ok, "Copper inspection unexpectedly used a competency roll", failures)
+	var recommission: Dictionary = model.get_available_actions()[0]
+	var jules: Dictionary = model.get_assignment_preview(recommission, "jules")
+	var player: Dictionary = model.get_assignment_preview(recommission, "player")
+	var maelle: Dictionary = model.get_assignment_preview(recommission, "maelle")
+	var noor: Dictionary = model.get_assignment_preview(recommission, "noor")
+	_expect(int(jules.skill_level) == 3 and int(jules.duration) == 55 and int(jules.failure_risk) == 7, "Skill 3 recommissioning preview did not match duration and risk rules", failures)
+	_expect(int(player.skill_level) == 2 and int(player.duration) == 66 and int(player.failure_risk) == 13, "Skill 2 recommissioning preview did not match duration and risk rules", failures)
+	_expect(int(maelle.skill_level) == 1 and int(maelle.duration) == 90 and int(maelle.failure_risk) == 30, "Skill 1 recommissioning preview did not match duration and risk rules", failures)
+	_expect(int(noor.skill_level) == 0 and int(noor.failure_risk) == 65 and bool(noor.blocked), "Skill 0 was not blocked from safety-critical recommissioning", failures)
+	_expect(str(noor.block_reason) == "This work requires maintenance experience. Assign a qualified worker.", "Safety-critical block reason was not explicit", failures)
+
+	var noncritical: BrewSimulation = BrewSimulationModel.new()
+	noncritical.new_campaign()
+	noncritical.state.stage = "ready_to_mash"
+	noncritical.state.stations.brewhouse.cleanliness = 92
+	var mash_action: Dictionary = noncritical.get_available_actions()[0]
+	var noor_mash: Dictionary = noncritical.get_assignment_preview(mash_action, "noor")
+	_expect(not bool(noor_mash.blocked) and int(noor_mash.failure_risk) == 60, "Skill 0 could not attempt permitted non-critical work at disclosed risk", failures)
+
+	var condition_before := int(model.state.stations.brewhouse.condition)
+	var energy_before := int(model.state.staff.jules.energy)
+	var minute_before := int(model.state.game_minute)
+	model.state.next_resolution_roll_override = 1
+	_expect(model.start_action("recommission", "jules").ok, "Seeded recommissioning attempt could not start", failures)
+	var stored_risk := int(model.state.jobs[0].failure_risk)
+	var stored_roll := int(model.state.jobs[0].resolution_roll)
+	var path := "user://old_stables_failure_roll_test.json"
+	_expect(model.save_game(path).ok, "Could not save a pending competency roll", failures)
+	var loaded: BrewSimulation = BrewSimulationModel.new()
+	loaded.new_campaign()
+	_expect(loaded.load_game(path).ok, "Could not load a pending competency roll", failures)
+	_expect(int(loaded.state.jobs[0].failure_risk) == stored_risk and int(loaded.state.jobs[0].resolution_roll) == stored_roll, "Save/load rerolled pending work", failures)
+	var completion: Dictionary = loaded.advance_to_next_milestone()
+	_expect(not bool(completion.ok), "Seeded failure was reported as a success", failures)
+	_expect(str(loaded.state.stage) == "recommission", "Failed recommissioning advanced the campaign", failures)
+	_expect(bool(loaded.state.brewhouse_inspected), "Failed recommissioning erased the copper inspection", failures)
+	_expect(int(loaded.state.stations.brewhouse.condition) == condition_before - 2, "Failed recommissioning did not reduce condition by 2", failures)
+	_expect(int(loaded.state.staff.jules.energy) < energy_before and int(loaded.state.game_minute) > minute_before, "Failed work did not consume time and energy", failures)
+	_expect(str(completion.message) == "The chimney still draws poorly, and the hearth fails its safety check. The brewhouse cannot be lit yet.", "Recommissioning failure did not identify the safety problem", failures)
+	loaded.state.next_resolution_roll_override = 100
+	_expect(loaded.start_action("recommission", "jules").ok, "Recommissioning could not be retried after failure", failures)
+	_expect(loaded.advance_to_next_milestone().ok and str(loaded.state.stage) == "awaiting_brew_day", "Successful retry did not resume the Opening Commission", failures)
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
+
 func _test_competing_week_two_commitments(failures: Array[String]) -> void:
 	var festival: BrewSimulation = BrewSimulationModel.new()
 	festival.new_campaign()
+	festival.state.campaign_phase = "weekly_management"
+	festival.state.week_number = 1
 	festival.state.stage = "complete"
 	var festival_cash_before := int(festival.state.cash)
 	_expect(festival.begin_next_week().ok, "Could not open festival planning test", failures)
@@ -152,6 +221,8 @@ func _test_competing_week_two_commitments(failures: Array[String]) -> void:
 
 	var reserve: BrewSimulation = BrewSimulationModel.new()
 	reserve.new_campaign()
+	reserve.state.campaign_phase = "weekly_management"
+	reserve.state.week_number = 1
 	reserve.state.stage = "complete"
 	var reserve_cash_before := int(reserve.state.cash)
 	_expect(reserve.begin_next_week().ok, "Could not open reserve planning test", failures)
@@ -232,6 +303,8 @@ func _test_amber_lauter_responses(failures: Array[String]) -> void:
 func _reserve_at_lauter_issue(failures: Array[String]) -> BrewSimulation:
 	var model: BrewSimulation = BrewSimulationModel.new()
 	model.new_campaign()
+	model.state.campaign_phase = "weekly_management"
+	model.state.week_number = 1
 	model.state.stage = "complete"
 	_expect(model.begin_next_week().ok, "Could not open reserve response fixture", failures)
 	_expect(model.choose_week_plan("count_reserve").ok, "Could not choose reserve response fixture", failures)
@@ -257,6 +330,8 @@ func _test_week_two_end_to_end(failures: Array[String]) -> void:
 func _run_week_two_contract(plan_id: String, failures: Array[String]) -> BrewSimulation:
 	var model: BrewSimulation = BrewSimulationModel.new()
 	model.new_campaign()
+	model.state.campaign_phase = "weekly_management"
+	model.state.week_number = 1
 	model.state.stage = "complete"
 	model.state.review_count = 1
 	return _continue_week_two_contract(model, plan_id, failures)
@@ -335,6 +410,7 @@ func _test_delivery_recovery_paths(failures: Array[String]) -> void:
 func _delivery_fixture(_reasons: Array) -> BrewSimulation:
 	var model: BrewSimulation = BrewSimulationModel.new()
 	model.new_campaign()
+	model.state.campaign_phase = "weekly_management"
 	model.state.week_number = 2
 	model.state.active_week_plan = "count_reserve"
 	model.state.promise = {
@@ -361,6 +437,8 @@ func _delivery_fixture(_reasons: Array) -> BrewSimulation:
 func _test_stage_persistence(failures: Array[String]) -> void:
 	var planning: BrewSimulation = BrewSimulationModel.new()
 	planning.new_campaign()
+	planning.state.campaign_phase = "weekly_management"
+	planning.state.week_number = 1
 	planning.state.stage = "complete"
 	planning.begin_next_week()
 	_assert_stage_save(planning, "week_planning", "planning", failures)
@@ -479,7 +557,9 @@ func _test_capacity_conflict(failures: Array[String]) -> void:
 func _capacity_fixture(failures: Array[String]) -> BrewSimulation:
 	var model: BrewSimulation = BrewSimulationModel.new()
 	model.new_campaign()
+	model.state.campaign_phase = "weekly_management"
 	model.state.week_number = 2
+	model.state.review_count = 2
 	model.state.stage = "complete"
 	_expect(model.begin_next_week().ok and model.state.stage == "capacity_planning", "Week 3 did not open the capacity board", failures)
 	return model

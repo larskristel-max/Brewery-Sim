@@ -109,7 +109,7 @@ func set_story_state(state: Dictionary) -> void:
 	var scene_id := "brewery"
 	var active_action := ""
 	for job in state.get("jobs", []):
-		if job.status == "active" and job.station != "fermentation_clock":
+		if job.status == "active" and state.get("stations", {}).has(str(job.station)):
 			active_action = str(job.action)
 			break
 	if str(state.get("stage", "")) == "appointment":
@@ -538,7 +538,10 @@ func _station_busy(id: String) -> bool:
 	return not management_state.is_empty() and management_state.stations.has(id) and bool(management_state.stations[id].busy)
 
 func _station_status_text(id: String) -> String:
-	return "%s / %s" % [STATION_NAMES.get(id, str(id).to_upper()), "ACTIVE" if _station_busy(id) else "IDLE"]
+	var station_name: String = STATION_NAMES.get(id, str(id).to_upper())
+	if id == "courtyard" and str(management_state.get("campaign_phase", "")) == "opening_commission":
+		station_name = "LOADING COURT"
+	return "%s / %s" % [station_name, "ACTIVE" if _station_busy(id) else "IDLE"]
 
 func _point(normalized: Vector2) -> Vector2:
 	var texture: Texture2D = SCENES.get(current_scene, SCENES.brewery)

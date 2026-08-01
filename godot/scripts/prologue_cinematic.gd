@@ -34,7 +34,7 @@ const SHOTS := [
 		"eyebrow": "ONE ASSET REMAINS",
 		"speaker": "COUNT ARMAND DE VALENNE",
 		"role": "",
-		"line": "The Old Stables still contain a brewhouse. Cold and neglected, certainly, but perhaps not beyond repair.",
+		"line": "There is still the brewhouse in the Old Stables. It has stood cold for years, but the copper may yet be sound.",
 		"beat": "appointment"
 	},
 	{
@@ -61,7 +61,7 @@ const SHOTS := [
 		"eyebrow": "APOLLINE’S WARNING",
 		"speaker": "APOLLINE DE VALENNE",
 		"role": "",
-		"line": "And if the first batch fails, we lose money we cannot replace. Hope is not an entry in my ledger.",
+		"line": "If the first batch fails, we lose money we cannot replace. I will not approve the expense on optimism alone.",
 		"beat": "ledger"
 	},
 	{
@@ -70,7 +70,7 @@ const SHOTS := [
 		"eyebrow": "WHY YOU WERE SUMMONED",
 		"speaker": "COUNT ARMAND DE VALENNE",
 		"role": "",
-		"line": "You know brewing. You know what can be repaired, what must be replaced, and what should be abandoned.",
+		"line": "You trained as a brewer. Inspect the place and tell us plainly whether it can earn more than it costs.",
 		"beat": "appointment"
 	},
 	{
