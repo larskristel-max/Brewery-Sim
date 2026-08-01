@@ -9,76 +9,110 @@ const COPPER := Color("#d79a5b")
 const MUTED := Color("#b8aa98")
 const MIN_ADVANCE_DELAY := 0.28
 
-const DOORS := preload("res://assets/cinematics/awakening-01-doors.png")
+const CLOSED_DOORS := preload("res://assets/cinematics/awakening-00-doors-closed.png")
+const OPEN_DOORS := preload("res://assets/cinematics/awakening-01-doors.png")
 const FIRE := preload("res://assets/cinematics/awakening-02-fire.png")
 const STAFF := preload("res://assets/cinematics/awakening-03-staff.png")
 const WORK := preload("res://assets/cinematics/awakening-04-work.png")
 
 const SHOTS := [
 	{
-		"duration": 8.0,
-		"texture": DOORS,
-		"eyebrow": "THE OLD STABLES · FIRST LIGHT",
-		"speaker": "",
-		"line": "The doors protested before they opened. Rain had swollen the oak, and rust held fast to the hinges.",
+		"texture": CLOSED_DOORS,
+		"eyebrow": "FIRST LIGHT",
+		"speaker": "NARRATION",
+		"role": "",
+		"line": "At dawn, the Old Stables stand locked behind rain-swollen oak and rusted iron.",
+		"interactive": "doors",
 		"beat": "door"
 	},
 	{
-		"duration": 8.0,
-		"texture": FIRE,
-		"eyebrow": "THE COLD COPPER",
-		"speaker": "",
-		"line": "The copper smelled of soot, wet stone, and old grain. One match was enough to show how much work remained.",
+		"texture": OPEN_DOORS,
+		"eyebrow": "THE BREWHOUSE",
+		"speaker": "NARRATION",
+		"role": "",
+		"line": "Dust covers the copper. Soot cakes the hearth, and debris blocks the chimney above it.",
 		"beat": "lamp"
 	},
 	{
-		"duration": 9.0,
 		"texture": STAFF,
-		"eyebrow": "THE FIRST HANDS",
-		"speaker": "JULES LAMBERT · CELLAR HAND",
-		"line": "We heard the doors. Thought the old place might need hands before it needed opinions.",
+		"eyebrow": "JULES LAMBERT",
+		"speaker": "JULES",
+		"role": "CELLAR HAND AND MAINTENANCE",
+		"line": "I am Jules. Before anyone lights that hearth, I need to clear the chimney and inspect the copper.",
 		"beat": "arrival"
 	},
 	{
-		"duration": 9.0,
 		"texture": STAFF,
-		"eyebrow": "THE FIRST HANDS",
-		"speaker": "MAËLLE RENARD · TAPROOM LEAD",
-		"line": "Jules has the broom. Noor brought breakfast. Inez has already counted what you cannot afford.",
+		"eyebrow": "MAËLLE RENARD",
+		"speaker": "MAËLLE",
+		"role": "TAPROOM AND PACKAGING",
+		"line": "The innkeeper will spare us one tap if the first keg is good. Give me beer worth serving.",
 		"beat": "arrival"
 	},
 	{
-		"duration": 9.0,
+		"texture": STAFF,
+		"eyebrow": "NOOR BENALI",
+		"speaker": "NOOR",
+		"role": "HOSPITALITY COOK",
+		"line": "Nobody repairs a brewhouse on an empty stomach. I have soup waiting in the kitchen.",
+		"beat": "arrival"
+	},
+	{
+		"texture": STAFF,
+		"eyebrow": "INEZ DE WILDE",
+		"speaker": "INEZ",
+		"role": "ESTATE QUARTERMASTER",
+		"line": "Brewmaster [PLAYER NAME], the bakehouse can spare eighteen kilos of malt and one crock of fresh yeast.",
+		"beat": "ledger"
+	},
+	{
+		"texture": FIRE,
+		"eyebrow": "THE MISSING HOPS",
+		"speaker": "INEZ",
+		"role": "ESTATE QUARTERMASTER",
+		"line": "There are no hops in store. Wild vines grow beside the millstream, but their cones must be inspected before use.",
+		"beat": "ledger"
+	},
+	{
 		"texture": WORK,
-		"eyebrow": "THE FIRST WORK",
-		"speaker": "",
-		"line": "No miracle followed. Only sweeping, scraping, counting, and the first honest flame under the copper.",
+		"eyebrow": "WORK BEGINS",
+		"speaker": "NARRATION",
+		"role": "",
+		"line": "Jules climbs to the chimney. Inez checks the tools while Maëlle and Noor clear rubbish from the brewhouse.",
 		"beat": "work"
 	},
 	{
-		"duration": 8.0,
 		"texture": WORK,
-		"eyebrow": "FORTY-TWO DAYS REMAIN",
-		"speaker": "INEZ DE WILDE · ESTATE QUARTERMASTER",
-		"line": "Spend the first one making this room safe.",
-		"beat": "ledger"
+		"eyebrow": "THE COPPER BREWHOUSE",
+		"speaker": "JULES",
+		"role": "CELLAR HAND AND MAINTENANCE",
+		"line": "We cannot judge the copper beneath all that dirt. Inspect it first, then we will know what needs repairing.",
+		"beat": "work"
 	}
 ]
 
 var shot_index := -1
 var shot_elapsed := 0.0
 var complete := false
+var player_name := "Henri"
+var doors_opened := false
 var backdrop: TextureRect
 var eyebrow: Label
 var speaker: Label
+var speaker_role: Label
 var dialogue: Label
 var progress: Label
 var transition: ColorRect
 var subtitle_panel: PanelContainer
 var skip_button: Button
 var chapter_label: Label
+var advance_button: Button
+var door_button: Button
 
-func start() -> void:
+func start(chosen_player_name := "Henri") -> void:
+	player_name = str(chosen_player_name).strip_edges().left(14)
+	if player_name.is_empty():
+		player_name = "Henri"
 	set_process(true)
 	_set_shot(0)
 
@@ -97,7 +131,10 @@ func _process(delta: float) -> void:
 	var shot: Dictionary = SHOTS[shot_index]
 	var reveal_duration: float = clampf(str(shot.line).length() * 0.026, 0.7, 2.6)
 	dialogue.visible_ratio = clampf(shot_elapsed / reveal_duration, 0.0, 1.0)
-	progress.text = "TAP TO CONTINUE · SKIP ABOVE" if size.y > size.x * 1.28 else "SPACE TO CONTINUE · ESC TO SKIP"
+	if shot_index == 0 and not doors_opened:
+		progress.text = "TAP THE STABLE DOORS TO OPEN THEM"
+	else:
+		progress.text = "TAP TO CONTINUE · SKIP ABOVE" if size.y > size.x * 1.28 else "TAP TO CONTINUE · SPACE / ENTER · ESC TO SKIP"
 
 func _unhandled_input(event: InputEvent) -> void:
 	if complete or not visible:
@@ -107,11 +144,16 @@ func _unhandled_input(event: InputEvent) -> void:
 			finish(true)
 			get_viewport().set_input_as_handled()
 		elif event.keycode in [KEY_SPACE, KEY_ENTER]:
-			advance()
+			if shot_index == 0 and not doors_opened:
+				_open_doors()
+			else:
+				advance()
 			get_viewport().set_input_as_handled()
 
 func advance() -> void:
 	if complete:
+		return
+	if shot_index == 0 and not doors_opened:
 		return
 	if shot_elapsed < MIN_ADVANCE_DELAY:
 		return
@@ -139,12 +181,29 @@ func _set_shot(index: int) -> void:
 	eyebrow.text = str(shot.eyebrow)
 	speaker.text = str(shot.speaker)
 	speaker.visible = not speaker.text.is_empty()
-	dialogue.text = str(shot.line)
+	speaker_role.text = str(shot.get("role", ""))
+	speaker_role.visible = not speaker_role.text.is_empty()
+	dialogue.text = str(shot.line).replace("[PLAYER NAME]", player_name)
 	dialogue.visible_ratio = 0.0
+	var waiting_for_doors := str(shot.get("interactive", "")) == "doors" and not doors_opened
+	advance_button.mouse_filter = Control.MOUSE_FILTER_IGNORE if waiting_for_doors else Control.MOUSE_FILTER_STOP
+	door_button.visible = waiting_for_doors
 	transition.color.a = 0.72 if index == 0 else 0.46
 	var fade := create_tween()
 	fade.tween_property(transition, "color:a", 0.0, 0.8).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	beat.emit(str(shot.beat))
+
+func _open_doors() -> void:
+	if complete or shot_index != 0 or doors_opened:
+		return
+	doors_opened = true
+	door_button.visible = false
+	_play_door_transition()
+
+func _play_door_transition() -> void:
+	var fade := create_tween()
+	fade.tween_property(transition, "color:a", 0.78, 0.18)
+	fade.tween_callback(_set_shot.bind(1))
 
 func _reveal_duration() -> float:
 	return clampf(str(SHOTS[shot_index].line).length() * 0.026, 0.7, 2.6)
@@ -175,13 +234,29 @@ func _build_interface() -> void:
 			bar.anchor_bottom = 1.0
 		add_child(bar)
 
-	var advance_button := Button.new()
+	advance_button = Button.new()
 	advance_button.name = "AdvanceAwakening"
 	advance_button.flat = true
 	advance_button.focus_mode = Control.FOCUS_NONE
 	advance_button.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	advance_button.pressed.connect(advance)
 	add_child(advance_button)
+
+	door_button = Button.new()
+	door_button.name = "OpenStableDoors"
+	door_button.text = "OPEN THE STABLE DOORS"
+	door_button.tooltip_text = "Open the Old Stables"
+	door_button.focus_mode = Control.FOCUS_ALL
+	door_button.add_theme_font_size_override("font_size", 11)
+	door_button.add_theme_color_override("font_color", CREAM)
+	var door_style := StyleBoxFlat.new()
+	door_style.bg_color = Color(0.05, 0.035, 0.025, 0.54)
+	door_style.border_color = Color(0.84, 0.55, 0.30, 0.88)
+	door_style.set_border_width_all(2)
+	door_style.set_corner_radius_all(7)
+	door_button.add_theme_stylebox_override("normal", door_style)
+	door_button.pressed.connect(_open_doors)
+	add_child(door_button)
 
 	skip_button = Button.new()
 	skip_button.name = "SkipAwakening"
@@ -229,6 +304,11 @@ func _build_interface() -> void:
 	speaker.add_theme_color_override("font_color", Color("#e5bd8a"))
 	speaker.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	copy.add_child(speaker)
+	speaker_role = Label.new()
+	speaker_role.add_theme_font_size_override("font_size", 9)
+	speaker_role.add_theme_color_override("font_color", MUTED)
+	speaker_role.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	copy.add_child(speaker_role)
 	dialogue = Label.new()
 	dialogue.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	dialogue.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -277,6 +357,10 @@ func _apply_responsive_layout() -> void:
 		skip_button.offset_bottom = 62
 		chapter_label.offset_left = 20
 		chapter_label.offset_top = 27
+		door_button.anchor_left = 0.24
+		door_button.anchor_top = 0.31
+		door_button.anchor_right = 0.76
+		door_button.anchor_bottom = 0.52
 	else:
 		backdrop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 		backdrop.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
@@ -292,3 +376,11 @@ func _apply_responsive_layout() -> void:
 		skip_button.offset_bottom = 64
 		chapter_label.offset_left = 34
 		chapter_label.offset_top = 29
+		door_button.anchor_left = 0.41
+		door_button.anchor_top = 0.19
+		door_button.anchor_right = 0.73
+		door_button.anchor_bottom = 0.58
+	door_button.offset_left = 0
+	door_button.offset_top = 0
+	door_button.offset_right = 0
+	door_button.offset_bottom = 0

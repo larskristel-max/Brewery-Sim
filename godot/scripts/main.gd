@@ -26,7 +26,6 @@ var selected_station := ""
 var cue_player: AudioStreamPlayer
 var cue_streams: Dictionary = {}
 var prologue_active := false
-var awaiting_first_light := false
 var awakening_active := false
 var portrait_layout := false
 var compact_layout := false
@@ -40,7 +39,6 @@ func _ready() -> void:
 	resized.connect(_apply_responsive_layout)
 	$World.station_selected.connect(_on_world_station_selected)
 	$World.station_hovered.connect(_on_world_station_hovered)
-	$World.first_light_activated.connect(_on_first_light_activated)
 	_refresh(true)
 	_show_title_screen()
 	_apply_responsive_layout()
@@ -61,7 +59,7 @@ func _process(delta: float) -> void:
 		_refresh()
 
 func _unhandled_input(event: InputEvent) -> void:
-	if prologue_active or awaiting_first_light or awakening_active:
+	if prologue_active or awakening_active:
 		return
 	if event.is_action_pressed("toggle_pause"): _set_speed(0)
 	elif event.is_action_pressed("speed_one"): _set_speed(1)
@@ -547,7 +545,8 @@ func _apply_responsive_layout() -> void:
 	portrait_layout = aspect < 0.78
 	compact_layout = portrait_layout or size.x < 960.0 or size.y < 650.0
 	mobile_landscape_layout = not portrait_layout and physical_size.x <= 1000.0 and physical_size.y <= 600.0 and physical_size.x > physical_size.y
-	ui.rotation_gate.visible = portrait_layout
+	var opening_visible := not started or prologue_active or awakening_active or (ui.has("customization") and is_instance_valid(ui.customization))
+	ui.rotation_gate.visible = portrait_layout and not opening_visible
 	_layout_top_bar()
 	_layout_guidance()
 	_layout_command_dock()
@@ -784,26 +783,13 @@ func _layout_story_overlays() -> void:
 			_set_anchor_rect(ui.title_card, 0.25, 0.10, 0.75, 0.90)
 		else:
 			_set_anchor_rect(ui.title_card, 0.31, 0.23, 0.69, 0.77)
-	if ui.has("customization_story") and is_instance_valid(ui.customization_story):
-		ui.customization_story.visible = not portrait_layout
-		if compact_layout and not portrait_layout:
-			_set_anchor_rect(ui.customization_story, 0.035, 0.52, 0.48, 0.95)
-		elif not portrait_layout:
-			_set_anchor_rect(ui.customization_story, 0.035, 0.60, 0.47, 0.91)
 	if ui.has("customization_card") and is_instance_valid(ui.customization_card):
 		if portrait_layout:
-			_set_anchor_rect(ui.customization_card, 0.035, 0.08, 0.965, 0.96)
+			_set_anchor_rect(ui.customization_card, 0.035, 0.14, 0.965, 0.70)
 		elif compact_layout:
-			_set_anchor_rect(ui.customization_card, 0.60, 0.05, 0.97, 0.95)
+			_set_anchor_rect(ui.customization_card, 0.56, 0.05, 0.96, 0.95)
 		else:
-			_set_anchor_rect(ui.customization_card, 0.62, 0.15, 0.965, 0.72)
-	if ui.has("first_light_card") and is_instance_valid(ui.first_light_card):
-		if portrait_layout:
-			_set_anchor_rect(ui.first_light_card, 0.035, 0.10, 0.965, 0.30)
-		elif compact_layout:
-			_set_anchor_rect(ui.first_light_card, 0.58, 0.08, 0.97, 0.35)
-		else:
-			_set_anchor_rect(ui.first_light_card, 0.61, 0.14, 0.965, 0.32)
+			_set_anchor_rect(ui.customization_card, 0.58, 0.18, 0.95, 0.78)
 
 func _move_control(control: Control, target: Container, index: int) -> void:
 	if control.get_parent() != target:
@@ -842,7 +828,7 @@ func _show_title_screen() -> void:
 	copy.add_theme_constant_override("separation", 14)
 	card.add_child(copy)
 	var estate := Label.new()
-	estate.text = "CHÂTEAU DE VALENNE"
+	estate.text = "CHÂTEAU DE VALENNE, 1901"
 	estate.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	estate.add_theme_font_size_override("font_size", 11)
 	estate.add_theme_color_override("font_color", COPPER)
@@ -854,28 +840,20 @@ func _show_title_screen() -> void:
 	title.add_theme_color_override("font_color", CREAM)
 	copy.add_child(title)
 	var subtitle := Label.new()
-	subtitle.text = "A brewery management story"
+	subtitle.text = "A Brewer’s Story"
 	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	subtitle.add_theme_font_size_override("font_size", 16)
 	subtitle.add_theme_color_override("font_color", SAGE)
 	copy.add_child(subtitle)
-	copy.add_child(HSeparator.new())
-	var invitation := Label.new()
-	invitation.text = "Enter the estate. The story begins before the first brew."
-	invitation.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	invitation.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	invitation.add_theme_font_size_override("font_size", 13)
-	invitation.add_theme_color_override("font_color", Color("#d2c4b0"))
-	copy.add_child(invitation)
 	var begin := Button.new()
-	begin.text = "Begin the story"
+	begin.text = "BEGIN"
 	begin.custom_minimum_size = Vector2(0, 58)
 	begin.add_theme_font_size_override("font_size", 16)
 	begin.add_theme_stylebox_override("normal", _button_style(Color(0.37,0.19,0.09,0.98), COPPER_BRIGHT, 1))
 	begin.pressed.connect(_start_opening_story)
 	copy.add_child(begin)
 	var note := Label.new()
-	note.text = "The cinematic can be skipped at any time."
+	note.text = "Cinematics may be skipped at any time."
 	note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	note.add_theme_font_size_override("font_size", 10)
 	note.add_theme_color_override("font_color", MUTED)
@@ -892,46 +870,18 @@ func _start_opening_story() -> void:
 	_start_prologue()
 
 func _show_customization() -> void:
-	$World.set_story_scene("appointment")
+	$World.reset_story_camera("appointment")
 	var shade := ColorRect.new()
 	shade.name = "Customization"
 	shade.color = Color(0.01, 0.012, 0.018, 0.32)
 	shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(shade)
 	ui.customization = shade
-	var story := PanelContainer.new()
-	story.anchor_left = 0.035
-	story.anchor_top = 0.60
-	story.anchor_right = 0.47
-	story.anchor_bottom = 0.91
-	story.add_theme_stylebox_override("panel", _panel_style(0.88, 10, 20))
-	shade.add_child(story)
-	ui.customization_story = story
-	var story_content := VBoxContainer.new()
-	story_content.add_theme_constant_override("separation", 7)
-	story.add_child(story_content)
-	var speaker := Label.new()
-	speaker.text = "COUNT ARMAND DE VALENNE"
-	speaker.add_theme_font_size_override("font_size", 10)
-	speaker.add_theme_color_override("font_color", COPPER_BRIGHT)
-	story_content.add_child(speaker)
-	var line := Label.new()
-	line.text = "“Then light it. Brew one honest beer.\nIf the village asks for a second, Valenne has a future.”"
-	line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	line.add_theme_font_size_override("font_size", 21)
-	line.add_theme_color_override("font_color", CREAM)
-	story_content.add_child(line)
-	var terms := Label.new()
-	terms.text = "Apolline has left a line in the ledger for the brewer who accepts."
-	terms.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	terms.add_theme_font_size_override("font_size", 11)
-	terms.add_theme_color_override("font_color", SAGE)
-	story_content.add_child(terms)
 	var card := PanelContainer.new()
-	card.anchor_left = 0.62
-	card.anchor_top = 0.15
-	card.anchor_right = 0.965
-	card.anchor_bottom = 0.72
+	card.anchor_left = 0.58
+	card.anchor_top = 0.18
+	card.anchor_right = 0.95
+	card.anchor_bottom = 0.78
 	card.add_theme_stylebox_override("panel", _panel_style(0.97, 12, 22))
 	shade.add_child(card)
 	ui.customization_card = card
@@ -944,18 +894,18 @@ func _show_customization() -> void:
 	form.add_theme_constant_override("separation", 13)
 	form_scroll.add_child(form)
 	var eyebrow := Label.new()
-	eyebrow.text = "APPOINTMENT LEDGER · DAY ONE"
+	eyebrow.text = "APPOINTMENT LEDGER"
 	eyebrow.add_theme_font_size_override("font_size", 10)
 	eyebrow.add_theme_color_override("font_color", COPPER)
 	form.add_child(eyebrow)
 	var title := Label.new()
-	title.text = "Accept the stable key"
+	title.text = "Castle Brewmaster"
 	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	title.add_theme_font_size_override("font_size", 29)
 	title.add_theme_color_override("font_color", CREAM)
 	form.add_child(title)
 	var copy := Label.new()
-	copy.text = "The Count has made his terms. Enter the name Apolline will place beside the Old Stables."
+	copy.text = "Sign your name and accept responsibility for the Old Stables brewery."
 	copy.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	copy.add_theme_font_size_override("font_size", 13)
 	copy.add_theme_color_override("font_color", Color("#d2c4b0"))
@@ -966,27 +916,16 @@ func _show_customization() -> void:
 	name_label.add_theme_color_override("font_color", COPPER)
 	form.add_child(name_label)
 	var name_input := LineEdit.new()
-	name_input.text = "Elise"
+	name_input.text = "Henri"
 	name_input.max_length = 14
 	name_input.custom_minimum_size = Vector2(0, 44)
 	form.add_child(name_input)
-	var coat_label := Label.new()
-	coat_label.text = "COAT COLOUR · COSMETIC ONLY"
-	coat_label.add_theme_font_size_override("font_size", 9)
-	coat_label.add_theme_color_override("font_color", COPPER)
-	form.add_child(coat_label)
-	var coat := OptionButton.new()
-	coat.add_item("Kiln copper")
-	coat.add_item("Cellar teal")
-	coat.add_item("Oxblood plum")
-	coat.custom_minimum_size = Vector2(0, 44)
-	form.add_child(coat)
 	var begin := Button.new()
-	begin.text = "Accept the stable key"
+	begin.text = "ACCEPT THE KEY"
 	begin.custom_minimum_size = Vector2(0, 54)
 	begin.add_theme_font_size_override("font_size", 15)
 	begin.add_theme_stylebox_override("normal", _button_style(Color(0.37,0.19,0.09,0.98), COPPER_BRIGHT, 1))
-	begin.pressed.connect(begin_campaign_with.bind(name_input, coat))
+	begin.pressed.connect(begin_campaign_with.bind(name_input))
 	form.add_child(begin)
 	ui.top_bar.visible = false
 	ui.command_dock.visible = false
@@ -994,10 +933,10 @@ func _show_customization() -> void:
 	name_input.grab_focus()
 	_apply_responsive_layout()
 
-func begin_campaign_with(name_source, coat_source = null) -> void:
+func begin_campaign_with(name_source, _coat_source = null) -> void:
 	var display_name := str(name_source.text if name_source is LineEdit else name_source).strip_edges()
-	var coat_index := int(coat_source.selected if coat_source is OptionButton else coat_source)
-	if display_name.is_empty(): display_name = "Brewmaster"
+	var coat_index := 0
+	if display_name.is_empty(): display_name = "Henri"
 	simulation.new_campaign(display_name, coat_index)
 	started = true
 	speed = 0
@@ -1009,7 +948,6 @@ func begin_campaign_with(name_source, coat_source = null) -> void:
 	if not result.ok and str(simulation.state.stage) != "recommission":
 		_show_result(result)
 		return
-	awaiting_first_light = false
 	$World.set_story_scene("brewery")
 	_play_cue("key")
 	_refresh(true)
@@ -1017,7 +955,6 @@ func begin_campaign_with(name_source, coat_source = null) -> void:
 
 func _start_prologue() -> void:
 	prologue_active = true
-	awaiting_first_light = false
 	var prologue: Control = PrologueCinematicScene.new()
 	prologue.name = "PrologueCinematic"
 	prologue.finished.connect(_on_prologue_finished)
@@ -1034,62 +971,9 @@ func _on_prologue_finished(_was_skipped: bool) -> void:
 		ui.prologue.queue_free()
 	_show_customization()
 
-func _show_first_light_handoff() -> void:
-	if ui.has("first_light_card") and is_instance_valid(ui.first_light_card):
-		ui.first_light_card.queue_free()
-	var card := PanelContainer.new()
-	card.name = "FirstLightObjective"
-	card.anchor_left = 0.61
-	card.anchor_top = 0.14
-	card.anchor_right = 0.965
-	card.anchor_bottom = 0.32
-	card.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	card.add_theme_stylebox_override("panel", _panel_style(0.94, 10, 18))
-	add_child(card)
-	ui.first_light_card = card
-	var copy := VBoxContainer.new()
-	copy.add_theme_constant_override("separation", 5)
-	card.add_child(copy)
-	var eyebrow := Label.new()
-	eyebrow.text = "YOUR FIRST ACT AS CASTLE BREWMASTER"
-	eyebrow.add_theme_font_size_override("font_size", 9)
-	eyebrow.add_theme_color_override("font_color", COPPER)
-	copy.add_child(eyebrow)
-	var title := Label.new()
-	title.name = "Title"
-	title.text = "Open the Old Stables"
-	title.add_theme_font_size_override("font_size", 25)
-	title.add_theme_color_override("font_color", CREAM)
-	copy.add_child(title)
-	ui.first_light_title = title
-	var instruction := Label.new()
-	instruction.name = "Instruction"
-	instruction.text = "Click the glowing stable doors. Let the first light in before you wake the copper."
-	instruction.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	instruction.add_theme_font_size_override("font_size", 12)
-	instruction.add_theme_color_override("font_color", Color("#d5c7b4"))
-	copy.add_child(instruction)
-	ui.first_light_instruction = instruction
-	_reveal(card)
-
-func _on_first_light_activated() -> void:
-	if not awaiting_first_light:
-		return
-	awaiting_first_light = false
-	_play_cue("lamp")
-	if ui.has("first_light_title") and is_instance_valid(ui.first_light_title):
-		ui.first_light_title.text = "The Old Stables awaken"
-	if ui.has("first_light_instruction") and is_instance_valid(ui.first_light_instruction):
-		ui.first_light_instruction.text = "Your first real brew begins now."
-	await get_tree().create_timer(0.45).timeout
-	if ui.has("first_light_card") and is_instance_valid(ui.first_light_card):
-		var fade := create_tween()
-		fade.tween_property(ui.first_light_card, "modulate:a", 0.0, 0.32)
-		fade.tween_callback(ui.first_light_card.queue_free)
-	_start_awakening_cinematic()
-
 func _start_awakening_cinematic() -> void:
 	awakening_active = true
+	_apply_responsive_layout()
 	ui.top_bar.visible = false
 	ui.command_dock.visible = false
 	ui.guidance_panel.visible = false
@@ -1101,7 +985,7 @@ func _start_awakening_cinematic() -> void:
 	awakening.beat.connect(_play_cue)
 	add_child(awakening)
 	ui.awakening = awakening
-	awakening.start()
+	awakening.start(str(simulation.state.player.name))
 
 func _on_awakening_finished(_was_skipped: bool) -> void:
 	if not awakening_active:
@@ -1111,14 +995,17 @@ func _on_awakening_finished(_was_skipped: bool) -> void:
 		ui.awakening.queue_free()
 	$World.visible = true
 	_complete_first_light_handoff()
+	_apply_responsive_layout()
 
 func _complete_first_light_handoff() -> void:
 	ui.top_bar.visible = true
 	ui.command_dock.visible = true
 	ui.guidance_panel.visible = true
-	speed = 1
-	_set_status("The lamps are lit. Select the copper brewhouse and begin its recommissioning.", true)
-	$World.show_feedback("The Old Stables awaken. Your first brew begins now.", true)
+	speed = 0
+	selected_station = ""
+	$World.focus_station("brewhouse")
+	_set_status("CASTLE BREWMASTER APPOINTED · Select the copper brewhouse to inspect its condition.", true)
+	$World.show_feedback("DAY ONE · OLD STABLES · Select the highlighted copper brewhouse.", true)
 	simulation.save_game()
 	_refresh(true)
 
@@ -1132,7 +1019,7 @@ func _refresh(force_structure := false) -> void:
 	ui.confidence.text = "%d / 100" % int(state.count_confidence)
 	ui.community.text = "%d / 100" % int(state.community_trust)
 	ui.restoration.text = "%d%%" % int(state.restoration)
-	ui.runway.text = "%d DAYS" % int(state.runway_days)
+	ui.runway.text = "APPROX. %d DAYS" % int(state.runway_days)
 	ui.rank.text = str(state.authority_role).to_upper()
 	ui.stage.text = _stage_label(state)
 	ui.stage.tooltip_text = _stage_label(state)
@@ -1176,6 +1063,7 @@ func _stage_label(state: Dictionary) -> String:
 	var jobs := simulation.get_active_jobs()
 	if jobs.size() == 1: return "IN PROGRESS · %s" % str(jobs[0].label).to_upper()
 	if jobs.size() > 1: return "%d WORK ORDERS ACTIVE" % jobs.size()
+	if state.stage == "recommission": return "DAY ONE · OLD STABLES"
 	if state.stage == "week_planning": return "WEEK %d · PRODUCTION PLAN" % int(state.week_number)
 	if state.stage == "delivery_recovery": return "DELIVERY ALERT · RECOVERY"
 	if state.stage == "capacity_planning": return "WEEK %d · CAPACITY BOARD" % int(state.week_number)
@@ -1536,8 +1424,15 @@ func _on_staff_selected(index: int) -> void:
 func _on_world_station_selected(id: String) -> void:
 	selected_station = id
 	last_structure_signature = ""
+	if id == "brewhouse" and str(simulation.state.stage) == "recommission" and not bool(simulation.state.get("brewhouse_inspected", false)):
+		var inspection := simulation.inspect_brewhouse()
+		_set_status(str(inspection.message), bool(inspection.ok))
+		simulation.save_game()
 	_refresh(true)
-	$World.show_feedback("%s selected — available commands are below." % id.replace("_"," ").capitalize(), true)
+	if id == "brewhouse" and str(simulation.state.stage) == "recommission":
+		$World.show_feedback("COPPER BREWHOUSE · CONDITION %d · CLEANLINESS %d · Recommissioning work is now available." % [int(simulation.state.stations.brewhouse.condition), int(simulation.state.stations.brewhouse.cleanliness)], true)
+	else:
+		$World.show_feedback("%s selected — available commands are below." % id.replace("_"," ").capitalize(), true)
 	_play_cue("select")
 
 func _close_mobile_context() -> void:
@@ -1610,6 +1505,7 @@ func _context_title() -> String:
 	if simulation.state.stage == "operations_council": return "The production ledger"
 	if simulation.state.stage == "council": return "Apolline opens the ledger"
 	if simulation.state.stage == "complete": return "Week %d closes" % int(simulation.state.get("week_number", 1))
+	if selected_station == "brewhouse": return "Copper brewhouse"
 	if not selected_station.is_empty(): return selected_station.replace("_"," ").capitalize()
 	return "The First Real Brew" if int(simulation.state.get("week_number", 1)) == 1 else str(simulation.state.batch.recipe)
 
@@ -1675,11 +1571,13 @@ func _consequence_text() -> String:
 	if state.pending_issue == "mash_drift":
 		return "LANTERN BLONDE · protect its crisp finish\nTrade time and confidence against volume and body."
 	if state.pending_issue == "missing_hops":
-		return "LANTERN BLONDE · bitterness is unresolved\nChoose estate identity, costly quality, or a softer beer."
+		return "LANTERN BLONDE · no usable hops are in store\nInspect the millstream vines, buy hops, or brew a softer beer."
 	if state.pending_issue == "amber_lauter_stall":
 		return "STABLE AMBER · quality target %d\nProtect its toasted depth without forcing a harsh runoff." % int(state.promise.get("quality_target", 72))
 	if state.pending_issue != "":
 		return "%s · production judgment\nEvery response changes flavor, schedule, cash, or trust." % str(state.batch.get("recipe", "Batch")).to_upper()
+	if state.stage == "recommission" and selected_station == "brewhouse":
+		return "CONDITION · %d / 100 · CLEANLINESS · %d / 100\nWORK REQUIRED · clear the chimney, clean the copper, and inspect the hearth before lighting it." % [int(state.stations.brewhouse.condition), int(state.stations.brewhouse.cleanliness)]
 	if state.stage == "council":
 		var outcome := str(state.service_result.get("contract_outcome", "")).replace("_", " ").to_upper()
 		if not outcome.is_empty():
@@ -1693,14 +1591,14 @@ func _consequence_text() -> String:
 func _issue_title() -> String:
 	match str(simulation.state.pending_issue):
 		"mash_drift": return "The copper runs hot"
-		"missing_hops": return "The road is empty"
+		"missing_hops": return "The hops need judgment"
 		"amber_lauter_stall": return "The amber runoff has stalled"
 		_: return ""
 
 func _guidance_text() -> String:
 	match str(simulation.state.stage):
 		"appointment": return "1 · Accept the stable key below — your first authority is the brewery itself."
-		"recommission": return "2 · Select the copper brewhouse, choose a worker, then recommission it."
+		"recommission": return "1 · Select the copper brewhouse to inspect its condition." if not bool(simulation.state.get("brewhouse_inspected", false)) else "Inspection complete · choose a worker and recommission the copper."
 		"ready_to_mash": return "3 · Return to the brewhouse and begin the %s mash." % simulation.state.batch.recipe
 		_: return ""
 
@@ -1725,9 +1623,8 @@ func _handle_story_transition(state: Dictionary) -> void:
 				$World.show_feedback("Every production commitment has reached the ledger.", true)
 				_set_status("Time is paused for the Week %d production council." % int(state.get("week_number", 1)), true)
 			"recommission":
-				if not awaiting_first_light:
-					$World.show_feedback("The stable key is yours. Wake the copper brewhouse.", true)
-					_set_status("Select the brewhouse marker and assign its recommissioning.", true)
+				$World.show_feedback("The stable key is yours. Inspect the copper brewhouse.", true)
+				_set_status("Select the highlighted copper brewhouse to inspect its condition.", true)
 			"ready_to_mash":
 				$World.show_feedback("The copper is ready. %s can begin." % state.batch.recipe, true)
 				_set_status("The brewhouse is ready for the next mash.", true)

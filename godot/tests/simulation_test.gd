@@ -4,7 +4,7 @@ const BrewSimulationModel = preload("res://scripts/brew_simulation.gd")
 
 func run() -> Array[String]:
 	var failures: Array[String] = []
-	var craft: BrewSimulation = _run_route("cut_heat_stir", "estate_herbs", "reinvest", failures)
+	var craft: BrewSimulation = _run_route("cut_heat_stir", "inspect_wild_hops", "reinvest", failures)
 	var economy: BrewSimulation = _run_route("accept_rich_body", "reduce_bitterness", "pay_creditor", failures)
 	_expect(craft.state.stage == "complete", "Craft route did not complete", failures)
 	_expect(economy.state.stage == "complete", "Economy route did not complete", failures)
@@ -34,9 +34,14 @@ func run() -> Array[String]:
 func _run_route(mash_choice: String, hop_choice: String, council_choice: String, failures: Array[String]) -> BrewSimulation:
 	var model: BrewSimulation = BrewSimulationModel.new()
 	model.new_campaign("Elise", 0)
+	_expect(float(model.state.inventory.malt.quantity) == 18.0 and str(model.state.inventory.malt.source) == "estate_bakehouse", "Opening malt was not sourced from the estate bakehouse", failures)
+	_expect(float(model.state.inventory.yeast.quantity) == 1.0 and str(model.state.inventory.yeast.source) == "estate_bakehouse", "Opening yeast was not one bakehouse crock", failures)
+	_expect(float(model.state.inventory.citrus_hops.quantity) == 0.0 and str(model.state.inventory.citrus_hops.status) == "requires_inspection", "Wild hops were granted as usable opening inventory", failures)
 	_expect(model.is_staff_available("player"), "Brewmaster should be available at campaign start", failures)
 	_expect(not model.is_staff_available("noor"), "Noor's schedule should keep her off shift at campaign start", failures)
 	_expect(model.start_action("accept_key").ok, "Could not accept stable key", failures)
+	_expect(not model.start_action("recommission", "jules").ok, "Brewhouse work began before the required inspection", failures)
+	_expect(model.inspect_brewhouse().ok and bool(model.state.brewhouse_inspected), "Copper inspection did not unlock its condition record", failures)
 	_expect(model.start_action("recommission", "jules").ok, "Could not assign Jules to recommissioning", failures)
 	_expect(not model.start_action("recommission", "player").ok, "Busy station accepted a second job", failures)
 	model.advance_to_next_milestone()
@@ -88,6 +93,7 @@ func _test_save_round_trip(source: BrewSimulation, failures: Array[String]) -> v
 	loaded.new_campaign("Other", 2)
 	_expect(loaded.load_game(path).ok, "Could not load campaign save", failures)
 	_expect(loaded.state.player.name == source.state.player.name, "Save did not preserve customized player", failures)
+	_expect(bool(loaded.state.get("brewhouse_inspected", false)), "Save did not preserve the copper inspection", failures)
 	_expect(loaded.state.issue_history == source.state.issue_history, "Save did not preserve brewing decisions", failures)
 	_expect(int(loaded.state.council_result.score) == int(source.state.council_result.score), "Save did not preserve council score", failures)
 	_expect(str(loaded.state.council_result.choice) == str(source.state.council_result.choice), "Save did not preserve council choice", failures)
@@ -264,7 +270,7 @@ func _continue_week_two_contract(model: BrewSimulation, plan_id: String, failure
 	model.advance_to_next_milestone()
 	if plan_id == "festival_rush":
 		_expect(model.choose_issue("cut_heat_stir").ok, "Festival mash recovery failed", failures)
-		_expect(model.choose_issue("estate_herbs").ok, "Festival ingredient recovery failed", failures)
+		_expect(model.choose_issue("inspect_wild_hops").ok, "Festival ingredient recovery failed", failures)
 	else:
 		_expect(model.choose_issue("rake_recirculate").ok, "Reserve runoff recovery failed", failures)
 	_ensure_on_shift(model, "player")

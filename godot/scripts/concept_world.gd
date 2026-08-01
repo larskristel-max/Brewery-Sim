@@ -119,7 +119,7 @@ func set_story_state(state: Dictionary) -> void:
 	elif active_action == "package" or str(state.get("stage", "")) == "ready_to_package":
 		scene_id = "packaging"
 	elif active_action == "serve" or str(state.get("stage", "")) == "ready_to_serve":
-		scene_id = "courtyard"
+		scene_id = "packaging" if str(state.get("promise", {}).get("venue", "")) == "village_inn" else "courtyard"
 	elif str(state.get("stage", "")) in ["council", "complete"]:
 		scene_id = "council"
 	set_story_scene(scene_id)
@@ -138,6 +138,14 @@ func set_cinematic_camera(scene_id: String, focus: Vector2, zoom: float) -> void
 	set_story_scene(scene_id)
 	camera_focus_target = focus
 	camera_zoom_target = zoom
+
+func reset_story_camera(scene_id: String) -> void:
+	set_story_scene(scene_id)
+	camera_focus_target = _default_focus(scene_id)
+	camera_zoom_target = 1.0
+	camera_focus = camera_focus_target
+	camera_zoom = camera_zoom_target
+	queue_redraw()
 
 func begin_first_light() -> void:
 	set_story_scene("brewery")
@@ -219,10 +227,11 @@ func _layout_hotspots() -> void:
 
 func _update_station_buttons() -> void:
 	var interactive := current_scene == "brewery" and not first_light_waiting and first_light_reveal >= 0.92
+	var copper_only := not management_state.is_empty() and str(management_state.get("stage", "")) == "recommission" and not bool(management_state.get("brewhouse_inspected", false))
 	for id in station_buttons:
 		var button: Button = station_buttons[id]
-		button.visible = interactive
-		button.disabled = not interactive
+		button.visible = interactive and (not copper_only or id == "brewhouse")
+		button.disabled = not interactive or (copper_only and id != "brewhouse")
 		button.modulate = Color.WHITE if selected_station == "" or selected_station == id else Color(1, 1, 1, 0.55)
 	_layout_hotspots()
 
@@ -347,7 +356,10 @@ func _draw_first_light_state() -> void:
 
 func _draw_station_state() -> void:
 	var font := ThemeDB.fallback_font
+	var copper_only := not management_state.is_empty() and str(management_state.get("stage", "")) == "recommission" and not bool(management_state.get("brewhouse_inspected", false))
 	for id in STATION_POINTS:
+		if copper_only and id != "brewhouse":
+			continue
 		var point: Vector2 = _station_point(id)
 		var busy: bool = _station_busy(id)
 		var highlighted: bool = id == selected_station or id == hovered_station

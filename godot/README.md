@@ -4,13 +4,13 @@ This folder is the clean Godot reboot of Brewery-Sim. The original TypeScript pr
 
 ## Play
 
-Open `project.godot` in Godot 4.7.1 and run the project. “Night of First Lights” is a complete station-driven management slice presented through staged, animated 2.5D scenes.
+Open `project.godot` in Godot 4.7.1 and run the project. “The Old Stables” is a complete station-driven management slice presented through staged, animated 2.5D scenes.
 
 1. Enter the skippable in-engine prologue, then customize the Castle Brewmaster. Cinematic beats wait indefinitely; Space or a tap advances and Escape skips.
 2. Accept the Count's mandate and move directly into the Old Stables awakening cinematic before play begins.
 3. Select equipment in the brewery, choose a named worker, and issue the contextual work order from the command dock.
 4. Recommission the copper brewhouse, mash, solve the temperature drift, choose a response to the missing hop delivery, boil, clean and purge the fermenter, transfer, ferment and package.
-5. Prepare the courtyard during fermentation, serve the 20 L keg, and choose how to answer Apolline at the weekly council.
+5. Arrange delivery through the village inn during fermentation, send the 20 L keg, and choose how to answer Apolline at the weekly council.
 6. Begin Week 2 and choose between the Saint Brigid Festival and the Count's Cellar Reserve. The reserve introduces Stable Amber, a higher quality target, and a recipe-specific stalled-runoff decision.
 7. After the second council, negotiate two simultaneous opportunities. The live production board lets one batch ferment while another is prepared, while workers, stations, stock, fatigue, equipment wear, and deadlines compete.
 

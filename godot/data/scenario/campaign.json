@@ -2,6 +2,13 @@
   "house":"House de Valenne",
   "patron":{"id":"count_armand","name":"Count Armand de Valenne","tone":"proud_but_fair"},
   "rival":{"id":"apolline","name":"Apolline de Valenne","position":"acting_administrator","motive":"save_the_estate_through_financial_discipline"},
+  "opening_runway":{"days":42,"precision":"approximate","basis":"current_estate_cash"},
+  "opening_supplies":{
+    "malt":{"quantity":18,"unit":"kg","source":"estate_bakehouse"},
+    "yeast":{"quantity":1,"unit":"crock","source":"estate_bakehouse"},
+    "hops":{"quantity":0,"unit":"kg","source":"millstream_wild_vines","status":"requires_inspection"}
+  },
+  "initial_sales_venue":"village_inn",
   "authority_ladder":[
     {"rank":1,"id":"castle_brewmaster","unlocks":["brew","clean","ingredient_requests","release_recommendations"]},
     {"rank":2,"id":"keeper_old_stables","unlocks":["brewery_budget","equipment","courtyard"]},

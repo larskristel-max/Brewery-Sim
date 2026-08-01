@@ -11,57 +11,93 @@ const MIN_ADVANCE_DELAY := 0.28
 
 const SHOTS := [
 	{
-		"duration": 8.0,
-		"focus": Vector2(0.80, 0.25),
-		"zoom": 1.28,
-		"eyebrow": "ESTATE · LAST LIGHT",
-		"speaker": "",
-		"line": "The bailiff’s men led Valenne’s last carriage horse through the rain. By morning, they would begin on the furniture.",
+		"focus": Vector2(0.50, 0.48),
+		"zoom": 1.12,
+		"eyebrow": "THE LAST CARRIAGE HORSE",
+		"speaker": "NARRATION",
+		"role": "",
+		"line": "The bailiff’s men lead away Valenne’s last carriage horse. Its empty stall still bears the family crest.",
 		"beat": "bell"
 	},
 	{
-		"duration": 8.0,
-		"focus": Vector2(0.28, 0.76),
-		"zoom": 1.72,
-		"eyebrow": "THE LEDGER",
+		"focus": Vector2(0.79, 0.27),
+		"zoom": 1.30,
+		"eyebrow": "THE ESTATE LEDGER",
 		"speaker": "APOLLINE DE VALENNE",
-		"line": "Forty-two days of wages. Eighteen kilos of malt. Two crocks of yeast. Not a hop in the stores.",
+		"role": "ACTING ADMINISTRATOR",
+		"line": "The treasury can support the estate for forty-two more days. After that, we are destitute.",
 		"beat": "ledger"
 	},
 	{
-		"duration": 10.0,
 		"focus": Vector2(0.30, 0.26),
 		"zoom": 1.28,
-		"eyebrow": "THE APPOINTMENT",
+		"eyebrow": "ONE ASSET REMAINS",
 		"speaker": "COUNT ARMAND DE VALENNE",
-		"line": "My grandfather filled this courtyard from gate to chapel. Can you make people cross it again?",
+		"role": "",
+		"line": "The Old Stables still contain a brewhouse. Cold and neglected, certainly, but perhaps not beyond repair.",
 		"beat": "appointment"
 	},
 	{
-		"duration": 10.0,
 		"focus": Vector2(0.79, 0.27),
 		"zoom": 1.32,
-		"eyebrow": "THE COST",
+		"eyebrow": "THE OLD BREWERY",
 		"speaker": "APOLLINE DE VALENNE",
-		"line": "Not with memory. The maltster wants cash, the excise man wants his duty, and that copper has been cold for years.",
+		"role": "",
+		"line": "The brewery? It needs repairs, fuel, ingredients, labour, and a brewmaster. None of those comes cheaply.",
 		"beat": "ledger"
 	},
 	{
-		"duration": 11.0,
 		"focus": Vector2(0.30, 0.26),
 		"zoom": 1.18,
-		"eyebrow": "THE TERMS",
+		"eyebrow": "THE COUNT’S PROPOSAL",
 		"speaker": "COUNT ARMAND DE VALENNE",
-		"line": "Then light it. Brew one honest beer. If the village asks for a second, Valenne has a future.",
+		"role": "",
+		"line": "Put the copper back to work. Beer sold through the village inn could give Valenne an income again.",
 		"beat": "appointment"
 	},
 	{
-		"duration": 8.0,
+		"focus": Vector2(0.79, 0.27),
+		"zoom": 1.30,
+		"eyebrow": "APOLLINE’S WARNING",
+		"speaker": "APOLLINE DE VALENNE",
+		"role": "",
+		"line": "And if the first batch fails, we lose money we cannot replace. Hope is not an entry in my ledger.",
+		"beat": "ledger"
+	},
+	{
+		"focus": Vector2(0.30, 0.26),
+		"zoom": 1.24,
+		"eyebrow": "WHY YOU WERE SUMMONED",
+		"speaker": "COUNT ARMAND DE VALENNE",
+		"role": "",
+		"line": "You know brewing. You know what can be repaired, what must be replaced, and what should be abandoned.",
+		"beat": "appointment"
+	},
+	{
+		"focus": Vector2(0.30, 0.26),
+		"zoom": 1.18,
+		"eyebrow": "CASTLE BREWMASTER",
+		"speaker": "COUNT ARMAND DE VALENNE",
+		"role": "",
+		"line": "The brewery is yours to run. You may direct its staff, request supplies, and decide how the beer is made.",
+		"beat": "appointment"
+	},
+	{
+		"focus": Vector2(0.79, 0.27),
+		"zoom": 1.30,
+		"eyebrow": "THE ACCOUNTS",
+		"speaker": "APOLLINE DE VALENNE",
+		"role": "ACTING ADMINISTRATOR",
+		"line": "Bring me the cost of the first batch before you spend a franc. I will decide what Valenne can risk.",
+		"beat": "ledger"
+	},
+	{
 		"focus": Vector2(0.48, 0.64),
 		"zoom": 1.84,
-		"eyebrow": "THE OLD STABLES",
-		"speaker": "",
-		"line": "He set the stable key beside the ledger. Apolline dipped her pen and left a line for your name.",
+		"eyebrow": "THE APPOINTMENT",
+		"speaker": "NARRATION",
+		"role": "",
+		"line": "The Count pushes an iron key across the ledger. Beside it lies your appointment, waiting for a signature.",
 		"beat": "key"
 	}
 ]
@@ -72,6 +108,7 @@ var shot_elapsed := 0.0
 var complete := false
 var eyebrow: Label
 var speaker: Label
+var speaker_role: Label
 var dialogue: Label
 var progress: Label
 var transition: ColorRect
@@ -99,7 +136,7 @@ func _process(delta: float) -> void:
 	var shot: Dictionary = SHOTS[shot_index]
 	var reveal_duration: float = clampf(str(shot.line).length() * 0.026, 0.7, 2.6)
 	dialogue.visible_ratio = clampf(shot_elapsed / reveal_duration, 0.0, 1.0)
-	progress.text = "TAP TO CONTINUE  ·  SKIP ABOVE" if size.y > size.x * 1.28 else "SPACE TO CONTINUE  ·  ESC TO SKIP"
+	progress.text = "TAP TO CONTINUE  ·  SKIP ABOVE" if size.y > size.x * 1.28 else "TAP TO CONTINUE  ·  SPACE / ENTER  ·  ESC TO SKIP"
 
 func _unhandled_input(event: InputEvent) -> void:
 	if complete or not visible:
@@ -140,6 +177,8 @@ func _set_shot(index: int) -> void:
 	eyebrow.text = str(shot.eyebrow)
 	speaker.text = str(shot.speaker)
 	speaker.visible = not speaker.text.is_empty()
+	speaker_role.text = str(shot.get("role", ""))
+	speaker_role.visible = not speaker_role.text.is_empty()
 	dialogue.text = str(shot.line)
 	dialogue.visible_ratio = 0.0
 	if is_instance_valid(world) and world.has_method("set_cinematic_camera"):
@@ -237,6 +276,11 @@ func _build_interface() -> void:
 	speaker.add_theme_color_override("font_color", Color("#e5bd8a"))
 	speaker.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	copy.add_child(speaker)
+	speaker_role = Label.new()
+	speaker_role.add_theme_font_size_override("font_size", 9)
+	speaker_role.add_theme_color_override("font_color", MUTED)
+	speaker_role.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	copy.add_child(speaker_role)
 	dialogue = Label.new()
 	dialogue.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	dialogue.size_flags_vertical = Control.SIZE_EXPAND_FILL

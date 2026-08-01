@@ -7,9 +7,14 @@ const FACE_POINTS := {
 	"apolline": Vector2(0.80, 0.25)
 }
 const SPEAKER_SHOTS := {
+	1: "apolline",
 	2: "count",
 	3: "apolline",
-	4: "count"
+	4: "count",
+	5: "apolline",
+	6: "count",
+	7: "count",
+	8: "apolline"
 }
 const VIEWPORT_CASES := [
 	Vector2(1280, 720),

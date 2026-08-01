@@ -49,18 +49,6 @@ export function PlaytestShell() {
       </header>
 
       <section className="game-frame-wrap" aria-label="Old Stables game">
-        <div className="orientation-gate" role="status" aria-live="polite">
-          <div className="orientation-card">
-            <span className="orientation-mark" aria-hidden="true">
-              OS
-            </span>
-            <strong>Turn your phone sideways</strong>
-            <p>
-              The brewery is designed for landscape play. Your place will be
-              kept while you rotate.
-            </p>
-          </div>
-        </div>
         <div className="load-note" aria-hidden={ready}>
           <strong>Preparing the Old Stables</strong>
           The first load can take a moment while the brewery arrives.

@@ -13,12 +13,13 @@ func _run() -> void:
 	await process_frame
 	root.size = Vector2i(1280, 720)
 	await process_frame
-	var opening := _find_button(instance.ui.title_screen, "Begin the story")
+	var opening := _find_button(instance.ui.title_screen, "BEGIN")
 	_expect(opening != null, "Opening title did not expose the story")
 	if opening: opening.pressed.emit()
 	await process_frame
 	await process_frame
 	_expect(instance.prologue_active, "Opening title did not begin the story prologue")
+	_expect(instance.ui.prologue.SHOTS.size() == 10, "Approved ten-beat opening script was not loaded")
 	_expect(instance.speed == 0, "Estate clock ran underneath the prologue")
 	var prologue_index := int(instance.ui.prologue.shot_index)
 	instance.ui.prologue.shot_elapsed = 999.0
@@ -30,38 +31,59 @@ func _run() -> void:
 	await process_frame
 	await process_frame
 	_expect(instance.ui.has("customization") and is_instance_valid(instance.ui.customization), "Prologue did not hand off to the appointment")
-	var begin := _find_button(instance.ui.customization, "Accept the stable key")
+	var name_input: LineEdit = null
+	for candidate in instance.ui.customization.find_children("*", "LineEdit", true, false):
+		name_input = candidate as LineEdit
+		break
+	_expect(name_input != null and name_input.text == "Henri", "Appointment did not default the player name to Henri")
+	if name_input: name_input.text = "Éloïse"
+	_expect(instance.ui.customization.find_children("*", "OptionButton", true, false).is_empty(), "Appointment retained the coat-colour selector")
+	var begin := _find_button(instance.ui.customization, "ACCEPT THE KEY")
 	_expect(begin != null, "Appointment did not expose the stable-key decision")
 	if begin: begin.pressed.emit()
 	await process_frame
 	await process_frame
 	_expect(instance.started, "Appointment did not start the campaign")
 	_expect(instance.simulation.state.stage == "recommission", "Appointment did not accept the stable key")
-	_expect(not instance.awaiting_first_light, "Appointment retained the duplicate stable-door interlude")
 	var first_light := instance.get_node_or_null("World/FirstLightHotspot") as Button
 	_expect(first_light != null and not first_light.visible, "Duplicate stable-door hotspot remained visible after the appointment")
 	_expect(instance.awakening_active, "Appointment did not move directly into the awakening cinematic")
 	_expect(instance.speed == 0, "Estate clock ran underneath the awakening cinematic")
 	_expect(not instance.get_node("World").visible, "Gameplay world remained visible underneath the awakening cinematic")
+	_expect(instance.ui.awakening.SHOTS.size() == 9, "Approved nine-beat Old Stables script was not loaded")
+	var stable_doors := instance.ui.awakening.find_child("OpenStableDoors", true, false) as Button
+	_expect(stable_doors != null and stable_doors.visible, "First Light did not require the stable doors to be opened")
 	var awakening_index := int(instance.ui.awakening.shot_index)
 	instance.ui.awakening.shot_elapsed = 999.0
 	await process_frame
 	_expect(int(instance.ui.awakening.shot_index) == awakening_index, "Awakening cinematic advanced without player input")
+	if stable_doors: stable_doors.pressed.emit()
+	await create_timer(0.25).timeout
+	await process_frame
+	_expect(instance.ui.awakening.doors_opened and int(instance.ui.awakening.shot_index) == 1, "Stable-door interaction did not open the doors exactly once")
+	instance.ui.awakening._set_shot(5)
+	_expect(instance.ui.awakening.dialogue.text.contains("Éloïse"), "Inez did not address the submitted player name")
 	var awakening_skip := _find_button(instance.ui.awakening, "SKIP")
 	_expect(awakening_skip != null, "Awakening cinematic did not expose a skip control")
 	if awakening_skip: awakening_skip.pressed.emit()
 	await process_frame
 	await process_frame
-	_expect(not instance.awaiting_first_light and not instance.awakening_active, "Awakening cinematic did not complete the first-light handoff")
+	_expect(not instance.awakening_active, "Awakening cinematic did not complete the first-light handoff")
 	_expect(instance.get_node("World").visible, "Gameplay world did not return after the awakening cinematic")
-	_expect(instance.speed == 1, "Estate clock did not begin after the awakening cinematic")
+	_expect(instance.speed == 0, "Estate clock was not paused for the first copper inspection")
+	_expect(instance.simulation.objective_text() == "SELECT THE COPPER BREWHOUSE TO INSPECT ITS CONDITION.", "Gameplay handoff did not present the single copper-inspection objective")
 	_expect(_fits_horizontally(instance.ui.command_header, instance.ui.clock_group), "Command-dock clock and save controls overflowed at 1280x720")
 	_expect(instance.ui.command_dock.position.x >= 0.0 and instance.ui.command_dock.position.x + instance.ui.command_dock.size.x <= instance.size.x, "Command dock extended outside the responsive viewport")
 	var brewhouse_hotspot := instance.get_node_or_null("World/BrewhouseHotspot") as Button
-	_expect(brewhouse_hotspot != null, "Brewhouse did not expose a clickable world hotspot")
+	_expect(brewhouse_hotspot != null and brewhouse_hotspot.visible, "Brewhouse did not expose the highlighted inspection target")
+	for station_id in ["FermenterHotspot", "PackagingHotspot", "CourtyardHotspot"]:
+		var competing := instance.get_node_or_null("World/" + station_id) as Button
+		_expect(competing != null and not competing.visible, "A competing station appeared before the copper inspection: %s" % station_id)
 	if brewhouse_hotspot: brewhouse_hotspot.pressed.emit()
 	await _settle()
 	_expect(instance.selected_station == "brewhouse", "World hotspot did not focus the brewhouse")
+	_expect(bool(instance.simulation.state.brewhouse_inspected), "Selecting the copper did not record its inspection")
+	_expect(instance.ui.consequence.text.contains("CONDITION") and instance.ui.consequence.text.contains("WORK REQUIRED"), "Copper inspection did not reveal condition and recommissioning work")
 	var clean := _find_button(instance.ui.actions, "Clean and recommission")
 	_expect(clean != null, "Recommissioning command was not rendered")
 	if clean: clean.pressed.emit()
@@ -93,7 +115,7 @@ func _run() -> void:
 	await process_frame
 	await process_frame
 	_expect(instance.simulation.state.pending_issue == "missing_hops", "Mash decision button did not lead to the hop problem")
-	var herbs := _find_button(instance.ui.choices, "Use garden herbs")
+	var herbs := _find_button(instance.ui.choices, "Inspect the millstream hops")
 	_expect(herbs != null, "Hop decision buttons were not rendered")
 	if herbs: herbs.pressed.emit()
 	await process_frame
@@ -138,8 +160,8 @@ func _run() -> void:
 	await _settle()
 	_expect(_select_staff(instance, "noor"), "Could not select Noor for courtyard preparation")
 	await _settle()
-	var courtyard := _find_button(instance.ui.actions, "Prepare the long table")
-	_expect(courtyard != null, "Courtyard hotspot did not expose preparation")
+	var courtyard := _find_button(instance.ui.actions, "Arrange the village inn delivery")
+	_expect(courtyard != null, "Loading court did not expose village-inn delivery preparation")
 	if courtyard: courtyard.pressed.emit()
 	await _settle()
 	var packaging_hotspot := instance.get_node_or_null("World/PackagingHotspot") as Button
@@ -166,9 +188,9 @@ func _run() -> void:
 	await _settle()
 	instance.ui.wait_button.pressed.emit()
 	await _settle()
-	_expect(instance.simulation.state.stage == "ready_to_serve", "Packaging did not prepare courtyard service")
-	var serve := _find_button(instance.ui.actions, "Serve Night of First Lights")
-	_expect(serve != null, "Courtyard scene did not expose service")
+	_expect(instance.simulation.state.stage == "ready_to_serve", "Packaging did not prepare village-inn delivery")
+	var serve := _find_button(instance.ui.actions, "Deliver the first keg to the village inn")
+	_expect(serve != null, "Village-inn delivery command was not exposed")
 	if serve: serve.pressed.emit()
 	await _settle()
 	instance.ui.wait_button.pressed.emit()

@@ -23,6 +23,7 @@ func _capture_gallery() -> void:
 	instance._refresh(true)
 	await _settle(0.2)
 	instance.selected_staff_id = "jules"
+	instance.simulation.inspect_brewhouse()
 	instance._start_action("recommission")
 	instance._refresh(true)
 	await _settle(1.2)
@@ -37,7 +38,7 @@ func _capture_gallery() -> void:
 	await _save("03-mash-decision.png")
 
 	model.choose_issue("cut_heat_stir")
-	model.choose_issue("estate_herbs")
+	model.choose_issue("inspect_wild_hops")
 	model.start_action("boil", "player")
 	model.advance_to_next_milestone()
 	model.start_action("clean_fermenter", "jules")

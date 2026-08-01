@@ -14,9 +14,10 @@ func _capture() -> void:
 		instance.ui.awakening.finish(true)
 	await create_timer(0.2).timeout
 	var model: BrewSimulation = instance.simulation
+	model.inspect_brewhouse()
 	model.start_action("recommission", "jules"); model.advance_to_next_milestone()
 	model.start_action("mash", "player"); model.advance_to_next_milestone()
-	model.choose_issue("cut_heat_stir"); model.choose_issue("estate_herbs")
+	model.choose_issue("cut_heat_stir"); model.choose_issue("inspect_wild_hops")
 	model.start_action("boil", "player"); model.advance_to_next_milestone()
 	model.start_action("clean_fermenter", "jules"); model.advance_to_next_milestone()
 	model.start_action("transfer", "player"); model.advance_to_next_milestone()
