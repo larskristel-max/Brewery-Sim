@@ -19,7 +19,7 @@ Status as of 2026-08-01: technical implementation complete; human listening and 
 
 Implementation files are `godot/scripts/audio_director.gd`, `godot/assets/audio/audio_manifest.json`, `godot/default_bus_layout.tres` and integrations in `main.gd` plus both opening cinematic controllers. Asset and rejection details, exact source URLs, original/runtime names, treatments and checksums are in `godot/assets/audio/AUDIO_LICENSES.md`.
 
-Nineteen CC0 high-quality Freesound preview derivatives total 9,207,338 bytes (8.78 MiB). They are kept untouched under `source-masters`; cue offsets, duration limits, level and pitch treatment are nondestructive runtime definitions.
+Nineteen CC0 high-quality Freesound preview derivatives total 9,207,338 bytes (8.78 MiB) and remain untouched under `source-masters`. Reproducible, lossless Ogg-page runtime cuts total 7,224,578 bytes (6.89 MiB); unused master tails are excluded from game exports. Cue offsets, duration limits, level and pitch treatment remain nondestructive runtime definitions.
 
 ## Automated verification
 
@@ -57,11 +57,11 @@ The complete Godot validation suite passes on Godot 4.7.1, including simulation/
 - [ ] Save/load in planning, brewing, fermentation, packaging and council states
 - [ ] Full-length contamination audit of every integrated recording
 
-Because this model cannot hear local audio output, it cannot honestly sign off these listening gates. Per the implementation brief, the changes must remain uncommitted until a human completes them and any rejected cue is removed or adjusted. A private candidate may be hosted solely to complete this listening audit; it is not a release approval.
+Because this model cannot hear local audio output, it cannot honestly sign off these listening gates. A focused candidate commit exists solely to enable the private hosted listening audit; it must remain unmerged until a human completes the checks and any rejected cue is removed or adjusted.
 
 ## Remaining gaps
 
 - Commission or license exact recordings for the three music identities; silence is intentional until then.
 - Human-audition all 19 recordings and validate the chosen offsets, especially the long rice/stirring, bells, carriage and multi-cask sources.
 - Replace any provisional Ogg one-shot with an edited WAV master if the human-approved mastering workflow requires it. The current high-quality Ogg derivatives are browser-efficient but do not yet meet the preferred WAV-for-short-SFX preparation guideline.
-- Publish a private listening candidate, complete the hosted desktop/mobile mix pass, then rerun all validations and commit as one focused change.
+- Complete the private hosted desktop/mobile mix pass, then make any required adjustments, rerun all validations and merge only after approval.

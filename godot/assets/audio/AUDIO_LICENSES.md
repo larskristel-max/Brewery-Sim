@@ -6,11 +6,11 @@ Licence used by every file below: [Creative Commons Zero 1.0](https://creativeco
 
 All source links below were opened individually on the audit date. Each exact Freesound page displayed “Creative Commons 0” and the statement that commercial copying, modification, distribution and performance are permitted without asking the author. Attribution is retained voluntarily. The repository contains Freesound's untouched high-quality Ogg preview derivative rather than the login-gated original master; this distinction is recorded in the filename and table.
 
-Important release gate: licence verification is complete, but the full-recording human listening pass is not. These files are candidates integrated for technical testing, not release-approved recordings. Do not commit or ship them until desktop, headphones and phone listening have confirmed that no modern contamination, speech, clipping or fatiguing detail is present.
+Important release gate: licence verification is complete, but the full-recording human listening pass is not. These files are candidates integrated for private technical testing, not release-approved recordings. Do not merge or publicly release them until desktop, headphones and phone listening have confirmed that no modern contamination, speech, clipping or fatiguing detail is present.
 
 ## Integrated CC0 candidates
 
-| ID | Asset / creator | Exact source | Original filename | Runtime/source-master filename | Runtime treatment | SHA-256 |
+| ID | Asset / creator | Exact source | Original filename | Source/runtime basename | Runtime treatment | Source SHA-256 |
 |---|---|---|---|---|---|---|
 | 207781 | Pouring Liquid.wav / Dvideoguy | [source](https://freesound.org/people/Dvideoguy/sounds/207781/) | `207781__dvideoguy__pouring-liquid.wav` | `207781-hq-preview.ogg` | Trimmed at playback to 0.45–2.7 s; level and ±2.5% pitch variation at runtime | `b19073d7d216b9337034329c71581b2b9592764a32ccc9ce9698a542dbb44f31` |
 | 216134 | INT Rainy ambience / Sayuri_Odin | [source](https://freesound.org/people/Sayuri_Odin/sounds/216134/) | `216134__sayuri_odin__int-rainy-ambience-rain-heard-from-inside-a-room.wav` | `216134-hq-preview.ogg` | Seamless loop flag at runtime; crossfaded; scene-specific level | `43ff58cbf1c03b998e4e9d9d32b181844e7403ad684ad679a5170f83ab9d3462` |
@@ -32,7 +32,33 @@ Important release gate: licence verification is complete, but the full-recording
 | 709961 | Paper rustle / Squidems | [source](https://freesound.org/people/Squidems/sounds/709961/) | `709961__squidems__paper-rustle.wav` | `709961-hq-preview.ogg` | Multiple short offsets for ledger pages, cleaning cloth and day advance | `30b48b42da98da9871de1986b21fc89b3484e1694fe46e22e498587d3042d85b` |
 | 737643 | Horse Carriage / Kraftaggregat | [source](https://freesound.org/people/Kraftaggregat/sounds/737643/) | `737643__kraftaggregat__horse-carriage.wav` | `737643-hq-preview.ogg` | First 12 s, very low and infrequent in courtyard ambience | `a455097942a732696e6a27de026e5250073f8c1e898bc57d958d8bbd20972d57` |
 
-Compressed candidate audio stored in the repository: 9,207,338 bytes (8.78 MiB). Godot import metadata is not included in this figure.
+Untouched compressed source masters stored in the repository: 9,207,338 bytes (8.78 MiB). Godot import metadata is not included in this figure. Runtime files use the same basename under `assets/audio/runtime/`; masters remain under `assets/audio/source-masters/` and are excluded from exports.
+
+## Runtime cut register
+
+`scripts/prepare-audio-runtime.ps1` creates lossless, complete-Ogg-page prefix cuts. It keeps all cue offsets declared in the manifest, avoids re-encoding, and removes unused tails from the shipped build. Runtime audio totals 7,224,578 bytes (6.89 MiB).
+
+| Runtime filename | Bytes | Runtime SHA-256 |
+|---|---:|---|
+| `207781-hq-preview.ogg` | 96566 | `b19073d7d216b9337034329c71581b2b9592764a32ccc9ce9698a542dbb44f31` |
+| `216134-hq-preview.ogg` | 210667 | `43ff58cbf1c03b998e4e9d9d32b181844e7403ad684ad679a5170f83ab9d3462` |
+| `234317-hq-preview.ogg` | 806741 | `08a72f28e64dad53844e986262a7c495fa7af76bb564da5f93c946a905b70716` |
+| `264123-hq-preview.ogg` | 2045015 | `e7141a8fedde49da22426f18a51e7037cc8036d3202dc4bb0f6cb8fa7a8b203f` |
+| `275471-hq-preview.ogg` | 28298 | `d2903e209cb0ee2a993239705aa4fde2c4cd243f0050a4590258a9001ab02c17` |
+| `353125-hq-preview.ogg` | 37723 | `7d95512d6928e7a464be683cfae86a45a7716f8dd842233607437352355570f4` |
+| `369710-hq-preview.ogg` | 19961 | `c3ae566b236e1d4afc9a7ae70d05191b7f17ea37ecfe2ad6a75ed09e7f820f3a` |
+| `470710-hq-preview.ogg` | 30052 | `d1a936c382b330cafbba94dc9e6886c9bdbc0343dbff7ad97be68938aafdc11a` |
+| `495660-hq-preview.ogg` | 381417 | `5514f3b9b41404f719cfd9b68dd0e2481c69d822f1ce12b0a28339a17db47f2e` |
+| `517610-hq-preview.ogg` | 90843 | `852fd6417473d23654597da374c945ecadfdfe4911cc5e08afc56fac02a2224e` |
+| `520143-hq-preview.ogg` | 36721 | `e7e373fc4ce457feb02c697caf7556bed5dc2b309d11f8675bd85a56f109ee13` |
+| `565799-hq-preview.ogg` | 152165 | `8e9dbd6e59b34908fdc9bc650d6b51ac7240ff1c2dbac491ded0114d7e925730` |
+| `627657-hq-preview.ogg` | 1519423 | `a270f8de04b75f13140d46050ad2054a0546e4b76dfd6d6aef90230ded72f651` |
+| `663380-hq-preview.ogg` | 923712 | `abb9e29ac33472537cba5d7b79c55d17dafc0fcd9ff2b5546c9b4d7cbf5d75e5` |
+| `675975-hq-preview.ogg` | 319954 | `83bafc25ace8c40331fab3b4ae199f26872e7b53f483409b004526b50b6569d5` |
+| `686544-hq-preview.ogg` | 16739 | `f34a2819021cd736f23a81f2cf3b0ff9311d9ed0859105a66d9809093b8b69e8` |
+| `698136-hq-preview.ogg` | 8374 | `a502c0cf2e24619af57913feb2ade5b16ff5f6af93dd989226665421d4d9ef73` |
+| `709961-hq-preview.ogg` | 310511 | `e28c7d596448437a1b95e0d8be012090f9d6052801f80f0cc3193d058831826b` |
+| `737643-hq-preview.ogg` | 189696 | `2438e2239a01bc311ee977cdb4f8a18461ffbec82b3398b0fc1a5912f65e53a1` |
 
 ## Rejected supplied candidates
 
