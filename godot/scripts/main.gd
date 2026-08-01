@@ -23,8 +23,6 @@ var last_stage := ""
 var last_issue := ""
 var selected_staff_id := "player"
 var selected_station := ""
-var cue_player: AudioStreamPlayer
-var cue_streams: Dictionary = {}
 var prologue_active := false
 var awakening_active := false
 var portrait_layout := false
@@ -127,7 +125,7 @@ func _build_interface() -> void:
 	_build_command_dock()
 	_build_decision_panel()
 	_build_rotation_gate()
-	_build_audio()
+	_build_audio_settings()
 
 func _build_top_bar() -> void:
 	var panel := PanelContainer.new()
@@ -299,6 +297,13 @@ func _build_command_dock() -> void:
 	load.pressed.connect(_load_game)
 	clock_group.add_child(load)
 	ui.load_button = load
+	var audio := Button.new()
+	audio.text = "AUDIO"
+	audio.custom_minimum_size = Vector2(58, 32)
+	audio.tooltip_text = "Open audio settings"
+	audio.pressed.connect(_show_audio_settings)
+	clock_group.add_child(audio)
+	ui.audio_button = audio
 	var batch_rail_panel := PanelContainer.new()
 	batch_rail_panel.name = "BatchRail"
 	batch_rail_panel.custom_minimum_size = Vector2(0, 76)
@@ -529,10 +534,99 @@ func _build_rotation_gate() -> void:
 	instruction.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	copy.add_child(instruction)
 
-func _build_audio() -> void:
-	cue_player = AudioStreamPlayer.new()
-	cue_player.volume_db = -15.0
-	add_child(cue_player)
+func _build_audio_settings() -> void:
+	var shade := ColorRect.new()
+	shade.name = "AudioSettings"
+	shade.color = Color(0.005, 0.008, 0.012, 0.82)
+	shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	shade.mouse_filter = Control.MOUSE_FILTER_STOP
+	shade.visible = false
+	shade.z_index = 90
+	add_child(shade)
+	ui.audio_settings = shade
+	var center := CenterContainer.new()
+	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	shade.add_child(center)
+	var panel := PanelContainer.new()
+	panel.custom_minimum_size = Vector2(440, 0)
+	panel.add_theme_stylebox_override("panel", _panel_style(0.99, 12, 24))
+	center.add_child(panel)
+	var content := VBoxContainer.new()
+	content.add_theme_constant_override("separation", 11)
+	panel.add_child(content)
+	var title := Label.new()
+	title.text = "AUDIO"
+	title.add_theme_font_size_override("font_size", 24)
+	title.add_theme_color_override("font_color", CREAM)
+	content.add_child(title)
+	var note := Label.new()
+	note.text = "The brewery mix is dry and restrained for reliable browser play."
+	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	note.add_theme_font_size_override("font_size", 11)
+	note.add_theme_color_override("font_color", MUTED)
+	content.add_child(note)
+	ui.audio_sliders = {}
+	for definition in [
+		{"bus":"Master", "label":"MASTER"},
+		{"bus":"Music", "label":"MUSIC"},
+		{"bus":"Ambience", "label":"AMBIENCE"},
+		{"bus":"SFX", "label":"EFFECTS"},
+	]:
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 12)
+		content.add_child(row)
+		var label := Label.new()
+		label.text = str(definition.label)
+		label.custom_minimum_size = Vector2(100, 0)
+		label.add_theme_font_size_override("font_size", 10)
+		label.add_theme_color_override("font_color", COPPER)
+		row.add_child(label)
+		var slider := HSlider.new()
+		slider.min_value = 0
+		slider.max_value = 100
+		slider.step = 1
+		slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		slider.custom_minimum_size = Vector2(240, 36)
+		slider.value_changed.connect(_on_audio_volume_changed.bind(str(definition.bus)))
+		row.add_child(slider)
+		ui.audio_sliders[str(definition.bus)] = slider
+	var interface_toggle := CheckButton.new()
+	interface_toggle.text = "INTERFACE SOUNDS"
+	interface_toggle.tooltip_text = "Navigation feedback only; physical brewery actions remain audible."
+	interface_toggle.toggled.connect(_on_interface_sounds_toggled)
+	content.add_child(interface_toggle)
+	ui.interface_sounds_toggle = interface_toggle
+	var close := Button.new()
+	close.text = "CLOSE"
+	close.custom_minimum_size = Vector2(0, 48)
+	close.pressed.connect(_hide_audio_settings)
+	content.add_child(close)
+	_sync_audio_settings_controls()
+
+func _show_audio_settings() -> void:
+	_sync_audio_settings_controls()
+	ui.audio_settings.visible = true
+	AudioDirector.play_cue("ui_panel_open")
+
+func _hide_audio_settings() -> void:
+	AudioDirector.play_cue("ui_panel_close")
+	ui.audio_settings.visible = false
+
+func _sync_audio_settings_controls() -> void:
+	if not ui.has("audio_sliders"):
+		return
+	for bus_name in ui.audio_sliders:
+		var slider: HSlider = ui.audio_sliders[bus_name]
+		slider.set_value_no_signal(AudioDirector.get_bus_volume_linear(bus_name) * 100.0)
+	ui.interface_sounds_toggle.set_pressed_no_signal(AudioDirector.interface_sounds_enabled)
+
+func _on_audio_volume_changed(value: float, bus_name: String) -> void:
+	AudioDirector.set_bus_volume_linear(bus_name, value / 100.0)
+
+func _on_interface_sounds_toggled(enabled: bool) -> void:
+	AudioDirector.set_interface_sounds_enabled(enabled)
+	if enabled:
+		AudioDirector.play_cue("ui_confirm", true)
 
 func _apply_responsive_layout() -> void:
 	if not is_inside_tree() or size.x < 2.0 or size.y < 2.0 or not ui.has("command_dock"):
@@ -548,6 +642,7 @@ func _apply_responsive_layout() -> void:
 	portrait_layout = aspect < 0.78
 	compact_layout = portrait_layout or size.x < 960.0 or size.y < 650.0
 	mobile_landscape_layout = not portrait_layout and physical_size.x <= 1000.0 and physical_size.y <= 600.0 and physical_size.x > physical_size.y
+	AudioDirector.set_mobile_mode(portrait_layout or mobile_landscape_layout)
 	var opening_visible := not started or prologue_active or awakening_active or (ui.has("customization") and is_instance_valid(ui.customization))
 	ui.rotation_gate.visible = portrait_layout and not opening_visible
 	_layout_top_bar()
@@ -648,6 +743,8 @@ func _layout_command_dock() -> void:
 		ui.status.visible = false
 		ui.save_button.visible = false
 		ui.load_button.visible = false
+		ui.audio_button.visible = true
+		ui.audio_button.custom_minimum_size = Vector2(58, 42)
 		for clock_control in ui.clock_buttons:
 			var clock_speed := int(clock_control.speed)
 			clock_control.button.visible = clock_speed in [0, 1]
@@ -698,6 +795,8 @@ func _layout_command_dock() -> void:
 		ui.status.add_theme_font_size_override("font_size", 10)
 		ui.save_button.visible = false
 		ui.load_button.visible = false
+		ui.audio_button.visible = true
+		ui.audio_button.custom_minimum_size = Vector2(58, 40)
 		ui.mobile_close.visible = not selected_station.is_empty()
 		for clock_control in ui.clock_buttons:
 			var clock_speed := int(clock_control.speed)
@@ -734,6 +833,8 @@ func _layout_command_dock() -> void:
 		ui.status.visible = true
 		ui.save_button.visible = true
 		ui.load_button.visible = true
+		ui.audio_button.visible = true
+		ui.audio_button.custom_minimum_size = Vector2(58, 32)
 		for clock_control in ui.clock_buttons:
 			clock_control.button.visible = true
 			clock_control.button.custom_minimum_size = Vector2(36, 32)
@@ -812,12 +913,6 @@ func _set_anchor_rect(control: Control, left: float, top: float, right: float, b
 	control.offset_right = 0
 	control.offset_bottom = 0
 
-func _exit_tree() -> void:
-	if is_instance_valid(cue_player):
-		cue_player.stop()
-		cue_player.stream = null
-	cue_streams.clear()
-
 func _show_title_screen() -> void:
 	var shade := ColorRect.new()
 	shade.name = "OpeningTitle"
@@ -871,6 +966,9 @@ func _show_title_screen() -> void:
 	_apply_responsive_layout()
 
 func _start_opening_story() -> void:
+	AudioDirector.unlock_audio()
+	AudioDirector.play_cue("ui_confirm")
+	AudioDirector.begin_story_context("appointment")
 	if ui.has("title_screen") and is_instance_valid(ui.title_screen):
 		ui.title_screen.queue_free()
 	_start_prologue()
@@ -955,7 +1053,7 @@ func begin_campaign_with(name_source, _coat_source = null) -> void:
 		_show_result(result)
 		return
 	$World.set_story_scene("brewery")
-	_play_cue("key")
+	AudioDirector.play_cue("contract_accept")
 	_refresh(true)
 	_start_awakening_cinematic()
 
@@ -964,7 +1062,8 @@ func _start_prologue() -> void:
 	var prologue: Control = PrologueCinematicScene.new()
 	prologue.name = "PrologueCinematic"
 	prologue.finished.connect(_on_prologue_finished)
-	prologue.beat.connect(_play_cue)
+	prologue.beat.connect(_on_prologue_beat)
+	prologue.action.connect(_on_cinematic_action)
 	add_child(prologue)
 	ui.prologue = prologue
 	prologue.start($World)
@@ -979,6 +1078,7 @@ func _on_prologue_finished(_was_skipped: bool) -> void:
 
 func _start_awakening_cinematic() -> void:
 	awakening_active = true
+	AudioDirector.begin_story_context("awakening")
 	_apply_responsive_layout()
 	ui.top_bar.visible = false
 	ui.command_dock.visible = false
@@ -988,7 +1088,8 @@ func _start_awakening_cinematic() -> void:
 	var awakening: Control = AwakeningCinematicScene.new()
 	awakening.name = "AwakeningCinematic"
 	awakening.finished.connect(_on_awakening_finished)
-	awakening.beat.connect(_play_cue)
+	awakening.beat.connect(_on_awakening_beat)
+	awakening.action.connect(_on_cinematic_action)
 	add_child(awakening)
 	ui.awakening = awakening
 	awakening.start(str(simulation.state.player.name))
@@ -1013,11 +1114,26 @@ func _complete_first_light_handoff() -> void:
 	_set_status("CASTLE BREWMASTER APPOINTED · Select the copper brewhouse to inspect its condition.", true)
 	$World.show_feedback("DAY ONE · OPENING COMMISSION · Select the highlighted copper brewhouse.", true)
 	simulation.save_game()
+	AudioDirector.sync_to_simulation(simulation.state)
 	_refresh(true)
+
+func _on_prologue_beat(kind: String) -> void:
+	AudioDirector.handle_cinematic_beat("appointment", kind)
+
+func _on_awakening_beat(kind: String) -> void:
+	AudioDirector.handle_cinematic_beat("awakening", kind)
+
+func _on_cinematic_action(kind: String) -> void:
+	match kind:
+		"advance": AudioDirector.play_cue("cinematic_advance")
+		"skip": AudioDirector.play_cue("cinematic_skip")
+		"doors": AudioDirector.play_cue("brewery_doors")
 
 func _refresh(force_structure := false) -> void:
 	last_revision = simulation.revision
 	var state := simulation.state
+	if started and not prologue_active and not awakening_active:
+		AudioDirector.sync_to_simulation(state)
 	var operations_mode := bool(state.get("operations_active", false)) or str(state.stage) == "operations_council"
 	ui.batch_rail_panel.visible = operations_mode
 	if str(state.stage) in ["week_planning", "delivery_recovery", "capacity_planning", "ready_to_package", "ready_to_serve", "council", "operations_council", "complete"]: selected_station = ""
@@ -1377,7 +1493,7 @@ func _start_action(action_id: String) -> void:
 	if result.ok and not action.is_empty():
 		selected_station = str(action.station) if str(action.station) != "estate" else ""
 		if selected_station != "": $World.focus_station(selected_station)
-		_play_cue("work")
+		AudioDirector.play_action(action_id)
 	_show_result(result)
 	if result.ok: simulation.save_game()
 
@@ -1389,7 +1505,7 @@ func _choose_issue(option_id: String) -> void:
 
 func _choose_council(option_id: String) -> void:
 	var result := simulation.resolve_operations_council(option_id) if simulation.state.stage == "operations_council" else simulation.resolve_council(option_id)
-	_play_cue("appointment" if result.ok else "error")
+	if not result.ok: _play_cue("error")
 	_show_result(result)
 	if result.ok: simulation.save_game()
 
@@ -1410,7 +1526,10 @@ func _choose_delivery_recovery(option_id: String) -> void:
 
 func _respond_to_capacity(opportunity_id: String, decision: String) -> void:
 	var result := simulation.respond_to_capacity_opportunity(opportunity_id, decision)
-	_play_cue("decision" if result.ok else "error")
+	if result.ok:
+		AudioDirector.play_cue("contract_accept" if decision == "accept" else ("ui_page_turn" if decision == "renegotiate" else "ui_cancel"))
+	else:
+		_play_cue("error")
 	_show_result(result)
 	if result.ok: simulation.save_game()
 
@@ -1432,7 +1551,7 @@ func _select_operations_batch(batch_id: String) -> void:
 func _fund_restoration(project_id: String) -> void:
 	var begins_next_week := project_id == "begin_next_week"
 	var result := simulation.begin_next_week() if begins_next_week else simulation.fund_restoration(project_id)
-	_play_cue("work" if result.ok else "error")
+	AudioDirector.play_cue("resource_spend" if result.ok and not begins_next_week else ("day_advance" if result.ok else "ui_invalid"))
 	if result.ok and begins_next_week:
 		selected_station = ""
 		speed = 0
@@ -1441,7 +1560,7 @@ func _fund_restoration(project_id: String) -> void:
 
 func _advance_to_milestone() -> void:
 	_show_result(simulation.advance_to_next_milestone())
-	_play_cue("decision")
+	AudioDirector.play_cue("day_advance")
 
 func _on_staff_selected(index: int) -> void:
 	selected_staff_id = str(ui.staff_picker.get_item_metadata(index))
@@ -1471,7 +1590,9 @@ func _close_mobile_context() -> void:
 	_refresh(true)
 
 func _on_world_station_hovered(id: String, entered: bool) -> void:
-	if entered: ui.context.text = "%s · CLICK TO FOCUS" % id.replace("_"," ").to_upper()
+	if entered:
+		ui.context.text = "%s · CLICK TO FOCUS" % id.replace("_"," ").to_upper()
+		AudioDirector.play_cue("ui_focus")
 	else: ui.context.text = _context_eyebrow(simulation.state)
 
 func _set_speed(value: int) -> void:
@@ -1484,7 +1605,10 @@ func _set_speed(value: int) -> void:
 	_set_status("Estate clock paused." if value == 0 else "Estate clock running at %d×." % value, true)
 	_refresh()
 
-func _save_game() -> void: _show_result(simulation.save_game())
+func _save_game() -> void:
+	var result := simulation.save_game()
+	AudioDirector.play_cue("ui_page_turn" if result.ok else "ui_invalid")
+	_show_result(result)
 
 func _load_game() -> void:
 	var result := simulation.load_game()
@@ -1492,6 +1616,8 @@ func _load_game() -> void:
 		started = true
 		var player: Dictionary = simulation.state.player
 		$World.customize_player(player.name, int(player.coat_index))
+		AudioDirector.sync_to_simulation(simulation.state)
+		AudioDirector.play_cue("ui_page_turn")
 		_refresh(true)
 	_show_result(result)
 
@@ -1639,18 +1765,25 @@ func _handle_story_transition(state: Dictionary) -> void:
 	if last_stage != stage:
 		match stage:
 			"week_planning":
+				AudioDirector.play_cue("ui_page_turn")
 				$World.show_feedback("Two promises compete for the Old Stables.", true)
 				_set_status("Time is paused until you choose this week's production commitment.", true)
 			"delivery_recovery":
+				AudioDirector.play_cue("contract_fail")
 				$World.show_feedback("The delivery is at risk. Decide who carries the cost.", false)
 				_set_status("Time is paused until the failed promise has a recovery plan.", false)
 			"capacity_planning":
+				AudioDirector.play_cue("ui_page_turn")
 				$World.show_feedback("Two opportunities now compete for the same people and equipment.", true)
 				_set_status("Time is paused while you negotiate the first overlapping production plan.", true)
 			"operations":
 				$World.show_feedback("The production board is live. Choose which batch gets the next worker and station.", true)
 				_set_status("Shared capacity is live; select a batch before assigning its next work order.", true)
 			"operations_council":
+				var all_fulfilled := true
+				for outcome in state.get("operations_results", []):
+					if str(outcome.get("status", "")) != "fulfilled": all_fulfilled = false
+				AudioDirector.play_cue("contract_complete" if all_fulfilled else "contract_fail")
 				$World.show_feedback("Every production commitment has reached the ledger.", true)
 				_set_status("Time is paused for the Week %d production council." % int(state.get("week_number", 1)), true)
 			"recommission":
@@ -1675,9 +1808,12 @@ func _handle_story_transition(state: Dictionary) -> void:
 				$World.show_feedback("The cask is ready for the loading court and the village inn.", true)
 				_set_status("Opening Commission · load the cask, then deliver it on Day 11.", true)
 			"council":
+				AudioDirector.play_cue("contract_complete" if str(state.promise.get("status", "")) == "kept" else "contract_fail")
 				$World.show_feedback("The village-inn account is settled. Apolline opens the ledger.", true)
 				_set_status("Time is paused for the Opening Commission financial review." if str(state.get("campaign_phase", "")) == "opening_commission" else "Time is paused for the Week %d council." % int(state.get("week_number", 1)), true)
 			"complete":
+				var score := int(state.get("council_result", {}).get("score", 0))
+				AudioDirector.play_cue("council_result_positive" if score >= 150 else ("council_result_mixed" if score >= 110 else "council_result_negative"))
 				$World.show_feedback("The Count has made his judgment.", true)
 				_set_status("Week %d is closed; choose the estate's next investment." % int(state.get("week_number", 1)), true)
 	if last_issue == "" and issue != "":
@@ -1692,41 +1828,19 @@ func _reveal(node: CanvasItem) -> void:
 	tween.tween_property(node, "modulate:a", 1.0, 0.24).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 
 func _play_cue(kind: String) -> void:
-	var frequency := 360.0
-	var duration := 0.10
-	match kind:
-		"select": frequency = 440.0; duration = 0.06
-		"work": frequency = 280.0; duration = 0.12
-		"decision": frequency = 520.0; duration = 0.13
-		"alert": frequency = 185.0; duration = 0.24
-		"appointment": frequency = 620.0; duration = 0.22
-		"bell": frequency = 82.0; duration = 0.72
-		"ledger": frequency = 190.0; duration = 0.14
-		"key": frequency = 880.0; duration = 0.34
-		"lamp": frequency = 330.0; duration = 0.62
-		"error": frequency = 145.0; duration = 0.16
-	if not cue_streams.has(kind):
-		cue_streams[kind] = _make_tone(frequency, duration)
-	cue_player.stream = cue_streams[kind]
-	cue_player.play()
-
-func _make_tone(frequency: float, duration: float) -> AudioStreamWAV:
-	var sample_rate := 22050
-	var sample_count := int(sample_rate * duration)
-	var bytes := PackedByteArray()
-	bytes.resize(sample_count * 2)
-	for index in range(sample_count):
-		var t := float(index) / float(sample_rate)
-		var envelope := sin(PI * float(index) / float(sample_count))
-		var value := int(sin(TAU * frequency * t) * envelope * 4200.0)
-		bytes[index * 2] = value & 0xff
-		bytes[index * 2 + 1] = (value >> 8) & 0xff
-	var stream := AudioStreamWAV.new()
-	stream.format = AudioStreamWAV.FORMAT_16_BITS
-	stream.mix_rate = sample_rate
-	stream.stereo = false
-	stream.data = bytes
-	return stream
+	var mapping := {
+		"select": "ui_press",
+		"work": "ui_confirm",
+		"decision": "ui_confirm",
+		"alert": "ui_warning",
+		"appointment": "council_result_mixed",
+		"bell": "environment_distant_bell",
+		"ledger": "ui_page_turn",
+		"key": "contract_accept",
+		"lamp": "light_furnace",
+		"error": "ui_invalid",
+	}
+	AudioDirector.play_cue(str(mapping.get(kind, "ui_press")))
 
 func _clear_children(node: Node) -> void:
 	for child in node.get_children(): child.queue_free()

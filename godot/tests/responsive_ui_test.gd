@@ -77,6 +77,12 @@ func _run() -> void:
 	_expect(_fits_in_viewport(instance, instance.ui.command_dock), "Collapsed landscape command strip overflowed the viewport: pos=%s size=%s viewport=%s" % [instance.ui.command_dock.position, instance.ui.command_dock.size, instance.size])
 	_expect(instance.ui.command_dock.size.y <= 72.0, "Collapsed landscape command strip took too much vertical space")
 	_expect(not instance.ui.guidance_panel.visible, "Persistent tutorial panel reduced the landscape play area")
+	_expect(instance.ui.audio_button.visible and instance.ui.audio_button.custom_minimum_size.y >= 40.0, "Landscape phone did not expose a tappable audio-settings control")
+	instance.ui.audio_button.pressed.emit()
+	await _settle()
+	_expect(instance.ui.audio_settings.visible and _fits_in_viewport(instance, instance.ui.audio_settings), "Landscape audio settings overflowed or failed to open")
+	instance._hide_audio_settings()
+	await _settle()
 	var clear_world_height: float = instance.ui.command_dock.position.y - (instance.ui.top_bar.position.y + instance.ui.top_bar.size.y)
 	_expect(clear_world_height >= instance.size.y * 0.65, "Collapsed landscape HUD left too little tappable brewery space")
 
@@ -115,8 +121,9 @@ func _run() -> void:
 	else:
 		for failure in failures: push_error(failure)
 		exit_code = 1
-	instance.cue_player.stop()
-	instance.cue_player.stream = null
+	var director := root.get_node_or_null("AudioDirector")
+	if director != null and director.has_method("stop_all_audio"):
+		director.stop_all_audio()
 	instance.queue_free()
 	await _settle()
 	quit(exit_code)

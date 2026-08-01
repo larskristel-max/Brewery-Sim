@@ -1,0 +1,81 @@
+{
+  "schema_version": 1,
+  "default_era": "1901",
+  "eras": {
+    "1901": {
+      "label": "Valenne, 1901",
+      "ambience": {
+        "title": {"stream": "res://assets/audio/source-masters/216134-hq-preview.ogg", "volume_db": -20.0, "one_shots": []},
+        "appointment": {"stream": "res://assets/audio/source-masters/216134-hq-preview.ogg", "volume_db": -17.0, "one_shots": ["environment_fire_crackle", "environment_distant_bell"]},
+        "awakening_dormant": {"stream": "res://assets/audio/source-masters/216134-hq-preview.ogg", "volume_db": -18.0, "one_shots": ["environment_timber"]},
+        "awakening_inhabited": {"stream": "res://assets/audio/source-masters/495660-hq-preview.ogg", "volume_db": -18.0, "one_shots": ["environment_rain_detail", "environment_distant_bell"]},
+        "brewhouse_idle": {"stream": "res://assets/audio/source-masters/495660-hq-preview.ogg", "volume_db": -21.0, "one_shots": ["environment_rain_detail", "environment_timber"]},
+        "mash_boil": {"stream": "res://assets/audio/source-masters/495660-hq-preview.ogg", "volume_db": -17.0, "one_shots": ["environment_copper_settle"]},
+        "fermentation": {"stream": "res://assets/audio/source-masters/216134-hq-preview.ogg", "volume_db": -25.0, "one_shots": ["environment_drip", "environment_timber"]},
+        "packaging": {"stream": "res://assets/audio/source-masters/216134-hq-preview.ogg", "volume_db": -24.0, "one_shots": ["environment_timber"]},
+        "courtyard": {"stream": "res://assets/audio/source-masters/234317-hq-preview.ogg", "volume_db": -20.0, "one_shots": ["environment_horse", "environment_distant_bell"]},
+        "council": {"stream": "res://assets/audio/source-masters/495660-hq-preview.ogg", "volume_db": -22.0, "one_shots": ["environment_timber"]}
+      },
+      "music": {
+        "appointment_theme": {"stream": "", "placeholder": true, "volume_db": -24.0},
+        "awakening_theme": {"stream": "", "placeholder": true, "volume_db": -23.0},
+        "council_positive": {"stream": "", "placeholder": true, "volume_db": -22.0},
+        "council_mixed": {"stream": "", "placeholder": true, "volume_db": -23.0},
+        "council_negative": {"stream": "", "placeholder": true, "volume_db": -24.0}
+      }
+    },
+    "1930s": {"label": "Reserved for interwar machinery and regulation", "ambience": {}, "music": {}},
+    "1940s": {"label": "Reserved for wartime scarcity", "ambience": {}, "music": {}},
+    "1950s_1960s": {"label": "Reserved for post-war mechanisation", "ambience": {}, "music": {}},
+    "1980s": {"label": "Reserved for the microbrewery revival", "ambience": {}, "music": {}},
+    "modern": {"label": "Reserved for contemporary production and compliance", "ambience": {}, "music": {}}
+  },
+  "cues": {
+    "ui_focus": {"bus": "UI", "streams": [{"path": "res://assets/audio/source-masters/698136-hq-preview.ogg"}], "volume_db": -30.0, "cooldown_ms": 90, "mobile_hover": false},
+    "ui_press": {"bus": "UI", "streams": [{"path": "res://assets/audio/source-masters/686544-hq-preview.ogg", "duration": 0.45}], "volume_db": -22.0, "cooldown_ms": 75},
+    "ui_confirm": {"bus": "UI", "streams": [{"path": "res://assets/audio/source-masters/686544-hq-preview.ogg", "duration": 0.6}], "volume_db": -18.0, "cooldown_ms": 90},
+    "ui_cancel": {"bus": "UI", "streams": [{"path": "res://assets/audio/source-masters/369710-hq-preview.ogg", "duration": 0.5}], "volume_db": -23.0, "cooldown_ms": 90},
+    "ui_invalid": {"bus": "UI", "streams": [{"path": "res://assets/audio/source-masters/369710-hq-preview.ogg", "duration": 0.42}], "volume_db": -17.0, "cooldown_ms": 180, "double": true},
+    "ui_warning": {"bus": "UI", "streams": [{"path": "res://assets/audio/source-masters/698136-hq-preview.ogg"}], "volume_db": -16.0, "cooldown_ms": 240},
+    "ui_panel_open": {"bus": "UI", "streams": [{"path": "res://assets/audio/source-masters/353125-hq-preview.ogg", "duration": 0.75}], "volume_db": -22.0, "cooldown_ms": 100},
+    "ui_panel_close": {"bus": "UI", "streams": [{"path": "res://assets/audio/source-masters/353125-hq-preview.ogg", "offset": 0.25, "duration": 0.7}], "volume_db": -25.0, "cooldown_ms": 100},
+    "ui_page_turn": {"bus": "UI", "streams": [{"path": "res://assets/audio/source-masters/709961-hq-preview.ogg", "offset": 2.3, "duration": 0.8}, {"path": "res://assets/audio/source-masters/709961-hq-preview.ogg", "offset": 4.4, "duration": 0.8}, {"path": "res://assets/audio/source-masters/709961-hq-preview.ogg", "offset": 8.4, "duration": 0.8}], "volume_db": -18.0, "cooldown_ms": 130},
+    "cinematic_advance": {"bus": "UI", "streams": [{"path": "res://assets/audio/source-masters/353125-hq-preview.ogg", "duration": 0.38}], "volume_db": -31.0, "cooldown_ms": 90},
+    "cinematic_skip": {"bus": "UI", "streams": [{"path": "res://assets/audio/source-masters/369710-hq-preview.ogg", "duration": 0.55}], "volume_db": -20.0, "cooldown_ms": 150},
+    "contract_accept": {"bus": "UI", "streams": [{"path": "res://assets/audio/source-masters/470710-hq-preview.ogg", "duration": 1.1}], "volume_db": -17.0, "cooldown_ms": 250},
+    "contract_complete": {"bus": "UI", "streams": [{"path": "res://assets/audio/source-masters/517610-hq-preview.ogg", "duration": 2.6}], "volume_db": -25.0, "cooldown_ms": 700},
+    "contract_fail": {"bus": "UI", "streams": [{"path": "res://assets/audio/source-masters/520143-hq-preview.ogg", "duration": 1.2}], "volume_db": -18.0, "cooldown_ms": 500},
+    "resource_gain": {"bus": "SFX", "streams": [{"path": "res://assets/audio/source-masters/565799-hq-preview.ogg", "offset": 0.4, "duration": 1.2}, {"path": "res://assets/audio/source-masters/565799-hq-preview.ogg", "offset": 4.2, "duration": 1.2}, {"path": "res://assets/audio/source-masters/565799-hq-preview.ogg", "offset": 8.0, "duration": 1.2}], "volume_db": -20.0, "cooldown_ms": 180},
+    "resource_spend": {"bus": "SFX", "streams": [{"path": "res://assets/audio/source-masters/565799-hq-preview.ogg", "offset": 1.6, "duration": 0.9}, {"path": "res://assets/audio/source-masters/565799-hq-preview.ogg", "offset": 5.4, "duration": 0.9}], "volume_db": -25.0, "cooldown_ms": 180},
+    "day_advance": {"bus": "UI", "streams": [{"path": "res://assets/audio/source-masters/709961-hq-preview.ogg", "offset": 12.7, "duration": 1.0}], "volume_db": -20.0, "cooldown_ms": 400},
+    "council_result_positive": {"bus": "UI", "streams": [{"path": "res://assets/audio/source-masters/470710-hq-preview.ogg", "duration": 1.2}], "volume_db": -18.0, "cooldown_ms": 600},
+    "council_result_mixed": {"bus": "UI", "streams": [{"path": "res://assets/audio/source-masters/353125-hq-preview.ogg", "duration": 0.9}], "volume_db": -19.0, "cooldown_ms": 600},
+    "council_result_negative": {"bus": "UI", "streams": [{"path": "res://assets/audio/source-masters/520143-hq-preview.ogg", "duration": 1.3}], "volume_db": -19.0, "cooldown_ms": 600},
+
+    "brewery_doors": {"bus": "SFX", "streams": [{"path": "res://assets/audio/source-masters/275471-hq-preview.ogg", "duration": 4.4}], "volume_db": -9.0, "cooldown_ms": 900},
+    "light_furnace": {"bus": "SFX", "streams": [{"path": "res://assets/audio/source-masters/495660-hq-preview.ogg", "offset": 1.0, "duration": 2.2}, {"path": "res://assets/audio/source-masters/495660-hq-preview.ogg", "offset": 9.0, "duration": 2.2}, {"path": "res://assets/audio/source-masters/495660-hq-preview.ogg", "offset": 18.0, "duration": 2.2}], "volume_db": -12.0, "cooldown_ms": 500},
+    "add_malt": {"bus": "SFX", "streams": [{"path": "res://assets/audio/source-masters/264123-hq-preview.ogg", "offset": 5.0, "duration": 2.0}, {"path": "res://assets/audio/source-masters/264123-hq-preview.ogg", "offset": 27.0, "duration": 2.0}, {"path": "res://assets/audio/source-masters/264123-hq-preview.ogg", "offset": 54.0, "duration": 2.0}], "volume_db": -13.0, "cooldown_ms": 250},
+    "stir_mash": {"bus": "SFX", "streams": [{"path": "res://assets/audio/source-masters/627657-hq-preview.ogg", "offset": 48.0, "duration": 3.0}, {"path": "res://assets/audio/source-masters/627657-hq-preview.ogg", "offset": 56.0, "duration": 3.0}, {"path": "res://assets/audio/source-masters/627657-hq-preview.ogg", "offset": 63.0, "duration": 3.0}], "volume_db": -14.0, "cooldown_ms": 350},
+    "adjust_heat": {"bus": "SFX", "streams": [{"path": "res://assets/audio/source-masters/495660-hq-preview.ogg", "offset": 4.0, "duration": 1.3}, {"path": "res://assets/audio/source-masters/495660-hq-preview.ogg", "offset": 14.0, "duration": 1.3}, {"path": "res://assets/audio/source-masters/495660-hq-preview.ogg", "offset": 24.0, "duration": 1.3}], "volume_db": -16.0, "cooldown_ms": 250},
+    "valve": {"bus": "SFX", "streams": [{"path": "res://assets/audio/source-masters/698136-hq-preview.ogg"}, {"path": "res://assets/audio/source-masters/520143-hq-preview.ogg", "offset": 0.1, "duration": 0.45}], "volume_db": -15.0, "cooldown_ms": 160},
+    "transfer_wort": {"bus": "SFX", "streams": [{"path": "res://assets/audio/source-masters/207781-hq-preview.ogg", "duration": 2.7}], "volume_db": -11.0, "cooldown_ms": 350},
+    "pitch_yeast": {"bus": "SFX", "streams": [{"path": "res://assets/audio/source-masters/264123-hq-preview.ogg", "offset": 79.0, "duration": 1.1}], "volume_db": -18.0, "cooldown_ms": 240},
+    "inspect_fermentation": {"bus": "SFX", "streams": [{"path": "res://assets/audio/source-masters/353125-hq-preview.ogg", "duration": 0.65}], "volume_db": -22.0, "cooldown_ms": 180},
+    "clean_workstation": {"bus": "SFX", "streams": [{"path": "res://assets/audio/source-masters/709961-hq-preview.ogg", "offset": 17.8, "duration": 1.6}, {"path": "res://assets/audio/source-masters/709961-hq-preview.ogg", "offset": 22.2, "duration": 1.6}, {"path": "res://assets/audio/source-masters/709961-hq-preview.ogg", "offset": 26.5, "duration": 1.6}], "volume_db": -17.0, "cooldown_ms": 250},
+    "prepare_cask": {"bus": "SFX", "streams": [{"path": "res://assets/audio/source-masters/675975-hq-preview.ogg", "offset": 1.2, "duration": 1.0}, {"path": "res://assets/audio/source-masters/675975-hq-preview.ogg", "offset": 6.7, "duration": 1.0}, {"path": "res://assets/audio/source-masters/675975-hq-preview.ogg", "offset": 18.0, "duration": 1.0}], "volume_db": -12.0, "cooldown_ms": 220},
+    "roll_cask": {"bus": "SFX", "streams": [{"path": "res://assets/audio/source-masters/675975-hq-preview.ogg", "offset": 21.9, "duration": 2.0}, {"path": "res://assets/audio/source-masters/675975-hq-preview.ogg", "offset": 26.1, "duration": 2.0}, {"path": "res://assets/audio/source-masters/675975-hq-preview.ogg", "offset": 29.9, "duration": 2.0}], "volume_db": -13.0, "cooldown_ms": 260},
+    "drive_bung": {"bus": "SFX", "streams": [{"path": "res://assets/audio/source-masters/520143-hq-preview.ogg", "duration": 1.2}, {"path": "res://assets/audio/source-masters/675975-hq-preview.ogg", "offset": 6.7, "duration": 0.8}, {"path": "res://assets/audio/source-masters/675975-hq-preview.ogg", "offset": 18.0, "duration": 0.8}], "volume_db": -11.0, "cooldown_ms": 180},
+    "fill_cask": {"bus": "SFX", "streams": [{"path": "res://assets/audio/source-masters/207781-hq-preview.ogg", "duration": 2.7}], "volume_db": -12.0, "cooldown_ms": 320},
+    "load_delivery": {"bus": "SFX", "streams": [{"path": "res://assets/audio/source-masters/675975-hq-preview.ogg", "offset": 29.9, "duration": 2.1}], "volume_db": -10.0, "cooldown_ms": 350},
+    "repair_equipment": {"bus": "SFX", "streams": [{"path": "res://assets/audio/source-masters/698136-hq-preview.ogg"}, {"path": "res://assets/audio/source-masters/520143-hq-preview.ogg", "duration": 1.1}], "volume_db": -13.0, "cooldown_ms": 180},
+    "receive_ingredients": {"bus": "SFX", "streams": [{"path": "res://assets/audio/source-masters/264123-hq-preview.ogg", "offset": 5.0, "duration": 2.0}], "volume_db": -15.0, "cooldown_ms": 300},
+
+    "environment_fire_crackle": {"bus": "Ambience", "streams": [{"path": "res://assets/audio/source-masters/495660-hq-preview.ogg", "offset": 3.0, "duration": 2.0}, {"path": "res://assets/audio/source-masters/495660-hq-preview.ogg", "offset": 15.0, "duration": 2.0}], "volume_db": -25.0, "cooldown_ms": 2000},
+    "environment_distant_bell": {"bus": "Ambience", "streams": [{"path": "res://assets/audio/source-masters/663380-hq-preview.ogg", "offset": 8.0, "duration": 7.0}, {"path": "res://assets/audio/source-masters/663380-hq-preview.ogg", "offset": 33.0, "duration": 7.0}], "volume_db": -30.0, "cooldown_ms": 12000},
+    "environment_horse": {"bus": "Ambience", "streams": [{"path": "res://assets/audio/source-masters/737643-hq-preview.ogg", "duration": 12.0}], "volume_db": -27.0, "cooldown_ms": 15000},
+    "environment_timber": {"bus": "Ambience", "streams": [{"path": "res://assets/audio/source-masters/275471-hq-preview.ogg", "offset": 0.3, "duration": 1.2}], "volume_db": -30.0, "cooldown_ms": 6000},
+    "environment_rain_detail": {"bus": "Ambience", "streams": [{"path": "res://assets/audio/source-masters/234317-hq-preview.ogg", "offset": 6.0, "duration": 3.0}], "volume_db": -31.0, "cooldown_ms": 5000},
+    "environment_copper_settle": {"bus": "Ambience", "streams": [{"path": "res://assets/audio/source-masters/698136-hq-preview.ogg"}], "volume_db": -27.0, "cooldown_ms": 4500},
+    "environment_drip": {"bus": "Ambience", "streams": [{"path": "res://assets/audio/source-masters/207781-hq-preview.ogg", "offset": 2.25, "duration": 0.45}], "volume_db": -32.0, "cooldown_ms": 5000}
+  }
+}

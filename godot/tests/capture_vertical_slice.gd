@@ -156,8 +156,6 @@ func _capture_gallery() -> void:
 	await _settle(1.0)
 	await _save("14-delivery-recovery.png")
 	print("Old Stables vertical-slice gallery: CAPTURED to " + output_dir)
-	instance.cue_player.stop()
-	instance.cue_player.stream = null
 	await create_timer(0.25).timeout
 	instance.queue_free()
 	await process_frame

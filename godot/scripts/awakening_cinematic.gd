@@ -3,6 +3,7 @@ extends Control
 
 signal finished(skipped: bool)
 signal beat(kind: String)
+signal action(kind: String)
 
 const CREAM := Color("#efe4d2")
 const COPPER := Color("#d79a5b")
@@ -165,6 +166,7 @@ func advance() -> void:
 		return
 	if shot_elapsed < MIN_ADVANCE_DELAY:
 		return
+	action.emit("advance")
 	if dialogue.visible_ratio < 0.999:
 		dialogue.visible_ratio = 1.0
 		shot_elapsed = _reveal_duration()
@@ -177,6 +179,8 @@ func advance() -> void:
 func finish(was_skipped: bool) -> void:
 	if complete:
 		return
+	if was_skipped:
+		action.emit("skip")
 	complete = true
 	set_process(false)
 	finished.emit(was_skipped)
@@ -205,6 +209,7 @@ func _open_doors() -> void:
 	if complete or shot_index != 0 or doors_opened:
 		return
 	doors_opened = true
+	action.emit("doors")
 	door_button.visible = false
 	_play_door_transition()
 

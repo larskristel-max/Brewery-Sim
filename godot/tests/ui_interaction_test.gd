@@ -397,9 +397,8 @@ func _run() -> void:
 	else:
 		for failure in failures: push_error(failure)
 		exit_code = 1
-	instance.cue_player.stop()
-	instance.cue_player.stream = null
 	await create_timer(0.25).timeout
+	_stop_audio_director()
 	instance.queue_free()
 	await process_frame
 	await process_frame
@@ -516,8 +515,7 @@ func _finish_opening_route_test(instance: Node) -> void:
 	else:
 		for failure in failures: push_error(failure)
 		exit_code = 1
-	instance.cue_player.stop()
-	instance.cue_player.stream = null
+	_stop_audio_director()
 	instance.queue_free()
 	await process_frame
 	await process_frame
@@ -525,3 +523,8 @@ func _finish_opening_route_test(instance: Node) -> void:
 
 func _expect(condition: bool, message: String) -> void:
 	if not condition: failures.append(message)
+
+func _stop_audio_director() -> void:
+	var director := root.get_node_or_null("AudioDirector")
+	if director != null and director.has_method("stop_all_audio"):
+		director.stop_all_audio()
