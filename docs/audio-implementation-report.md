@@ -19,7 +19,7 @@ Status as of 2026-08-01: technical implementation complete; human listening and 
 
 Implementation files are `godot/scripts/audio_director.gd`, `godot/assets/audio/audio_manifest.json`, `godot/default_bus_layout.tres` and integrations in `main.gd` plus both opening cinematic controllers. Asset and rejection details, exact source URLs, original/runtime names, treatments and checksums are in `godot/assets/audio/AUDIO_LICENSES.md`.
 
-Nineteen CC0 high-quality Freesound preview derivatives total 9,207,338 bytes (8.78 MiB) and remain untouched under `source-masters`. Reproducible, lossless Ogg-page runtime cuts total 7,224,578 bytes (6.89 MiB); unused master tails are excluded from game exports. Cue offsets, duration limits, level and pitch treatment remain nondestructive runtime definitions.
+Nineteen CC0 high-quality Freesound preview derivatives total 9,207,338 bytes (8.78 MiB) and remain untouched under `source-masters`. Reproducible Ogg Vorbis runtime cuts total 2,903,167 bytes (2.77 MiB); unused master tails are excluded from game exports. Runtime preparation removes metadata, resamples to 44.1 kHz, preserves broad ambience in stereo and converts physical/interface cues to mono. Cue offsets, duration limits, level and pitch treatment remain nondestructive runtime definitions.
 
 ## Automated verification
 

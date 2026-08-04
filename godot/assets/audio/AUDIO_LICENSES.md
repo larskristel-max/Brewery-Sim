@@ -36,29 +36,29 @@ Untouched compressed source masters stored in the repository: 9,207,338 bytes (8
 
 ## Runtime cut register
 
-`scripts/prepare-audio-runtime.ps1` creates lossless, complete-Ogg-page prefix cuts. It keeps all cue offsets declared in the manifest, avoids re-encoding, and removes unused tails from the shipped build. Runtime audio totals 7,224,578 bytes (6.89 MiB).
+`scripts/prepare-audio-runtime.ps1` creates duration-limited Ogg Vorbis runtime files with FFmpeg (`ffmpeg-static` 5.2.0 for this build), removes metadata and unused tails, resamples to 44.1 kHz, keeps broad ambience stereo and converts physical/interface cues to mono. The runtime encode uses `libvorbis` quality 1 and keeps all cue offsets declared in the manifest. Runtime audio totals 2,903,167 bytes (2.77 MiB).
 
 | Runtime filename | Bytes | Runtime SHA-256 |
 |---|---:|---|
-| `207781-hq-preview.ogg` | 96566 | `b19073d7d216b9337034329c71581b2b9592764a32ccc9ce9698a542dbb44f31` |
-| `216134-hq-preview.ogg` | 210667 | `43ff58cbf1c03b998e4e9d9d32b181844e7403ad684ad679a5170f83ab9d3462` |
-| `234317-hq-preview.ogg` | 806741 | `08a72f28e64dad53844e986262a7c495fa7af76bb564da5f93c946a905b70716` |
-| `264123-hq-preview.ogg` | 2045015 | `e7141a8fedde49da22426f18a51e7037cc8036d3202dc4bb0f6cb8fa7a8b203f` |
-| `275471-hq-preview.ogg` | 28298 | `d2903e209cb0ee2a993239705aa4fde2c4cd243f0050a4590258a9001ab02c17` |
-| `353125-hq-preview.ogg` | 37723 | `7d95512d6928e7a464be683cfae86a45a7716f8dd842233607437352355570f4` |
-| `369710-hq-preview.ogg` | 19961 | `c3ae566b236e1d4afc9a7ae70d05191b7f17ea37ecfe2ad6a75ed09e7f820f3a` |
-| `470710-hq-preview.ogg` | 30052 | `d1a936c382b330cafbba94dc9e6886c9bdbc0343dbff7ad97be68938aafdc11a` |
-| `495660-hq-preview.ogg` | 381417 | `5514f3b9b41404f719cfd9b68dd0e2481c69d822f1ce12b0a28339a17db47f2e` |
-| `517610-hq-preview.ogg` | 90843 | `852fd6417473d23654597da374c945ecadfdfe4911cc5e08afc56fac02a2224e` |
-| `520143-hq-preview.ogg` | 36721 | `e7e373fc4ce457feb02c697caf7556bed5dc2b309d11f8675bd85a56f109ee13` |
-| `565799-hq-preview.ogg` | 152165 | `8e9dbd6e59b34908fdc9bc650d6b51ac7240ff1c2dbac491ded0114d7e925730` |
-| `627657-hq-preview.ogg` | 1519423 | `a270f8de04b75f13140d46050ad2054a0546e4b76dfd6d6aef90230ded72f651` |
-| `663380-hq-preview.ogg` | 923712 | `abb9e29ac33472537cba5d7b79c55d17dafc0fcd9ff2b5546c9b4d7cbf5d75e5` |
-| `675975-hq-preview.ogg` | 319954 | `83bafc25ace8c40331fab3b4ae199f26872e7b53f483409b004526b50b6569d5` |
-| `686544-hq-preview.ogg` | 16739 | `f34a2819021cd736f23a81f2cf3b0ff9311d9ed0859105a66d9809093b8b69e8` |
-| `698136-hq-preview.ogg` | 8374 | `a502c0cf2e24619af57913feb2ade5b16ff5f6af93dd989226665421d4d9ef73` |
-| `709961-hq-preview.ogg` | 310511 | `e28c7d596448437a1b95e0d8be012090f9d6052801f80f0cc3193d058831826b` |
-| `737643-hq-preview.ogg` | 189696 | `2438e2239a01bc311ee977cdb4f8a18461ffbec82b3398b0fc1a5912f65e53a1` |
+| `207781-hq-preview.ogg` | 34369 | `0123bf4a1a11ec724c8e24f0b43ada1950030756d1d493af17aceb1b1faea969` |
+| `216134-hq-preview.ogg` | 91196 | `6cca6b1f783e0ea9ae5ce0d9e061126b99f0ff6aa360037c02d01efe25d3aaf5` |
+| `234317-hq-preview.ogg` | 311762 | `d9faf730442c7561fb6b281275c33921f9a85595b1fa57fb6181a8aa95d459e0` |
+| `264123-hq-preview.ogg` | 628014 | `31121150e27b1ab4d9369d9b43a8ee1d96d5952bab7dada4c2f2dcfa92211e8e` |
+| `275471-hq-preview.ogg` | 28724 | `bee354fc3789bd0d1b70336be689e3a513dd69b5142b181501d37c71c7a2fc4f` |
+| `353125-hq-preview.ogg` | 12408 | `003097c8202e51c0adf8aa2fcd094b3e00d1e5dba062feabe3e6bdba83fdc130` |
+| `369710-hq-preview.ogg` | 9943 | `0dfac6e292031ac4d7e6a53f7fc97f7a694f58f04f0c651bc42ce3f3046d6357` |
+| `470710-hq-preview.ogg` | 15161 | `cfdf98fc48dbeda103d0ff0e83811049e47dc38616f0720de65758d3bba88116` |
+| `495660-hq-preview.ogg` | 266129 | `8339a3ce180ba6ed679afef57e1e7f4ce254eec3a2450f94a5a3ed4ef4a2fe76` |
+| `517610-hq-preview.ogg` | 26409 | `772f31c0222df43a015f6ee4cf69f8f3d81ce4ccb45dac6487d8ce4a7aefa684` |
+| `520143-hq-preview.ogg` | 14027 | `078ab04940a2ef0b17fec92165c1ad4ef7b8fcb95b6cab1d161665a773f67e22` |
+| `565799-hq-preview.ogg` | 73523 | `3b30ab4a9028e4b8f055722d74c2b176a83195dd9775a65791d8f6a6236573c1` |
+| `627657-hq-preview.ogg` | 520254 | `c3a8c97745d32d2a7891ba20a40c5c4f86d81886c7537e1941a26b1a2a51a068` |
+| `663380-hq-preview.ogg` | 337661 | `f0279e264dd4c47834e5804815d0b3de133bab4172d3ce5cf7d21b8a780b411c` |
+| `675975-hq-preview.ogg` | 190641 | `7b7e34c296e3a7bebcd1d69710e6a8c72b89ba0d8cd5cfd631cb510db6e4a6f7` |
+| `686544-hq-preview.ogg` | 7707 | `e463f0f72eba48f74fc9b871f71e0a730e60183d6cdf75829bbd5f8fbe22bca2` |
+| `698136-hq-preview.ogg` | 4991 | `92830449d3a00b27482f012a079473dbc946912813d7303b187c4e3478c93612` |
+| `709961-hq-preview.ogg` | 204040 | `6b9cf9938ad3ea18de87fd5a4484d3f205f2a1ae4102a57890a5097c707703d1` |
+| `737643-hq-preview.ogg` | 126208 | `556204ebf547cb0b79020ef3932cdb054e50b1a95bb50c4000d5d04dcfd76e42` |
 
 ## Rejected supplied candidates
 
