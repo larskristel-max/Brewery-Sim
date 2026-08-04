@@ -526,7 +526,7 @@ func _build_rotation_gate() -> void:
 	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	copy.add_child(title)
 	var instruction := Label.new()
-	instruction.text = "The brewery is designed for landscape play. Your place will be kept while you rotate."
+	instruction.text = "The opening begins once your phone is in landscape."
 	instruction.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	instruction.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	instruction.add_theme_font_size_override("font_size", 15)
@@ -643,8 +643,7 @@ func _apply_responsive_layout() -> void:
 	compact_layout = portrait_layout or size.x < 960.0 or size.y < 650.0
 	mobile_landscape_layout = not portrait_layout and physical_size.x <= 1000.0 and physical_size.y <= 600.0 and physical_size.x > physical_size.y
 	AudioDirector.set_mobile_mode(portrait_layout or mobile_landscape_layout)
-	var opening_visible := not started or prologue_active or awakening_active or (ui.has("customization") and is_instance_valid(ui.customization))
-	ui.rotation_gate.visible = portrait_layout and not opening_visible
+	ui.rotation_gate.visible = portrait_layout
 	_layout_top_bar()
 	_layout_guidance()
 	_layout_command_dock()
@@ -966,6 +965,9 @@ func _show_title_screen() -> void:
 	_apply_responsive_layout()
 
 func _start_opening_story() -> void:
+	if portrait_layout:
+		ui.rotation_gate.visible = true
+		return
 	AudioDirector.unlock_audio()
 	AudioDirector.play_cue("ui_confirm")
 	AudioDirector.begin_story_context("appointment")
