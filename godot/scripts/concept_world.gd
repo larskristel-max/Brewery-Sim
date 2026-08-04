@@ -6,6 +6,7 @@ signal first_light_activated
 
 const SCENES := {
 	"appointment": preload("res://assets/scenes/appointment.png"),
+	"appointment_council": preload("res://assets/scenes/appointment-family-council.png"),
 	"brewery": preload("res://assets/scenes/brewery-floor.png"),
 	"mash": preload("res://assets/scenes/mash-intervention.png"),
 	"packaging": preload("res://assets/scenes/packaging.png"),
@@ -109,7 +110,7 @@ func set_story_state(state: Dictionary) -> void:
 	var scene_id := "brewery"
 	var active_action := ""
 	for job in state.get("jobs", []):
-		if job.status == "active" and job.station != "fermentation_clock":
+		if job.status == "active" and state.get("stations", {}).has(str(job.station)):
 			active_action = str(job.action)
 			break
 	if str(state.get("stage", "")) == "appointment":
@@ -119,7 +120,7 @@ func set_story_state(state: Dictionary) -> void:
 	elif active_action == "package" or str(state.get("stage", "")) == "ready_to_package":
 		scene_id = "packaging"
 	elif active_action == "serve" or str(state.get("stage", "")) == "ready_to_serve":
-		scene_id = "courtyard"
+		scene_id = "packaging" if str(state.get("promise", {}).get("venue", "")) == "village_inn" else "courtyard"
 	elif str(state.get("stage", "")) in ["council", "complete"]:
 		scene_id = "council"
 	set_story_scene(scene_id)
@@ -134,10 +135,27 @@ func set_story_scene(scene_id: String) -> void:
 	camera_zoom_target = 1.0
 	_update_station_buttons()
 
-func set_cinematic_camera(scene_id: String, focus: Vector2, zoom: float) -> void:
-	set_story_scene(scene_id)
+func set_cinematic_camera(scene_id: String, focus: Vector2, zoom: float, immediate := false) -> void:
+	if immediate and SCENES.has(scene_id):
+		previous_scene = ""
+		current_scene = scene_id
+		scene_transition = 1.0
+	else:
+		set_story_scene(scene_id)
 	camera_focus_target = focus
 	camera_zoom_target = zoom
+	if immediate:
+		camera_focus = focus
+		camera_zoom = zoom
+	queue_redraw()
+
+func reset_story_camera(scene_id: String) -> void:
+	set_story_scene(scene_id)
+	camera_focus_target = _default_focus(scene_id)
+	camera_zoom_target = 1.0
+	camera_focus = camera_focus_target
+	camera_zoom = camera_zoom_target
+	queue_redraw()
 
 func begin_first_light() -> void:
 	set_story_scene("brewery")
@@ -173,7 +191,7 @@ func show_feedback(message: String, positive := true) -> void:
 
 func _default_focus(scene_id: String) -> Vector2:
 	match scene_id:
-		"appointment": return Vector2(0.52, 0.49)
+		"appointment", "appointment_council": return Vector2(0.52, 0.49)
 		"mash": return Vector2(0.52, 0.52)
 		"packaging": return Vector2(0.48, 0.53)
 		"courtyard": return Vector2(0.49, 0.54)
@@ -199,7 +217,7 @@ func _make_first_light_button() -> void:
 	first_light_button.name = "FirstLightHotspot"
 	first_light_button.text = ""
 	first_light_button.flat = true
-	first_light_button.tooltip_text = "Light the Old Stables"
+	first_light_button.tooltip_text = "Open the Old Stables"
 	first_light_button.focus_mode = Control.FOCUS_ALL
 	first_light_button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	first_light_button.visible = false
@@ -209,20 +227,21 @@ func _make_first_light_button() -> void:
 func _layout_hotspots() -> void:
 	for id in station_buttons:
 		var button: Button = station_buttons[id]
-		var point := _point(STATION_POINTS[id])
+		var point := _station_point(id)
 		button.position = point - Vector2(52, 52)
 		button.size = Vector2(104, 104)
 	if is_instance_valid(first_light_button):
-		var light_point := _point(Vector2(0.42, 0.22))
+		var light_point := _first_light_point()
 		first_light_button.position = light_point - Vector2(64, 58)
 		first_light_button.size = Vector2(128, 116)
 
 func _update_station_buttons() -> void:
 	var interactive := current_scene == "brewery" and not first_light_waiting and first_light_reveal >= 0.92
+	var copper_only := not management_state.is_empty() and str(management_state.get("stage", "")) == "recommission" and not bool(management_state.get("brewhouse_inspected", false))
 	for id in station_buttons:
 		var button: Button = station_buttons[id]
-		button.visible = interactive
-		button.disabled = not interactive
+		button.visible = interactive and (not copper_only or id == "brewhouse")
+		button.disabled = not interactive or (copper_only and id != "brewhouse")
 		button.modulate = Color.WHITE if selected_station == "" or selected_station == id else Color(1, 1, 1, 0.55)
 	_layout_hotspots()
 
@@ -293,7 +312,7 @@ func _draw_color_grade() -> void:
 		draw_rect(Rect2(Vector2.ZERO, size), Color(0.24,0.075,0.012,0.015 + vitality * 0.04))
 
 func _draw_environment_effects() -> void:
-	if current_scene == "appointment":
+	if current_scene in ["appointment", "appointment_council"]:
 		_draw_window_rain()
 		_draw_lantern(_point(Vector2(0.055, 0.73)), 34.0)
 	elif current_scene == "brewery":
@@ -331,14 +350,14 @@ func _draw_window_rain() -> void:
 func _draw_first_light_state() -> void:
 	var darkness := (1.0 - first_light_reveal) * 0.82
 	draw_rect(Rect2(Vector2.ZERO, size), Color(0.005, 0.009, 0.016, darkness))
-	var point := _point(Vector2(0.42, 0.22))
+	var point := _first_light_point()
 	var glow_strength := (0.22 + (sin(pulse * 3.2) + 1.0) * 0.055) if first_light_waiting else first_light_reveal * 0.38
 	for index in range(5, 0, -1):
 		var radius := 25.0 + float(index) * 14.0
 		draw_circle(point, radius, Color(0.98, 0.56, 0.20, glow_strength * float(6 - index) * 0.09))
 	if first_light_waiting:
 		var font := ThemeDB.fallback_font
-		var title := "LIGHT THE OLD STABLES"
+		var title := "OPEN THE OLD STABLES"
 		var width := font.get_string_size(title, HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x + 30.0
 		var box := Rect2(point + Vector2(-width * 0.5, 70), Vector2(width, 34))
 		draw_rect(box, Color(0.018, 0.017, 0.019, 0.94))
@@ -347,8 +366,11 @@ func _draw_first_light_state() -> void:
 
 func _draw_station_state() -> void:
 	var font := ThemeDB.fallback_font
+	var copper_only := not management_state.is_empty() and str(management_state.get("stage", "")) == "recommission" and not bool(management_state.get("brewhouse_inspected", false))
 	for id in STATION_POINTS:
-		var point: Vector2 = _point(STATION_POINTS[id])
+		if copper_only and id != "brewhouse":
+			continue
+		var point: Vector2 = _station_point(id)
 		var busy: bool = _station_busy(id)
 		var highlighted: bool = id == selected_station or id == hovered_station
 		var radius: float = 33.0 + (sin(pulse * 3.0) * 3.0 if busy else 0.0)
@@ -442,7 +464,7 @@ func _assignment_chip_rect(staff_id: String) -> Rect2:
 			break
 		if str(assignment.station_id) == station_id:
 			stack_index += 1
-	var anchor := _point(STATION_POINTS[station_id]) + Vector2(0, 75 + stack_index * 47)
+	var anchor := _station_point(station_id) + Vector2(0, 75 + stack_index * 47)
 	var position := anchor - Vector2(ASSIGNMENT_CHIP_SIZE.x * 0.5, 0)
 	position.x = clampf(position.x, 8.0, maxf(8.0, size.x - ASSIGNMENT_CHIP_SIZE.x - 8.0))
 	position.y = clampf(position.y, 8.0, maxf(8.0, size.y - ASSIGNMENT_CHIP_SIZE.y - 8.0))
@@ -526,7 +548,10 @@ func _station_busy(id: String) -> bool:
 	return not management_state.is_empty() and management_state.stations.has(id) and bool(management_state.stations[id].busy)
 
 func _station_status_text(id: String) -> String:
-	return "%s / %s" % [STATION_NAMES.get(id, str(id).to_upper()), "ACTIVE" if _station_busy(id) else "IDLE"]
+	var station_name: String = STATION_NAMES.get(id, str(id).to_upper())
+	if id == "courtyard" and str(management_state.get("campaign_phase", "")) == "opening_commission":
+		station_name = "LOADING COURT"
+	return "%s / %s" % [station_name, "ACTIVE" if _station_busy(id) else "IDLE"]
 
 func _point(normalized: Vector2) -> Vector2:
 	var texture: Texture2D = SCENES.get(current_scene, SCENES.brewery)
@@ -534,3 +559,15 @@ func _point(normalized: Vector2) -> Vector2:
 	var source := _source_rect(texture)
 	var source_point := normalized * texture_size
 	return (source_point - source.position) / source.size * size
+
+func _station_point(station_id: String) -> Vector2:
+	return _clamped_interaction_point(STATION_POINTS[station_id], Vector2(52, 52))
+
+func _first_light_point() -> Vector2:
+	return _clamped_interaction_point(Vector2(0.84, 0.72), Vector2(64, 58))
+
+func _clamped_interaction_point(normalized: Vector2, inset: Vector2) -> Vector2:
+	var point := _point(normalized)
+	point.x = clampf(point.x, inset.x, maxf(inset.x, size.x - inset.x))
+	point.y = clampf(point.y, inset.y, maxf(inset.y, size.y - inset.y))
+	return point

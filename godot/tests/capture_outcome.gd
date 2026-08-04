@@ -9,15 +9,15 @@ func _capture() -> void:
 	root.add_child(instance)
 	await process_frame
 	instance.begin_campaign_with("Elise", 0)
-	instance.ui.prologue.finish(true)
 	await process_frame
-	var first_light := instance.get_node_or_null("World/FirstLightHotspot") as Button
-	if first_light: first_light.pressed.emit()
-	await create_timer(1.3).timeout
+	if instance.ui.has("awakening") and is_instance_valid(instance.ui.awakening):
+		instance.ui.awakening.finish(true)
+	await create_timer(0.2).timeout
 	var model: BrewSimulation = instance.simulation
+	model.inspect_brewhouse()
 	model.start_action("recommission", "jules"); model.advance_to_next_milestone()
 	model.start_action("mash", "player"); model.advance_to_next_milestone()
-	model.choose_issue("cut_heat_stir"); model.choose_issue("estate_herbs")
+	model.choose_issue("cut_heat_stir"); model.choose_issue("inspect_wild_hops")
 	model.start_action("boil", "player"); model.advance_to_next_milestone()
 	model.start_action("clean_fermenter", "jules"); model.advance_to_next_milestone()
 	model.start_action("transfer", "player"); model.advance_to_next_milestone()

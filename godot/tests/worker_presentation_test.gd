@@ -56,7 +56,7 @@ func _check_active_assignment_chip(world: Control, viewport_size: Vector2) -> vo
 	_expect(str(assignments[0].station_id) == "brewhouse", "Active assignment chip targeted the wrong station at %s" % viewport_size)
 	_expect(world._station_status_text("brewhouse").ends_with("/ ACTIVE"), "Busy station was not explicitly presented as active at %s" % viewport_size)
 	var chip: Rect2 = world._assignment_chip_rect("jules")
-	var station_point: Vector2 = world._point(world.STATION_POINTS.brewhouse)
+	var station_point: Vector2 = world._station_point("brewhouse")
 	_expect(_rect_inside_view(chip, viewport_size), "Assignment chip was clipped at %s" % viewport_size)
 	_expect(absf(chip.get_center().x - station_point.x) <= 0.01, "Assignment chip drifted horizontally from the brewhouse at %s" % viewport_size)
 	var hotspot: Button = world.station_buttons.brewhouse

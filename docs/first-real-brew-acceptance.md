@@ -27,7 +27,7 @@
 - Used brewhouse, fermenter, and packaging stations retain sanitation debt between batches and must be cleaned before reuse.
 - Apolline's council offers reinvestment, creditor payment and community backing.
 - Versioned saves preserve the customized player, batch, lots, jobs, staff, decisions, delivery recovery, council, restoration, capacity board, and production queue. UI checkpoints cover planning, production trouble, fermentation, and the second council.
-- After the First Fortnight, the Abbey harvest table and Three Lanterns inn compete for finite malt, two returnable kegs, fourteen staff hours, working cash, and one fermenter. The player must accept, renegotiate, or reject both before production begins.
+- After the First Fortnight, the Abbey winter table and Three Lanterns inn compete for finite malt, two returnable casks, fourteen staff hours, working cash, and one fermenter. The player must accept, renegotiate, or reject both before production begins.
 - One full and one renegotiated commitment creates an explicit overlapping production queue; the second grain bill can be staged while the first batch ferments.
 - The authority ladder contains Castle Brewmaster, Keeper of the Old Stables, Deputy Steward and Estate Steward with distinct gates and unlocks.
 - First insolvency triggers emergency credit and probation. A third poor council review can lose the estate.

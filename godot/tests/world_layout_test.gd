@@ -5,7 +5,9 @@ const WORLD_SCRIPT := preload("res://scripts/concept_world.gd")
 const VIEWPORT_CASES := [
 	Vector2(1280, 720),
 	Vector2(1600, 900),
-	Vector2(2560, 1080)
+	Vector2(2560, 1080),
+	Vector2(540, 1168),
+	Vector2(1280, 592)
 ]
 
 var failures: Array[String] = []
@@ -28,7 +30,7 @@ func _run() -> void:
 	world.queue_free()
 	await process_frame
 	if failures.is_empty():
-		print("Old Stables world layout test: PASS (hotspots track crop and focus at 720p, 900p, and ultrawide sizes)")
+		print("Old Stables world layout test: PASS (hotspots track crop and focus across desktop and phone aspect ratios)")
 		quit(0)
 	else:
 		for failure in failures:
@@ -54,7 +56,7 @@ func _check_focused_layout(world: Control, viewport_size: Vector2, station_id: S
 	var context := "focused %s" % station_id
 	_check_source_crop(world, viewport_size, context)
 	_check_hotspot_centres(world, viewport_size, context)
-	var focused_point: Vector2 = world._point(world.STATION_POINTS[station_id])
+	var focused_point: Vector2 = world._station_point(station_id)
 	_expect(
 		_point_inside_view(focused_point, viewport_size),
 		"%s at %s cropped the selected station out of view (got %s)" % [
@@ -75,13 +77,13 @@ func _check_source_crop(world: Control, viewport_size: Vector2, context: String)
 func _check_hotspot_centres(world: Control, viewport_size: Vector2, context: String) -> void:
 	for station_id in world.STATION_POINTS:
 		var button: Button = world.station_buttons[station_id]
-		var expected: Vector2 = world._point(world.STATION_POINTS[station_id])
+		var expected: Vector2 = world._station_point(station_id)
 		var actual: Vector2 = button.position + button.size * 0.5
 		_expect(actual.distance_to(expected) <= 0.01, "%s %s hotspot drifted from its rendered marker at %s" % [context, station_id, viewport_size])
 		_expect(_rect_inside_view(button.get_rect(), viewport_size), "%s %s hotspot was clipped at %s" % [context, station_id, viewport_size])
 
 func _check_first_light(world: Control, viewport_size: Vector2) -> void:
-	var expected: Vector2 = world._point(Vector2(0.42, 0.22))
+	var expected: Vector2 = world._first_light_point()
 	var actual: Vector2 = world.first_light_button.position + world.first_light_button.size * 0.5
 	_expect(actual.distance_to(expected) <= 0.01, "First-light hotspot drifted from its rendered lantern at %s" % viewport_size)
 	_expect(_rect_inside_view(world.first_light_button.get_rect(), viewport_size), "First-light hotspot was clipped at %s" % viewport_size)

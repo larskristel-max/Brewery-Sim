@@ -60,6 +60,15 @@ Invoke-ValidationStep "Run simulation and persistence tests" $godot @(
 Invoke-ValidationStep "Run complete UI interaction route" $godot @(
     "--headless", "--path", $projectPath, "--script", "res://tests/ui_interaction_test.gd"
 )
+Invoke-ValidationStep "Verify centralized audio, buses, persistence, and browser-safe behavior" $godot @(
+    "--headless", "--path", $projectPath, "--script", "res://tests/audio_director_test.gd"
+)
+Invoke-ValidationStep "Verify phone and rotation layouts" $godot @(
+    "--headless", "--path", $projectPath, "--script", "res://tests/responsive_ui_test.gd"
+)
+Invoke-ValidationStep "Verify prologue speaker framing" $godot @(
+    "--headless", "--path", $projectPath, "--script", "res://tests/prologue_framing_test.gd"
+)
 Invoke-ValidationStep "Verify world hotspot layout" $godot @(
     "--headless", "--path", $projectPath, "--script", "res://tests/world_layout_test.gd"
 )

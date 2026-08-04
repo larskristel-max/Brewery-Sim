@@ -1,4 +1,8 @@
 {
+  "campaign_phase":"opening_commission",
+  "week_number":0,
+  "coat_index":0,
+  "brewhouse_inspected":false,
   "game_minute":430,
   "cash_credits":6200,
   "estate_runway_days":42,
@@ -7,7 +11,15 @@
   "player_role":"castle_brewmaster",
   "authority":["brew","clean","request_ingredients","recommend_release"],
   "inventory":[
-    {"lot_id":"LOT-MALT-001","material_id":"malt_pale_estate","quantity":18.0,"quality":82},
-    {"lot_id":"LOT-YEAST-001","material_id":"yeast_house_ale","quantity":2,"quality":78}
-  ]
+    {"lot_id":"LOT-MALT-001","material_id":"malt_pale_estate","quantity":18.0,"quality":82,"source":"estate_granary"},
+    {"lot_id":"LOT-YEAST-001","material_id":"yeast_house_ale","quantity":1,"quality":78,"unit":"pitch","source":"brasserie_saint_odile"},
+    {"lot_id":"LOT-HOPS-001","material_id":"hops_wild_millstream","quantity":0.0,"quality":0,"source":"millstream_wild_vines","status":"requires_inspection"}
+  ],
+  "opening_commission":{
+    "day_1":"inspect_and_recommission",
+    "day_2":"mash_and_boil",
+    "fermentation_days":"2-9",
+    "day_10":"package",
+    "day_11":"deliver_to_village_inn"
+  }
 }
