@@ -4,8 +4,23 @@ import { useEffect, useState } from "react";
 
 export function PlaytestShell() {
   const [ready, setReady] = useState(false);
+  const [embedReady, setEmbedReady] = useState(false);
 
   useEffect(() => {
+    const touchDevice =
+      navigator.maxTouchPoints > 0 || window.matchMedia("(pointer: coarse)").matches;
+    const compactScreen = Math.min(window.screen.width, window.screen.height) <= 820;
+
+    // Run phones and small tablets directly in the game document. This avoids
+    // an iframe consuming scarce screen space and lets the Begin tap request
+    // fullscreen and unlock Web Audio in the same browsing context.
+    if (touchDevice && compactScreen) {
+      window.location.replace("/game/index.html");
+      return;
+    }
+
+    setEmbedReady(true);
+
     const handleMessage = (event: MessageEvent) => {
       if (
         event.origin === window.location.origin &&
@@ -40,10 +55,8 @@ export function PlaytestShell() {
           <a
             className="full-screen-link"
             href="/game/index.html"
-            target="_blank"
-            rel="noreferrer"
           >
-            Open game only
+            Open full-screen game
           </a>
         </div>
       </header>
@@ -53,13 +66,16 @@ export function PlaytestShell() {
           <strong>Preparing the Old Stables</strong>
           The first load can take a moment while the brewery arrives.
         </div>
-        <iframe
-          className="game-frame"
-          src="/game/index.html"
-          title="Old Stables browser game"
-          allow="autoplay; fullscreen; gamepad"
-          onLoad={() => setReady(false)}
-        />
+        {embedReady ? (
+          <iframe
+            className="game-frame"
+            src="/game/index.html"
+            title="Old Stables browser game"
+            allow="autoplay; fullscreen; gamepad"
+            allowFullScreen
+            onLoad={() => setReady(false)}
+          />
+        ) : null}
       </section>
     </main>
   );

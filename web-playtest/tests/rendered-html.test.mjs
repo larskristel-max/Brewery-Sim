@@ -31,7 +31,7 @@ test("server-renders the Old Stables browser launcher", async () => {
   const html = await response.text();
   assert.match(html, /<title>Old Stables — Browser Playtest<\/title>/i);
   assert.match(html, /Browser playtest/);
-  assert.match(html, /Open game only/);
+  assert.match(html, /Open full-screen game/);
   assert.match(html, /\/game\/index\.html/);
 });
 

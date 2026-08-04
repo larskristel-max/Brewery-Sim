@@ -32,7 +32,13 @@ func _run() -> void:
 			_expect(not path.is_empty() and ResourceLoader.exists(path), "Cue %s has a missing stream: %s" % [cue_id, path])
 
 	_expect(not director.play_cue("ui_press"), "Audio played before browser/player unlock")
+	_expect(director.set_ambience("appointment", 0.05), "Locked audio did not retain its requested story ambience")
+	_expect(director.active_ambience_player_count() == 0, "Ambience played before browser/player unlock")
 	director.unlock_audio()
+	await create_timer(0.08).timeout
+	_expect(director.current_ambience == "appointment", "Browser unlock lost the queued story ambience")
+	var unlocked_deck = director._ambience_players[director._active_ambience_index]
+	_expect(unlocked_deck.stream != null, "Browser unlock did not load the queued story ambience")
 	_expect(director.play_cue("ui_press"), "Unlocked UI cue did not play")
 	_expect(not director.play_cue("ui_press"), "Rapid-click cooldown did not limit an identical UI cue")
 
@@ -52,7 +58,7 @@ func _run() -> void:
 	disabled.queue_free()
 	_expect(not director.play_cue("cue_that_does_not_exist", true), "Missing cue did not fail safely")
 
-	_expect(director.set_ambience("appointment", 0.05), "Appointment ambience did not start")
+	_expect(not director.set_ambience("appointment", 0.05), "Repeated appointment state duplicated ambience after unlock")
 	await process_frame
 	_expect(not director.set_ambience("appointment", 0.05), "Repeated state entry duplicated ambience")
 	var before_resume: int = director.active_ambience_player_count()

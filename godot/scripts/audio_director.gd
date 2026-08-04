@@ -126,7 +126,17 @@ func _load_manifest() -> void:
 func unlock_audio() -> void:
 	if unlocked:
 		return
+	var pending_ambience := current_ambience
+	var pending_music := current_music
 	unlocked = true
+	# Web audio begins suspended. Re-enter any state selected while the title was
+	# visible so the first deliberate player gesture starts the actual soundscape.
+	current_ambience = ""
+	current_music = ""
+	if not pending_ambience.is_empty():
+		set_ambience(pending_ambience, 0.35)
+	if not pending_music.is_empty():
+		set_music(pending_music, 0.8)
 	audio_unlocked.emit()
 
 func set_mobile_mode(value: bool) -> void:

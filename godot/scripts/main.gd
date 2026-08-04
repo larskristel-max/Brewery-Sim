@@ -28,6 +28,7 @@ var awakening_active := false
 var portrait_layout := false
 var compact_layout := false
 var mobile_landscape_layout := false
+var opening_launching := false
 
 func _ready() -> void:
 	simulation = BrewSimulationModel.new()
@@ -968,9 +969,19 @@ func _start_opening_story() -> void:
 	if portrait_layout:
 		ui.rotation_gate.visible = true
 		return
-	AudioDirector.unlock_audio()
-	AudioDirector.play_cue("ui_confirm")
+	if opening_launching:
+		return
+	opening_launching = true
+	# Browser fullscreen and Web Audio both require a direct player gesture.
+	# Request fullscreen before yielding, while this button press still owns it.
+	if OS.has_feature("web") and mobile_landscape_layout:
+		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
 	AudioDirector.begin_story_context("appointment")
+	AudioDirector.unlock_audio()
+	# Give a suspended mobile AudioContext one frame to resume before the first
+	# audible confirmation and cinematic ambience are expected to be heard.
+	await get_tree().process_frame
+	AudioDirector.play_cue("ui_confirm")
 	if ui.has("title_screen") and is_instance_valid(ui.title_screen):
 		ui.title_screen.queue_free()
 	_start_prologue()

@@ -149,6 +149,15 @@ $engineScript = $engineScript.Replace(
 [System.IO.File]::WriteAllText($engineScriptPath, $engineScript)
 
 $exportHtml = [System.IO.File]::ReadAllText($exportPath)
+$exportHtml = $exportHtml.Replace(
+    '<meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0">',
+    @'
+<meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0, viewport-fit=cover">
+		<meta name="mobile-web-app-capable" content="yes">
+		<meta name="apple-mobile-web-app-capable" content="yes">
+		<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+'@.TrimEnd()
+)
 $partSizeEntries = @()
 for ($partIndex = 0; $partIndex -lt $wasmPartPaths.Count; $partIndex++) {
     $partLength = (Get-Item -LiteralPath $wasmPartPaths[$partIndex]).Length
