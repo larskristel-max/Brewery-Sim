@@ -10,7 +10,7 @@ Important release gate: licence verification is complete, but the full-recording
 
 ## Integrated CC0 candidates
 
-| ID | Asset / creator | Exact source | Original filename | Source/runtime basename | Runtime treatment | Source SHA-256 |
+| ID | Asset / creator | Exact source | Original filename | Source-preview basename | Runtime treatment | Source SHA-256 |
 |---|---|---|---|---|---|---|
 | 207781 | Pouring Liquid.wav / Dvideoguy | [source](https://freesound.org/people/Dvideoguy/sounds/207781/) | `207781__dvideoguy__pouring-liquid.wav` | `207781-hq-preview.ogg` | Trimmed at playback to 0.45–2.7 s; level and ±2.5% pitch variation at runtime | `b19073d7d216b9337034329c71581b2b9592764a32ccc9ce9698a542dbb44f31` |
 | 216134 | INT Rainy ambience / Sayuri_Odin | [source](https://freesound.org/people/Sayuri_Odin/sounds/216134/) | `216134__sayuri_odin__int-rainy-ambience-rain-heard-from-inside-a-room.wav` | `216134-hq-preview.ogg` | Seamless loop flag at runtime; crossfaded; scene-specific level | `43ff58cbf1c03b998e4e9d9d32b181844e7403ad684ad679a5170f83ab9d3462` |
@@ -32,33 +32,33 @@ Important release gate: licence verification is complete, but the full-recording
 | 709961 | Paper rustle / Squidems | [source](https://freesound.org/people/Squidems/sounds/709961/) | `709961__squidems__paper-rustle.wav` | `709961-hq-preview.ogg` | Multiple short offsets for ledger pages, cleaning cloth and day advance | `30b48b42da98da9871de1986b21fc89b3484e1694fe46e22e498587d3042d85b` |
 | 737643 | Horse Carriage / Kraftaggregat | [source](https://freesound.org/people/Kraftaggregat/sounds/737643/) | `737643__kraftaggregat__horse-carriage.wav` | `737643-hq-preview.ogg` | First 12 s, very low and infrequent in courtyard ambience | `a455097942a732696e6a27de026e5250073f8c1e898bc57d958d8bbd20972d57` |
 
-Untouched compressed source masters stored in the repository: 9,207,338 bytes (8.78 MiB). Godot import metadata is not included in this figure. Runtime files use the same basename under `assets/audio/runtime/`; masters remain under `assets/audio/source-masters/` and are excluded from exports.
+Untouched compressed source masters stored in the repository: 9,207,338 bytes (8.78 MiB). Godot import metadata is not included in this figure. Runtime files use the same stem with a `.mp3` extension under `assets/audio/runtime/`; masters remain under `assets/audio/source-masters/` and are excluded from exports.
 
 ## Runtime cut register
 
-`scripts/prepare-audio-runtime.ps1` creates duration-limited Ogg Vorbis runtime files with FFmpeg (`ffmpeg-static` 5.2.0 for this build), removes metadata and unused tails, resamples to 44.1 kHz, keeps broad ambience stereo and converts physical/interface cues to mono. The runtime encode uses `libvorbis` quality 1 and keeps all cue offsets declared in the manifest. Runtime audio totals 2,903,167 bytes (2.77 MiB).
+`scripts/prepare-audio-runtime.ps1` creates duration-limited MP3 runtime files with FFmpeg (`ffmpeg-static` 6.0 for this build), removes metadata and unused tails, resamples to 44.1 kHz, keeps broad ambience stereo at 112 kbit/s and converts physical/interface cues to mono at 80 kbit/s. MP3 replaces the previous Ogg Vorbis runtime palette because it is supported by both current and older iPhone Safari versions. All cue offsets declared in the manifest are retained. Runtime audio totals 4,182,982 bytes (3.99 MiB).
 
 | Runtime filename | Bytes | Runtime SHA-256 |
 |---|---:|---|
-| `207781-hq-preview.ogg` | 34369 | `0123bf4a1a11ec724c8e24f0b43ada1950030756d1d493af17aceb1b1faea969` |
-| `216134-hq-preview.ogg` | 91196 | `6cca6b1f783e0ea9ae5ce0d9e061126b99f0ff6aa360037c02d01efe25d3aaf5` |
-| `234317-hq-preview.ogg` | 311762 | `d9faf730442c7561fb6b281275c33921f9a85595b1fa57fb6181a8aa95d459e0` |
-| `264123-hq-preview.ogg` | 628014 | `31121150e27b1ab4d9369d9b43a8ee1d96d5952bab7dada4c2f2dcfa92211e8e` |
-| `275471-hq-preview.ogg` | 28724 | `bee354fc3789bd0d1b70336be689e3a513dd69b5142b181501d37c71c7a2fc4f` |
-| `353125-hq-preview.ogg` | 12408 | `003097c8202e51c0adf8aa2fcd094b3e00d1e5dba062feabe3e6bdba83fdc130` |
-| `369710-hq-preview.ogg` | 9943 | `0dfac6e292031ac4d7e6a53f7fc97f7a694f58f04f0c651bc42ce3f3046d6357` |
-| `470710-hq-preview.ogg` | 15161 | `cfdf98fc48dbeda103d0ff0e83811049e47dc38616f0720de65758d3bba88116` |
-| `495660-hq-preview.ogg` | 266129 | `8339a3ce180ba6ed679afef57e1e7f4ce254eec3a2450f94a5a3ed4ef4a2fe76` |
-| `517610-hq-preview.ogg` | 26409 | `772f31c0222df43a015f6ee4cf69f8f3d81ce4ccb45dac6487d8ce4a7aefa684` |
-| `520143-hq-preview.ogg` | 14027 | `078ab04940a2ef0b17fec92165c1ad4ef7b8fcb95b6cab1d161665a773f67e22` |
-| `565799-hq-preview.ogg` | 73523 | `3b30ab4a9028e4b8f055722d74c2b176a83195dd9775a65791d8f6a6236573c1` |
-| `627657-hq-preview.ogg` | 520254 | `c3a8c97745d32d2a7891ba20a40c5c4f86d81886c7537e1941a26b1a2a51a068` |
-| `663380-hq-preview.ogg` | 337661 | `f0279e264dd4c47834e5804815d0b3de133bab4172d3ce5cf7d21b8a780b411c` |
-| `675975-hq-preview.ogg` | 190641 | `7b7e34c296e3a7bebcd1d69710e6a8c72b89ba0d8cd5cfd631cb510db6e4a6f7` |
-| `686544-hq-preview.ogg` | 7707 | `e463f0f72eba48f74fc9b871f71e0a730e60183d6cdf75829bbd5f8fbe22bca2` |
-| `698136-hq-preview.ogg` | 4991 | `92830449d3a00b27482f012a079473dbc946912813d7303b187c4e3478c93612` |
-| `709961-hq-preview.ogg` | 204040 | `6b9cf9938ad3ea18de87fd5a4484d3f205f2a1ae4102a57890a5097c707703d1` |
-| `737643-hq-preview.ogg` | 126208 | `556204ebf547cb0b79020ef3932cdb054e50b1a95bb50c4000d5d04dcfd76e42` |
+| `207781-hq-preview.mp3` | 29040 | `f94768259c7fafd025a27e69a97dce48b0697a65508f9c6d7918b48fbbbeaab6` |
+| `216134-hq-preview.mp3` | 148157 | `e4c15070466b1c332015834563e12c44223ce3be4661dda254474e3a60130464` |
+| `234317-hq-preview.mp3` | 420980 | `80c260065fd36aa21c753ab35bd1e4a854402f9ee63eea6994ef109d952e41c7` |
+| `264123-hq-preview.mp3` | 820811 | `a507e525a7937dd44d49f44c393cc84a1400c257f35dd16d79afc7e0abf555f0` |
+| `275471-hq-preview.mp3` | 46281 | `6adcef2ff5806c0fb96d2a0f622cb4be98b81aec7885cf8be7a2b869e474c13d` |
+| `353125-hq-preview.mp3` | 12060 | `ff989452537bfe66dc265be68b5add48635b186492c33d9cf2bfd65eb7ecdbdf` |
+| `369710-hq-preview.mp3` | 9971 | `58d570be3b3b0713c213c5800d6831d2f6bcb149cae688b86d7aae59eda802cb` |
+| `470710-hq-preview.mp3` | 16501 | `bdeb94794911bd5dffba53e03041652436979c518a6c9ddd7517efd62a881501` |
+| `495660-hq-preview.mp3` | 420980 | `c31ade582f6414e734fef925d7046be1bc757bd6e435e6242044713c39be7451` |
+| `517610-hq-preview.mp3` | 35571 | `b30e6edb2b9fc018e439558973e459164d9267cf5d9723d661e17929e178cf7b` |
+| `520143-hq-preview.mp3` | 16501 | `16f116836855258c2d5633a764b15099fe8f1c38e32b8b7d4f856bee5136934b` |
+| `565799-hq-preview.mp3` | 100615 | `c398c577c7fd9e2a8b55b11279e317c9934e2855ac3ab864de219896a763a083` |
+| `627657-hq-preview.mp3` | 680795 | `0dda209e4e11b096a44ea6fc0d26802a1eb59423f9fc3497d24e5fc66bd24797` |
+| `663380-hq-preview.mp3` | 588843 | `a71c5483c7b232a2c454c10af78f0c3226b1fc3aa2c4f45ac32daba408762862` |
+| `675975-hq-preview.mp3` | 340681 | `72d0a6013e94556ad94d18c50da3a2e108a7f20b0af7088bf6d53432af7b29c0` |
+| `686544-hq-preview.mp3` | 12583 | `6ba4e76655a05df3b2798ee2fb352d57cca2d1c6eff32479c55ddb06c76cc303` |
+| `698136-hq-preview.mp3` | 3962 | `01e945ff0980c343d1500e412e81560c3015366390bd62b2950990955e035185` |
+| `709961-hq-preview.mp3` | 295750 | `19c1c630f717c0d44912efd35a474f64c4396f986901d7d55818817989c076b0` |
+| `737643-hq-preview.mp3` | 182900 | `6d803e6de28f376d50436fcb0b695cadb027a833c49637729bfca28eb8030fc7` |
 
 ## Rejected supplied candidates
 

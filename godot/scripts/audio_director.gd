@@ -519,4 +519,7 @@ func _load_stream(path: String, loop: bool) -> AudioStream:
 	if stream is AudioStreamOggVorbis:
 		stream = stream.duplicate()
 		stream.loop = loop
+	elif stream is AudioStreamMP3:
+		stream = stream.duplicate()
+		stream.loop = loop
 	return stream as AudioStream

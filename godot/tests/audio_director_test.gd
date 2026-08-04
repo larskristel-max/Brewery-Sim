@@ -30,6 +30,12 @@ func _run() -> void:
 		for variant in cue.get("streams", []):
 			var path := str(variant.get("path", ""))
 			_expect(not path.is_empty() and ResourceLoader.exists(path), "Cue %s has a missing stream: %s" % [cue_id, path])
+			_expect(path.ends_with(".mp3"), "Cue %s is not using the cross-browser MP3 palette: %s" % [cue_id, path])
+	for environment_id in ["title", "appointment", "awakening_dormant", "awakening_inhabited", "brewhouse_idle", "mash_boil", "fermentation", "packaging", "courtyard", "council"]:
+		var ambience: Dictionary = director.get_ambience_definition(environment_id)
+		var ambience_path := str(ambience.get("stream", ""))
+		_expect(not ambience_path.is_empty() and ResourceLoader.exists(ambience_path), "Ambience %s has a missing stream: %s" % [environment_id, ambience_path])
+		_expect(ambience_path.ends_with(".mp3"), "Ambience %s is not using the cross-browser MP3 palette: %s" % [environment_id, ambience_path])
 
 	_expect(not director.play_cue("ui_press"), "Audio played before browser/player unlock")
 	_expect(director.set_ambience("appointment", 0.05), "Locked audio did not retain its requested story ambience")
