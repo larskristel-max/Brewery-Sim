@@ -167,4 +167,6 @@ I’ll see to the chimney. The old copper patch is ugly, but it held before. Ins
 
 ## Rendering continuity
 
+The first eight prologue beats use the private family-council plate: Armand, Apolline and Cécile discuss the estate without the brewer present. The scene cuts to the appointment plate only at **WHY YOU WERE SUMMONED**, when Armand addresses the brewer for the first time.
+
 The appointment image places Cécile beside Apolline, visually separate from the ledger work and holding sealed correspondence from the Three Lanterns and Saint-Odile. The packaging image uses period-correct returnable wooden casks rather than modern stainless-steel kegs.

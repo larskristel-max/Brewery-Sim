@@ -9,6 +9,7 @@ const CREAM := Color("#efe4d2")
 const COPPER := Color("#d79a5b")
 const MUTED := Color("#b8aa98")
 const MIN_ADVANCE_DELAY := 0.28
+const BREWER_ENTRANCE_SHOT := 8
 
 const SHOTS := [
 	{
@@ -204,11 +205,14 @@ func _set_shot(index: int) -> void:
 	dialogue.text = str(shot.line)
 	dialogue.visible_ratio = 0.0
 	if is_instance_valid(world) and world.has_method("set_cinematic_camera"):
-		world.set_cinematic_camera("appointment", shot.focus, float(shot.zoom))
+		world.set_cinematic_camera(_scene_for_shot(index), shot.focus, float(shot.zoom), index == 0)
 	transition.color.a = 0.72 if index == 0 else 0.46
 	var fade := create_tween()
 	fade.tween_property(transition, "color:a", 0.0, 1.0).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	beat.emit(str(shot.beat))
+
+func _scene_for_shot(index: int) -> String:
+	return "appointment_council" if index < BREWER_ENTRANCE_SHOT else "appointment"
 
 func _reveal_duration() -> float:
 	return clampf(str(SHOTS[shot_index].line).length() * 0.026, 0.7, 2.6)

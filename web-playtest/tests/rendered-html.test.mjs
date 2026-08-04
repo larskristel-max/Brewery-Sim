@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { access, readFile } from "node:fs/promises";
+import { access, readFile, stat } from "node:fs/promises";
 import test from "node:test";
 import vm from "node:vm";
 
@@ -45,6 +45,10 @@ test("packages WebAssembly in sub-25 MB parts for Sites", async () => {
   await assert.rejects(
     access(new URL("../dist/client/game/index.wasm.gz", import.meta.url)),
   );
+  const gamePack = await stat(
+    new URL("../dist/client/game/index.pck", import.meta.url),
+  );
+  assert.ok(gamePack.size < 25 * 1024 * 1024);
 });
 
 test("exposes the Godot Web Audio context for phone diagnostics", async () => {

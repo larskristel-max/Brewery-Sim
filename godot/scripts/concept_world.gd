@@ -6,6 +6,7 @@ signal first_light_activated
 
 const SCENES := {
 	"appointment": preload("res://assets/scenes/appointment.png"),
+	"appointment_council": preload("res://assets/scenes/appointment-family-council.png"),
 	"brewery": preload("res://assets/scenes/brewery-floor.png"),
 	"mash": preload("res://assets/scenes/mash-intervention.png"),
 	"packaging": preload("res://assets/scenes/packaging.png"),
@@ -134,10 +135,19 @@ func set_story_scene(scene_id: String) -> void:
 	camera_zoom_target = 1.0
 	_update_station_buttons()
 
-func set_cinematic_camera(scene_id: String, focus: Vector2, zoom: float) -> void:
-	set_story_scene(scene_id)
+func set_cinematic_camera(scene_id: String, focus: Vector2, zoom: float, immediate := false) -> void:
+	if immediate and SCENES.has(scene_id):
+		previous_scene = ""
+		current_scene = scene_id
+		scene_transition = 1.0
+	else:
+		set_story_scene(scene_id)
 	camera_focus_target = focus
 	camera_zoom_target = zoom
+	if immediate:
+		camera_focus = focus
+		camera_zoom = zoom
+	queue_redraw()
 
 func reset_story_camera(scene_id: String) -> void:
 	set_story_scene(scene_id)
@@ -181,7 +191,7 @@ func show_feedback(message: String, positive := true) -> void:
 
 func _default_focus(scene_id: String) -> Vector2:
 	match scene_id:
-		"appointment": return Vector2(0.52, 0.49)
+		"appointment", "appointment_council": return Vector2(0.52, 0.49)
 		"mash": return Vector2(0.52, 0.52)
 		"packaging": return Vector2(0.48, 0.53)
 		"courtyard": return Vector2(0.49, 0.54)
@@ -302,7 +312,7 @@ func _draw_color_grade() -> void:
 		draw_rect(Rect2(Vector2.ZERO, size), Color(0.24,0.075,0.012,0.015 + vitality * 0.04))
 
 func _draw_environment_effects() -> void:
-	if current_scene == "appointment":
+	if current_scene in ["appointment", "appointment_council"]:
 		_draw_window_rain()
 		_draw_lantern(_point(Vector2(0.055, 0.73)), 34.0)
 	elif current_scene == "brewery":
