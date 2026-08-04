@@ -981,6 +981,7 @@ func _update_opening_audio_availability() -> void:
 		ui.title_sound_status.text = "This browser cannot provide game audio. Open this link in Chrome or Safari."
 
 func _test_opening_sound() -> void:
+	_prepare_web_audio_session()
 	AudioDirector.begin_story_context("appointment")
 	AudioDirector.unlock_audio()
 	await get_tree().process_frame
@@ -1003,7 +1004,12 @@ func _web_audio_state() -> String:
 	var state = JavaScriptBridge.eval("window.__oldStablesGodotAudioContext ? window.__oldStablesGodotAudioContext.state : 'missing'", true)
 	return str(state)
 
+func _prepare_web_audio_session() -> void:
+	if OS.has_feature("web"):
+		JavaScriptBridge.eval("window.__oldStablesUnlockAudio ? window.__oldStablesUnlockAudio() : ''", true)
+
 func _start_opening_story() -> void:
+	_prepare_web_audio_session()
 	if portrait_layout:
 		ui.rotation_gate.visible = true
 		return

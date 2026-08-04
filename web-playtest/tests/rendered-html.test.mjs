@@ -53,3 +53,21 @@ test("exposes the Godot Web Audio context for phone diagnostics", async () => {
   );
   assert.match(engine, /window\.__oldStablesGodotAudioContext=ctx/);
 });
+
+test("installs the iOS playback-session unlock bridge", async () => {
+  const gameHtml = await readFile(
+    new URL("../dist/client/game/index.html", import.meta.url),
+    "utf8",
+  );
+  const bridge = await readFile(
+    new URL("../dist/client/ios-audio-session.js", import.meta.url),
+    "utf8",
+  );
+  await access(
+    new URL("../dist/client/ios-audio-session-primer.mp3", import.meta.url),
+  );
+  assert.match(gameHtml, /<script src="\/ios-audio-session\.js"><\/script>/);
+  assert.match(bridge, /navigator\.audioSession\.type = "playback"/);
+  assert.match(bridge, /__oldStablesUnlockAudio/);
+  assert.match(bridge, /ios-audio-session-primer\.mp3/);
+});

@@ -162,6 +162,13 @@ $exportHtml = $exportHtml.Replace(
 		<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 '@.TrimEnd()
 )
+$exportHtml = $exportHtml.Replace(
+    '</head>',
+    @'
+		<script src="/ios-audio-session.js"></script>
+	</head>
+'@.TrimEnd()
+)
 $partSizeEntries = @()
 for ($partIndex = 0; $partIndex -lt $wasmPartPaths.Count; $partIndex++) {
     $partLength = (Get-Item -LiteralPath $wasmPartPaths[$partIndex]).Length
