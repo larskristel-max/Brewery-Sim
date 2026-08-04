@@ -22,6 +22,8 @@ func _run() -> void:
 	_expect(_fits_in_viewport(instance, instance.ui.title_card), "Opening title overflowed the portrait phone viewport")
 	var opening := _find_button(instance.ui.title_screen, "BEGIN")
 	_expect(opening != null, "Opening title did not expose the story action")
+	var sound_test := _find_button(instance.ui.title_screen, "TEST SOUND")
+	_expect(sound_test != null and _fits_in_viewport(instance, sound_test), "Opening title did not expose a usable phone sound check")
 	if opening: opening.pressed.emit()
 	await _settle()
 	_expect(not instance.prologue_active, "Portrait input started the prologue behind the rotation gate")

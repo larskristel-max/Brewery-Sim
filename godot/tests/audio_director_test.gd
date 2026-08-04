@@ -3,7 +3,7 @@ extends SceneTree
 const REQUIRED_BUSES := ["Master", "Music", "Ambience", "SFX", "UI"]
 const REQUIRED_CUES := [
 	"ui_focus", "ui_press", "ui_confirm", "ui_cancel", "ui_invalid", "ui_warning",
-	"ui_panel_open", "ui_panel_close", "ui_page_turn", "cinematic_advance", "cinematic_skip",
+	"ui_panel_open", "ui_panel_close", "ui_page_turn", "cinematic_advance", "cinematic_skip", "sound_check",
 	"contract_accept", "contract_complete", "contract_fail", "resource_gain", "resource_spend",
 	"day_advance", "council_result_positive", "council_result_mixed", "council_result_negative",
 	"brewery_doors", "light_furnace", "add_malt", "stir_mash", "adjust_heat", "valve",
@@ -40,6 +40,7 @@ func _run() -> void:
 	var unlocked_deck = director._ambience_players[director._active_ambience_index]
 	_expect(unlocked_deck.stream != null, "Browser unlock did not load the queued story ambience")
 	_expect(director.play_cue("ui_press"), "Unlocked UI cue did not play")
+	_expect(director.play_cue("sound_check", true), "Opening sound-check cue did not resolve")
 	_expect(not director.play_cue("ui_press"), "Rapid-click cooldown did not limit an identical UI cue")
 
 	director.set_interface_sounds_enabled(false, false)

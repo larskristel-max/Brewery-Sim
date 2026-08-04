@@ -946,6 +946,12 @@ func _show_title_screen() -> void:
 	subtitle.add_theme_font_size_override("font_size", 16)
 	subtitle.add_theme_color_override("font_color", SAGE)
 	copy.add_child(subtitle)
+	var sound_test := Button.new()
+	sound_test.text = "TEST SOUND"
+	sound_test.custom_minimum_size = Vector2(0, 44)
+	sound_test.add_theme_font_size_override("font_size", 13)
+	sound_test.pressed.connect(_test_opening_sound)
+	copy.add_child(sound_test)
 	var begin := Button.new()
 	begin.text = "BEGIN"
 	begin.custom_minimum_size = Vector2(0, 58)
@@ -954,16 +960,48 @@ func _show_title_screen() -> void:
 	begin.pressed.connect(_start_opening_story)
 	copy.add_child(begin)
 	var note := Label.new()
-	note.text = "Cinematics may be skipped at any time."
+	note.text = "Tap TEST SOUND once. You should hear a clear bell."
 	note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	note.add_theme_font_size_override("font_size", 10)
 	note.add_theme_color_override("font_color", MUTED)
 	copy.add_child(note)
+	ui.title_sound_status = note
 	ui.top_bar.visible = false
 	ui.command_dock.visible = false
 	ui.guidance_panel.visible = false
 	begin.grab_focus()
 	_apply_responsive_layout()
+	call_deferred("_update_opening_audio_availability")
+
+func _update_opening_audio_availability() -> void:
+	if not ui.has("title_sound_status") or not is_instance_valid(ui.title_sound_status):
+		return
+	if _web_audio_state() == "missing":
+		ui.title_sound_status.text = "This browser cannot provide game audio. Open this link in Chrome or Safari."
+
+func _test_opening_sound() -> void:
+	AudioDirector.begin_story_context("appointment")
+	AudioDirector.unlock_audio()
+	await get_tree().process_frame
+	var played := AudioDirector.play_cue("sound_check", true)
+	var state := _web_audio_state()
+	if state == "running" and played:
+		ui.title_sound_status.text = "Sound enabled â€” you should hear one bell."
+	elif state == "suspended":
+		ui.title_sound_status.text = "Sound is blocked. Tap TEST SOUND once more."
+	elif state == "missing":
+		ui.title_sound_status.text = "This browser cannot provide game audio. Open this link in Chrome or Safari."
+	elif played:
+		ui.title_sound_status.text = "Sound check played. Raise your phoneâ€™s media volume if silent."
+	else:
+		ui.title_sound_status.text = "Sound check could not start."
+
+func _web_audio_state() -> String:
+	if not OS.has_feature("web"):
+		return "native"
+	var state = JavaScriptBridge.eval("window.__oldStablesGodotAudioContext ? window.__oldStablesGodotAudioContext.state : 'missing'", true)
+	return str(state)
 
 func _start_opening_story() -> void:
 	if portrait_layout:
@@ -972,16 +1010,16 @@ func _start_opening_story() -> void:
 	if opening_launching:
 		return
 	opening_launching = true
+	AudioDirector.begin_story_context("appointment")
+	AudioDirector.unlock_audio()
+	AudioDirector.play_cue("ui_confirm")
 	# Browser fullscreen and Web Audio both require a direct player gesture.
 	# Request fullscreen before yielding, while this button press still owns it.
 	if OS.has_feature("web") and mobile_landscape_layout:
 		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
-	AudioDirector.begin_story_context("appointment")
-	AudioDirector.unlock_audio()
 	# Give a suspended mobile AudioContext one frame to resume before the first
 	# audible confirmation and cinematic ambience are expected to be heard.
 	await get_tree().process_frame
-	AudioDirector.play_cue("ui_confirm")
 	if ui.has("title_screen") and is_instance_valid(ui.title_screen):
 		ui.title_screen.queue_free()
 	_start_prologue()

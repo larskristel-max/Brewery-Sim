@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { access } from "node:fs/promises";
+import { access, readFile } from "node:fs/promises";
 import test from "node:test";
 
 async function render() {
@@ -44,4 +44,12 @@ test("packages WebAssembly in sub-25 MB parts for Sites", async () => {
   await assert.rejects(
     access(new URL("../dist/client/game/index.wasm.gz", import.meta.url)),
   );
+});
+
+test("exposes the Godot Web Audio context for phone diagnostics", async () => {
+  const engine = await readFile(
+    new URL("../dist/client/game/index.js", import.meta.url),
+    "utf8",
+  );
+  assert.match(engine, /window\.__oldStablesGodotAudioContext=ctx/);
 });

@@ -72,7 +72,11 @@ func _process(_delta: float) -> void:
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_APPLICATION_FOCUS_OUT:
-		suspend_audio()
+		# Web fullscreen can briefly report focus loss while the browser moves the
+		# canvas. Pausing here leaves some mobile browsers silent after the move;
+		# the browser already suspends background tabs itself.
+		if not OS.has_feature("web"):
+			suspend_audio()
 	elif what == NOTIFICATION_APPLICATION_FOCUS_IN:
 		resume_audio()
 

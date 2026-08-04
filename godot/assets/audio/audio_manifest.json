@@ -42,6 +42,7 @@
     "ui_page_turn": {"bus": "UI", "streams": [{"path": "res://assets/audio/runtime/709961-hq-preview.ogg", "offset": 2.3, "duration": 0.8}, {"path": "res://assets/audio/runtime/709961-hq-preview.ogg", "offset": 4.4, "duration": 0.8}, {"path": "res://assets/audio/runtime/709961-hq-preview.ogg", "offset": 8.4, "duration": 0.8}], "volume_db": -18.0, "cooldown_ms": 130},
     "cinematic_advance": {"bus": "UI", "streams": [{"path": "res://assets/audio/runtime/353125-hq-preview.ogg", "duration": 0.38}], "volume_db": -31.0, "cooldown_ms": 90},
     "cinematic_skip": {"bus": "UI", "streams": [{"path": "res://assets/audio/runtime/369710-hq-preview.ogg", "duration": 0.55}], "volume_db": -20.0, "cooldown_ms": 150},
+    "sound_check": {"bus": "SFX", "streams": [{"path": "res://assets/audio/runtime/517610-hq-preview.ogg", "duration": 2.6}], "volume_db": -8.0, "cooldown_ms": 250},
     "contract_accept": {"bus": "UI", "streams": [{"path": "res://assets/audio/runtime/470710-hq-preview.ogg", "duration": 1.1}], "volume_db": -17.0, "cooldown_ms": 250},
     "contract_complete": {"bus": "UI", "streams": [{"path": "res://assets/audio/runtime/517610-hq-preview.ogg", "duration": 2.6}], "volume_db": -25.0, "cooldown_ms": 700},
     "contract_fail": {"bus": "UI", "streams": [{"path": "res://assets/audio/runtime/520143-hq-preview.ogg", "duration": 1.2}], "volume_db": -18.0, "cooldown_ms": 500},

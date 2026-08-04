@@ -146,6 +146,10 @@ $engineScript = $engineScript.Replace(
     'this.config.fileSizes[`${basePath}.wasm`]',
     $wasmPartSizeList
 )
+$engineScript = $engineScript.Replace(
+    'GodotAudio.ctx=ctx;',
+    'GodotAudio.ctx=ctx;window.__oldStablesGodotAudioContext=ctx;'
+)
 [System.IO.File]::WriteAllText($engineScriptPath, $engineScript)
 
 $exportHtml = [System.IO.File]::ReadAllText($exportPath)
