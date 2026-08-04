@@ -64,6 +64,8 @@ Untouched compressed source masters stored in the repository: 9,207,338 bytes (8
 
 `web-playtest/public/ios-audio-session-primer.mp3` is 0.5 seconds of machine-generated digital silence created locally with FFmpeg 6.0 (`anullsrc`, 22.05 kHz mono, MP3 at 32 kbit/s). It contains no third-party recording, composition or copyrightable performance. Older iOS Safari versions play it silently after the first deliberate tap to place Godot's Web Audio output on the media channel; modern iOS uses `navigator.audioSession.type = "playback"` instead. The file is 2,525 bytes with SHA-256 `7e02037d1e9cbf4de2be2439a81c2e4512c22998862142a1c847e85f3ab03e74`.
 
+The web build also copies the already-audited runtime MP3 files above to `web-playtest/public/browser-audio/`. These are byte-identical duplicates, not additional recordings. Safari on iPhone uses them through native HTML media elements when its Godot/Web Audio route remains inaudible. The duplicated compressed payload is 4,182,982 bytes.
+
 ## Rejected supplied candidates
 
 | Asset | Exact source / licence | Reason rejected |

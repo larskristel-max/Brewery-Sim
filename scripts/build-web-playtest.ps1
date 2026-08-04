@@ -52,6 +52,21 @@ if (Test-Path -LiteralPath $gameDirectory) {
 }
 New-Item -ItemType Directory -Path $gameDirectory -Force | Out-Null
 
+# iOS Safari can leave Godot's Web Audio graph running but inaudible. Keep the
+# audited MP3 masters available to the browser-native media fallback as well as
+# packing them into Godot's PCK.
+$browserAudioDirectory = Join-Path $sitePath "public\browser-audio"
+$resolvedBrowserAudioDirectory = [System.IO.Path]::GetFullPath($browserAudioDirectory)
+$resolvedSitePublic = [System.IO.Path]::GetFullPath((Join-Path $sitePath "public"))
+if (-not $resolvedBrowserAudioDirectory.StartsWith($resolvedSitePublic, [System.StringComparison]::OrdinalIgnoreCase)) {
+    throw "Refusing to prepare browser audio outside web-playtest/public."
+}
+if (Test-Path -LiteralPath $browserAudioDirectory) {
+    Remove-Item -LiteralPath $browserAudioDirectory -Recurse -Force
+}
+New-Item -ItemType Directory -Path $browserAudioDirectory -Force | Out-Null
+Copy-Item -Path (Join-Path $projectPath "assets\audio\runtime\*.mp3") -Destination $browserAudioDirectory
+
 $godot = Resolve-GodotExecutable -RequestedPath $GodotExecutable
 Write-Host "Exporting the single-threaded Old Stables browser build..."
 & $godot --headless --path $projectPath --export-release "Web Playtest" $exportPath
@@ -153,6 +168,8 @@ $engineScript = $engineScript.Replace(
 [System.IO.File]::WriteAllText($engineScriptPath, $engineScript)
 
 $exportHtml = [System.IO.File]::ReadAllText($exportPath)
+$audioBridgePath = Join-Path $sitePath "public\ios-audio-session.js"
+$audioBridgeVersion = (Get-FileHash -LiteralPath $audioBridgePath -Algorithm SHA256).Hash.Substring(0, 12).ToLowerInvariant()
 $exportHtml = $exportHtml.Replace(
     '<meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0">',
     @'
@@ -164,10 +181,10 @@ $exportHtml = $exportHtml.Replace(
 )
 $exportHtml = $exportHtml.Replace(
     '</head>',
-    @'
-		<script src="/ios-audio-session.js"></script>
+    @"
+		<script src="/ios-audio-session.js?v=$audioBridgeVersion"></script>
 	</head>
-'@.TrimEnd()
+"@.TrimEnd()
 )
 $partSizeEntries = @()
 for ($partIndex = 0; $partIndex -lt $wasmPartPaths.Count; $partIndex++) {

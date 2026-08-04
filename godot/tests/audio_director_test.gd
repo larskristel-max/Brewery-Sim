@@ -44,7 +44,8 @@ func _run() -> void:
 	await create_timer(0.08).timeout
 	_expect(director.current_ambience == "appointment", "Browser unlock lost the queued story ambience")
 	var unlocked_deck = director._ambience_players[director._active_ambience_index]
-	_expect(unlocked_deck.stream != null, "Browser unlock did not load the queued story ambience")
+	_expect(unlocked_deck.stream == null, "Continuous background ambience should remain silent after unlock")
+	_expect(director.active_ambience_player_count() == 0, "Continuous background ambience started after unlock")
 	_expect(director.play_cue("ui_press"), "Unlocked UI cue did not play")
 	_expect(director.play_cue("sound_check", true), "Opening sound-check cue did not resolve")
 	_expect(not director.play_cue("ui_press"), "Rapid-click cooldown did not limit an identical UI cue")

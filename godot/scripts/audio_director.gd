@@ -15,6 +15,10 @@ const DEFAULT_VOLUMES := {
 	"UI": 0.72,
 }
 const POOL_SIZE := 10
+# Continuous rain/fire room beds competed with reading and decision-making in
+# phone playtests. Keep the scene map for sparse environmental one-shots and
+# future opt-in mixing, but leave its looping layer silent by default.
+const CONTINUOUS_AMBIENCE_ENABLED := false
 
 var manifest: Dictionary = {}
 var era := "1901"
@@ -130,6 +134,7 @@ func _load_manifest() -> void:
 func unlock_audio() -> void:
 	if unlocked:
 		return
+	_browser_audio_call("unlock")
 	var pending_ambience := current_ambience
 	var pending_music := current_music
 	unlocked = true
@@ -174,9 +179,30 @@ func play_cue(cue_id: String, force := false) -> bool:
 		return false
 	var variant_index := _choose_variant(cue_id, variants.size())
 	var variant: Dictionary = variants[variant_index]
-	var stream := _load_stream(str(variant.get("path", "")), false)
+	var stream_path := str(variant.get("path", ""))
+	if stream_path.is_empty() or not ResourceLoader.exists(stream_path):
+		_missing_assets[cue_id] = stream_path if not stream_path.is_empty() else "missing path"
+		return false
+	var pitch := _rng.randf_range(0.975, 1.025)
+	if _use_browser_audio():
+		var browser_played := _browser_audio_call("playCue", {
+			"cue_id": cue_id,
+			"stream": stream_path,
+			"offset": float(variant.get("offset", 0.0)),
+			"duration": float(variant.get("duration", 0.0)),
+			"volume_db": float(cue.get("volume_db", -18.0)) + _rng.randf_range(-0.6, 0.6),
+			"pitch": pitch,
+			"bus": bus_name,
+			"double": bool(cue.get("double", false)),
+		})
+		if browser_played:
+			_last_played_ms[cue_id] = now
+			_last_variant[cue_id] = variant_index
+			_play_counts[cue_id] = int(_play_counts.get(cue_id, 0)) + 1
+		return browser_played
+	var stream := _load_stream(stream_path, false)
 	if stream == null:
-		_missing_assets[cue_id] = str(variant.get("path", "missing path"))
+		_missing_assets[cue_id] = stream_path
 		return false
 	var player := _claim_voice(cue_id)
 	if player == null:
@@ -184,7 +210,7 @@ func play_cue(cue_id: String, force := false) -> bool:
 	player.bus = bus_name
 	player.stream = stream
 	player.volume_db = float(cue.get("volume_db", -18.0)) + _rng.randf_range(-0.6, 0.6)
-	player.pitch_scale = _rng.randf_range(0.975, 1.025)
+	player.pitch_scale = pitch
 	_voice_cue[player.get_instance_id()] = cue_id
 	_last_played_ms[cue_id] = now
 	_last_variant[cue_id] = variant_index
@@ -246,7 +272,7 @@ func _on_voice_finished(player: AudioStreamPlayer) -> void:
 	_voice_cue.erase(player.get_instance_id())
 
 func set_ambience(environment_id: String, fade_seconds := 2.0) -> bool:
-	if environment_id == current_ambience and _ambience_players[_active_ambience_index].playing:
+	if environment_id == current_ambience and (not CONTINUOUS_AMBIENCE_ENABLED or _use_browser_audio() or _ambience_players[_active_ambience_index].playing):
 		return false
 	var definition := get_ambience_definition(environment_id)
 	if definition.is_empty():
@@ -257,9 +283,32 @@ func set_ambience(environment_id: String, fade_seconds := 2.0) -> bool:
 	var generation := _environment_generation
 	if not unlocked:
 		return true
-	var stream := _load_stream(str(definition.get("stream", "")), true)
+	if not CONTINUOUS_AMBIENCE_ENABLED:
+		_browser_audio_call("stopAmbience", {"fade_seconds": minf(fade_seconds, 0.25)})
+		for player in _ambience_players:
+			player.stop()
+			player.stream = null
+		_schedule_environment_one_shot(generation)
+		ambience_changed.emit(environment_id)
+		return true
+	var stream_path := str(definition.get("stream", ""))
+	if stream_path.is_empty() or not ResourceLoader.exists(stream_path):
+		_missing_assets[environment_id] = stream_path if not stream_path.is_empty() else "missing path"
+		return false
+	if _use_browser_audio():
+		var browser_started := _browser_audio_call("setAmbience", {
+			"environment_id": environment_id,
+			"stream": stream_path,
+			"volume_db": float(definition.get("volume_db", -20.0)),
+			"fade_seconds": fade_seconds,
+		})
+		if browser_started:
+			_schedule_environment_one_shot(generation)
+			ambience_changed.emit(environment_id)
+		return browser_started
+	var stream := _load_stream(stream_path, true)
 	if stream == null:
-		_missing_assets[environment_id] = str(definition.get("stream", "missing path"))
+		_missing_assets[environment_id] = stream_path
 		return false
 	var old_player := _ambience_players[_active_ambience_index]
 	_active_ambience_index = 1 - _active_ambience_index
@@ -282,6 +331,7 @@ func set_ambience(environment_id: String, fade_seconds := 2.0) -> bool:
 func stop_ambience(fade_seconds := 1.5) -> void:
 	current_ambience = ""
 	_environment_generation += 1
+	_browser_audio_call("stopAmbience", {"fade_seconds": fade_seconds})
 	for player in _ambience_players:
 		if player.playing:
 			var tween := create_tween()
@@ -289,7 +339,7 @@ func stop_ambience(fade_seconds := 1.5) -> void:
 			tween.tween_callback(player.stop)
 
 func set_music(music_id: String, fade_seconds := 4.0) -> bool:
-	if music_id == current_music and _music_players[_active_music_index].playing:
+	if music_id == current_music and (_use_browser_audio() or _music_players[_active_music_index].playing):
 		return false
 	var definition := get_music_definition(music_id)
 	current_music = music_id
@@ -298,9 +348,20 @@ func set_music(music_id: String, fade_seconds := 4.0) -> bool:
 		return false
 	if not unlocked:
 		return true
-	var stream := _load_stream(str(definition.get("stream", "")), false)
+	var stream_path := str(definition.get("stream", ""))
+	if stream_path.is_empty() or not ResourceLoader.exists(stream_path):
+		_missing_assets[music_id] = stream_path if not stream_path.is_empty() else "missing path"
+		return false
+	if _use_browser_audio():
+		return _browser_audio_call("setMusic", {
+			"music_id": music_id,
+			"stream": stream_path,
+			"volume_db": float(definition.get("volume_db", -24.0)),
+			"fade_seconds": fade_seconds,
+		})
+	var stream := _load_stream(stream_path, false)
 	if stream == null:
-		_missing_assets[music_id] = str(definition.get("stream", "missing path"))
+		_missing_assets[music_id] = stream_path
 		return false
 	var old_player := _music_players[_active_music_index]
 	_active_music_index = 1 - _active_music_index
@@ -318,6 +379,7 @@ func set_music(music_id: String, fade_seconds := 4.0) -> bool:
 
 func stop_music(fade_seconds := 2.0) -> void:
 	current_music = ""
+	_browser_audio_call("stopMusic", {"fade_seconds": fade_seconds})
 	for player in _music_players:
 		if player.playing:
 			var tween := create_tween()
@@ -421,6 +483,7 @@ func suspend_audio() -> void:
 	if _suspended:
 		return
 	_suspended = true
+	_browser_audio_call("suspend")
 	for player in _ambience_players + _music_players + _voice_players:
 		player.stream_paused = true
 
@@ -428,6 +491,7 @@ func resume_audio() -> void:
 	if not _suspended:
 		return
 	_suspended = false
+	_browser_audio_call("resume")
 	for player in _ambience_players + _music_players + _voice_players:
 		if is_instance_valid(player):
 			player.stream_paused = false
@@ -441,6 +505,7 @@ func stop_all_audio() -> void:
 	_environment_cues.clear()
 	_voice_deadline_ms.clear()
 	_pending_double_tails.clear()
+	_browser_audio_call("stopAll")
 	for player in _ambience_players + _music_players + _voice_players:
 		player.stop()
 		player.stream = null
@@ -455,6 +520,7 @@ func set_bus_volume_linear(bus_name: String, value: float, persist := true) -> v
 	AudioServer.set_bus_mute(index, linear <= 0.001)
 	if persist:
 		save_settings()
+	_sync_browser_settings()
 	settings_changed.emit()
 
 func get_bus_volume_linear(bus_name: String) -> float:
@@ -467,6 +533,7 @@ func set_interface_sounds_enabled(value: bool, persist := true) -> void:
 	interface_sounds_enabled = value
 	if persist:
 		save_settings()
+	_sync_browser_settings()
 	settings_changed.emit()
 
 func save_settings() -> void:
@@ -486,6 +553,35 @@ func load_settings() -> void:
 		var value := fallback if error != OK else float(config.get_value("audio", bus_name.to_lower(), fallback))
 		set_bus_volume_linear(bus_name, value, false)
 	interface_sounds_enabled = true if error != OK else bool(config.get_value("audio", "interface_sounds", true))
+	_sync_browser_settings()
+
+func _use_browser_audio() -> bool:
+	if not OS.has_feature("web"):
+		return false
+	return bool(JavaScriptBridge.eval("Boolean(window.__oldStablesBrowserAudio && window.__oldStablesBrowserAudio.isIOS)", true))
+
+func _browser_audio_call(method: String, payload: Dictionary = {}) -> bool:
+	if not _use_browser_audio():
+		return false
+	var method_json := JSON.stringify(method)
+	var payload_json := JSON.stringify(payload)
+	var result = JavaScriptBridge.eval(
+		"window.__oldStablesBrowserAudio[%s](%s)" % [method_json, payload_json],
+		true
+	)
+	return true if result == null else bool(result)
+
+func _sync_browser_settings() -> void:
+	if not _use_browser_audio():
+		return
+	_browser_audio_call("syncSettings", {
+		"Master": get_bus_volume_linear("Master"),
+		"Music": get_bus_volume_linear("Music"),
+		"Ambience": get_bus_volume_linear("Ambience"),
+		"SFX": get_bus_volume_linear("SFX"),
+		"UI": get_bus_volume_linear("UI"),
+		"interfaceSounds": interface_sounds_enabled,
+	})
 
 func get_cue_definition(cue_id: String) -> Dictionary:
 	return manifest.get("cues", {}).get(cue_id, {})
